@@ -2,7 +2,8 @@ import { DataProvider } from "@opencode-ai/session-ui/context"
 import { showToast } from "@/utils/toast"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { useLocation, useNavigate, useParams } from "@solidjs/router"
-import { type Accessor, createEffect, createMemo, createResource, onCleanup, type ParentProps, Show } from "solid-js"
+import { type Accessor, createEffect, createMemo, createResource, onCleanup, onMount, type ParentProps, Show } from "solid-js"
+import { makeEventListener } from "@solid-primitives/event-listener"
 import { useLanguage } from "@/context/language"
 import { LocalProvider } from "@/context/local"
 import { SDKProvider } from "@/context/sdk"
@@ -55,6 +56,26 @@ export function DirectoryDataProvider(
     if (!sessionID) return
     serverSync().session.pin(sessionID)
     onCleanup(() => serverSync().session.unpin(sessionID))
+  })
+
+  // Returning from background (mobile app switch, bfcache restore) loses SSE updates emitted
+  // while suspended; re-fetch the open session's content once so no tab switching is needed.
+  onMount(() => {
+    const foreground = () => {
+      const id = params.id
+      if (!id) return
+      void sync()
+        .session.sync(id, { force: true })
+        .catch(() => {})
+    }
+    makeEventListener(document, "visibilitychange", () => {
+      if (document.visibilityState !== "visible") return
+      foreground()
+    })
+    makeEventListener(window, "pageshow", (event) => {
+      if (!event.persisted) return
+      foreground()
+    })
   })
 
   return (

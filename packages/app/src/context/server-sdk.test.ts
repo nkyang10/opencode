@@ -1,17 +1,20 @@
 import { describe, expect, test } from "bun:test"
-import { adaptServerEvent, coalesceServerEvents, enqueueServerEvent, resumeStreamAfterPageShow } from "./server-sdk"
+import { STREAM_STALE_MS, adaptServerEvent, coalesceServerEvents, enqueueServerEvent, shouldRestartStream } from "./server-sdk"
 import type { OpenCodeEvent } from "@opencode-ai/client/promise"
 import type { Event } from "@opencode-ai/sdk/v2/client"
 
-describe("resumeStreamAfterPageShow", () => {
-  test("restarts a stream only after a back-forward cache restore", () => {
-    let starts = 0
-    const start = () => starts++
+describe("shouldRestartStream", () => {
+  test("restarts a stream that never started", () => {
+    expect(shouldRestartStream(false, 0, 1_000)).toBe(true)
+  })
 
-    resumeStreamAfterPageShow({ persisted: false } as PageTransitionEvent, start)
-    resumeStreamAfterPageShow({ persisted: true } as PageTransitionEvent, start)
+  test("keeps a stream that delivered an event within the heartbeat window", () => {
+    expect(shouldRestartStream(true, 9_000, 10_000)).toBe(false)
+  })
 
-    expect(starts).toBe(1)
+  test("restarts a stream silent beyond the heartbeat window", () => {
+    expect(shouldRestartStream(true, 0, STREAM_STALE_MS + 1)).toBe(true)
+    expect(shouldRestartStream(true, STREAM_STALE_MS - 1, 1_000_000)).toBe(true)
   })
 })
 

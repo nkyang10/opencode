@@ -159,9 +159,12 @@ function currentDeltaFragment(event: CurrentDelta) {
   return event.type === "session.compaction.delta" ? event.data.text : event.data.delta
 }
 
-export function resumeStreamAfterPageShow(event: PageTransitionEvent, start: () => unknown) {
-  if (!event.persisted) return
-  start()
+export const STREAM_STALE_MS = 20_000
+
+// Both SSE streams (v1 global + v2 instance) emit a server.heartbeat every 10 s,
+// so a healthy connection is never silent beyond this window; silence means it died.
+export function shouldRestartStream(running: boolean, lastEventAt: number, now: number) {
+  return !running || now - lastEventAt > STREAM_STALE_MS
 }
 
 type ServerEventEmitter = ReturnType<typeof createGlobalEmitter<{ [key: string]: ServerEvent }>>
@@ -256,6 +259,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
   let run: Promise<void> | undefined
   let started = false
   let generation = 0
+  let lastEventAt = 0
 
   const start = () => {
     if (started) return run
@@ -280,6 +284,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
           let yielded = Date.now()
           for await (const event of events) {
             streamErrorLogged = false
+            lastEventAt = Date.now()
             const legacy = "payload" in event
             if (legacy && event.payload.type === "sync") continue
             const directory = legacy ? (event.directory ?? "global") : (event.location?.directory ?? "global")
@@ -322,9 +327,25 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     attempt?.abort()
   }
 
+  // Foreground resume: a healthy stream needs no action (heartbeats keep lastEventAt fresh);
+  // a dead or never-started stream is restarted, which re-emits server.connected and drives
+  // the connected-time refresh path. Mobile suspension kills the socket without erroring it.
+  const resume = () => {
+    if (started && !shouldRestartStream(true, lastEventAt, Date.now())) return run
+    stop()
+    return start()
+  }
+
   onMount(() => {
     makeEventListener(window, "pagehide", stop)
-    makeEventListener(window, "pageshow", (event) => resumeStreamAfterPageShow(event, start))
+    makeEventListener(window, "pageshow", (event) => {
+      if (!event.persisted) return
+      void resume()
+    })
+    makeEventListener(document, "visibilitychange", () => {
+      if (document.visibilityState !== "visible") return
+      void resume()
+    })
   })
 
   onCleanup(() => {
