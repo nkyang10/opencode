@@ -4,14 +4,23 @@ import { HttpEffect, HttpRouter, HttpServerRequest, HttpServerResponse } from "e
 import { HttpApiError, HttpApiMiddleware } from "effect/unstable/httpapi"
 import { hasPtyConnectTicketURL } from "@/server/shared/pty-ticket"
 import { isPublicUIPath } from "@/server/shared/public-ui"
+import { loginPageHTML } from "@/server/shared/login"
 export {
   Authorization as ServerAuthorization,
   authorizationLayer as serverAuthorizationLayer,
+} from "@opencode-ai/server/middleware/authorization"
+import {
+  cookieAuthToken,
+  isLoginPath,
 } from "@opencode-ai/server/middleware/authorization"
 
 const AUTH_TOKEN_QUERY = "auth_token"
 const UNAUTHORIZED = 401
 const WWW_AUTHENTICATE = 'Basic realm="Secure Area"'
+
+function isBrowserRequest(request: HttpServerRequest.HttpServerRequest) {
+  return /text\/html/i.test(request.headers.accept ?? "")
+}
 
 // Avoid HttpApiSecurity alternatives here: Effect security middleware wraps the
 // full handler, so a downstream failure can make the next auth alternative run
@@ -79,23 +88,9 @@ function credentialFromURL(url: URL, request: HttpServerRequest.HttpServerReques
   if (token) return decodeCredential(token)
   const match = /^Basic\s+(.+)$/i.exec(request.headers.authorization ?? "")
   if (match) return decodeCredential(match[1])
+  const cookie = cookieAuthToken(request)
+  if (cookie) return decodeCredential(cookie)
   return Effect.succeed(emptyCredential())
-}
-
-function validateRawCredential<A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-  credential: ServerAuth.DecodedCredentials,
-  config: ServerAuth.Info,
-) {
-  if (!ServerAuth.required(config)) return effect
-  if (!ServerAuth.authorized(credential, config))
-    return Effect.succeed(
-      HttpServerResponse.empty({
-        status: UNAUTHORIZED,
-        headers: { "www-authenticate": WWW_AUTHENTICATE },
-      }),
-    )
-  return effect
 }
 
 export const authorizationRouterMiddleware = HttpRouter.middleware()(
@@ -107,10 +102,23 @@ export const authorizationRouterMiddleware = HttpRouter.middleware()(
       Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest
         const url = new URL(request.url, "http://localhost")
-        if (isPublicUIPath(request.method, url.pathname)) return yield* effect
-        return yield* credentialFromURL(url, request).pipe(
-          Effect.flatMap((credential) => validateRawCredential(effect, credential, config)),
-        )
+        if (isPublicUIPath(request.method, url.pathname) || isLoginPath(request.method, url.pathname))
+          return yield* effect
+        if (!ServerAuth.required(config)) return yield* effect
+        const credential = yield* credentialFromURL(url, request)
+        if (ServerAuth.authorized(credential, config)) return yield* effect
+        // Global failure path: a browser navigation gets the login landing page
+        // (carrying the original path so we can redirect back after a successful
+        // sign-in). Non-browser clients keep the plain 401.
+        if (isBrowserRequest(request)) {
+          const next = `${url.pathname}${url.search}`
+          const page = HttpServerResponse.html(loginPageHTML({ next }))
+          return HttpServerResponse.setStatus(page, UNAUTHORIZED)
+        }
+        return HttpServerResponse.empty({
+          status: UNAUTHORIZED,
+          headers: { "www-authenticate": WWW_AUTHENTICATE },
+        })
       })
   }),
 )

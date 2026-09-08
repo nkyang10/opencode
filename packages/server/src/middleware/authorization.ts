@@ -26,12 +26,50 @@ function decodeCredential(input: string) {
   )
 }
 
+// -- Landing-page auth (FE-001): a persistent auth cookie so the login survives
+// iOS "Add to Home Screen" shortcuts and restarts. Value is the same
+// base64(user:pass) token used by the Basic `Authorization` header.
+export const AUTH_COOKIE = "oc_creds"
+export const AUTH_COOKIE_MAX_AGE_SECONDS = 365 * 24 * 60 * 60
+
+export function parseCookies(request: HttpServerRequest.HttpServerRequest): ReadonlyMap<string, string> {
+  const header = request.headers.cookie ?? ""
+  const cookies = new Map<string, string>()
+  for (const part of header.split(";")) {
+    const eq = part.indexOf("=")
+    if (eq === -1) continue
+    cookies.set(part.slice(0, eq).trim(), part.slice(eq + 1).trim())
+  }
+  return cookies
+}
+
+export function cookieAuthToken(request: HttpServerRequest.HttpServerRequest): string | null {
+  return parseCookies(request).get(AUTH_COOKIE) ?? null
+}
+
+export function authCookieHeader(username: string, password: string, remember: boolean): string {
+  const token = Buffer.from(`${username}:${password}`).toString("base64")
+  const maxAge = remember ? `; Max-Age=${AUTH_COOKIE_MAX_AGE_SECONDS}` : ""
+  return `${AUTH_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax${maxAge}`
+}
+
+export function clearAuthCookieHeader(): string {
+  return `${AUTH_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
+}
+
+// The landing page / logout endpoints are reachable without credentials.
+export function isLoginPath(method: string, pathname: string): boolean {
+  return method === "GET" && (pathname === "/login" || pathname === "/logout") || method === "POST" && pathname === "/login"
+}
+
 function credentialFromRequest(request: HttpServerRequest.HttpServerRequest) {
   const url = new URL(request.url, "http://localhost")
   const token = url.searchParams.get(AUTH_TOKEN_QUERY)
   if (token) return decodeCredential(token)
   const match = /^Basic\s+(.+)$/i.exec(request.headers.authorization ?? "")
   if (match) return decodeCredential(match[1])
+  const cookie = cookieAuthToken(request)
+  if (cookie) return decodeCredential(cookie)
   return Effect.succeed(emptyCredential())
 }
 

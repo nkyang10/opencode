@@ -69,6 +69,7 @@ import * as SessionExecutionLocal from "@opencode-ai/core/session/execution/loca
 import { lazy } from "@/util/lazy"
 import { CorsConfig, isAllowedCorsOrigin, type CorsOptions } from "@opencode-ai/server/cors"
 import { serveUIEffect } from "@/server/shared/ui"
+import { loginPage, loginSubmit, logout } from "@/server/shared/login"
 import { ServerAuth } from "@/server/auth"
 import { InstanceHttpApi, RootHttpApi } from "./api"
 import { Api } from "@opencode-ai/server/api"
@@ -196,11 +197,18 @@ const uiRoute = HttpRouter.use((router) =>
     const fs = yield* FSUtil.Service
     const client = yield* HttpClient.HttpClient
     const flags = yield* RuntimeFlags.Service
+    const serverAuthConfig = yield* ServerAuth.Config
+    // FE-001: auth landing page. These routes bypass the auth router middleware
+    // (see isLoginPath) and are added before the SPA catch-all.
+    yield* router.add("GET", "/login", (request) => loginPage(request))
+    yield* router.add("POST", "/login", (request) => loginSubmit(request, serverAuthConfig))
+    yield* router.add("GET", "/logout", () => logout())
     yield* router.add("*", "/*", (request) =>
       serveUIEffect(request, { fs, client, disableEmbeddedWebUi: flags.disableEmbeddedWebUi }),
     )
   }),
-).pipe(Layer.provide(authOnlyRouterLayer))
+)
+  .pipe(Layer.provide(authOnlyRouterLayer), Layer.provide(ServerAuth.Config.layer))
 
 type RouteRequirements =
   | HttpRouter.HttpRouter

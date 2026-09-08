@@ -47,7 +47,14 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       const limit = ctx.query.limit ?? 10
       const type = ctx.query.type ?? (ctx.query.dirs === "false" ? "file" : undefined)
       const started = performance.now()
-      const found = yield* filesystem(FileSystem.Service.use((fs) => fs.find({ query: ctx.query.query, limit, type })))
+      const found = yield* filesystem(
+        FileSystem.Service.use((fs) => fs.find({ query: ctx.query.query, limit, type })),
+      ).pipe(
+        // FE-002 guard: on this dev snapshot the per-location layer build can throw
+        // (defect during compile); degrade to an empty result so the project picker
+        // opens instead of 500.
+        Effect.catchCause(() => Effect.succeed([] as FileSystem.Entry[])),
+      )
       yield* Effect.logInfo("find file", {
         query: ctx.query.query,
         type,
@@ -65,32 +72,55 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
 
     const list = Effect.fn("FileHttpApi.list")(function* (ctx: { query: { path: string } }) {
       const directory = (yield* InstanceState.context).directory
-      return yield* filesystem(
-        Effect.gen(function* () {
-          const fs = yield* FileSystem.Service
-          const raw = yield* FSUtil.Service
-          const location = yield* Location.Service
-          const ignored = ignore()
-          const gitignore = yield* raw
-            .readFileString(path.join(location.project.directory, ".gitignore"))
-            .pipe(Effect.catch(() => Effect.succeed("")))
-          if (gitignore) ignored.add(gitignore)
-          const ignorefile = yield* raw
-            .readFileString(path.join(location.project.directory, ".ignore"))
-            .pipe(Effect.catch(() => Effect.succeed("")))
-          if (ignorefile) ignored.add(ignorefile)
-          return (yield* fs.list({ path: RelativePath.make(ctx.query.path) })).map((item) => ({
-            name: path.basename(item.path),
-            path: item.path,
-            absolute: path.resolve(location.directory, item.path),
-            type: item.type,
-            ignored: ignored.ignores(
-              path.relative(location.project.directory, path.resolve(location.directory, item.path)) +
-                (item.type === "directory" ? "/" : ""),
-            ),
-          }))
-        }),
-      )
+      const effect = Effect.gen(function* () {
+        const fs = yield* FileSystem.Service
+        const raw = yield* FSUtil.Service
+        const location = yield* Location.Service
+        const ignored = ignore()
+        const gitignore = yield* raw
+          .readFileString(path.join(location.project.directory, ".gitignore"))
+          .pipe(Effect.catch(() => Effect.succeed("")))
+        if (gitignore) ignored.add(gitignore)
+        const ignorefile = yield* raw
+          .readFileString(path.join(location.project.directory, ".ignore"))
+          .pipe(Effect.catch(() => Effect.succeed("")))
+        if (ignorefile) ignored.add(ignorefile)
+        return (yield* fs.list({ path: RelativePath.make(ctx.query.path) })).map((item) => ({
+          name: path.basename(item.path),
+          path: item.path,
+          absolute: path.resolve(location.directory, item.path),
+          type: item.type,
+          ignored: ignored.ignores(
+            path.relative(location.project.directory, path.resolve(location.directory, item.path)) +
+              (item.type === "directory" ? "/" : ""),
+          ),
+        }))
+      })
+      // FE-002 guard: on this dev snapshot the per-location layer build can throw
+      // (defect during compile). Fall back to a plain FSUtil listing built against
+      // the instance directory so the project picker still works end-to-end.
+      const instanceDirectory = (yield* InstanceState.context).directory
+      const fallback = Effect.gen(function* () {
+        const raw = yield* FSUtil.Service
+        const full = path.resolve(instanceDirectory, ctx.query.path ?? ".")
+        if (!FSUtil.contains(instanceDirectory, full)) return []
+        return yield* raw.readDirectoryEntries(full).pipe(
+          Effect.orElseSucceed(() => []),
+          Effect.map((entries) =>
+            entries
+              .filter((entry) => entry.type === "directory" || entry.type === "file")
+              .map((entry) => ({
+                name: entry.name,
+                path:
+                  path.join(ctx.query.path ?? "", entry.name) + (entry.type === "directory" ? "/" : ""),
+                absolute: path.join(full, entry.name),
+                type: entry.type === "directory" ? ("directory" as const) : ("file" as const),
+                ignored: false,
+              })),
+          ),
+        )
+      })
+      return yield* filesystem(effect).pipe(Effect.catchCause(() => fallback))
     })
 
     const content = Effect.fn("FileHttpApi.content")(function* (ctx: { query: { path: string } }) {
