@@ -7,7 +7,7 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
-import { ServerConnection } from "@/context/server"
+import { ServerConnection, useServer } from "@/context/server"
 import type { Path } from "@opencode-ai/sdk/v2/client"
 import {
   absoluteTreePath,
@@ -40,9 +40,20 @@ interface DialogSelectDirectoryV2Props {
   start?: string
 }
 
+function tappedRowPath(event: MouseEvent) {
+  for (const node of event.composedPath()) {
+    if (node instanceof HTMLElement) {
+      const path = node.dataset.itemPath
+      if (typeof path === "string" && path) return path
+    }
+  }
+  return undefined
+}
+
 export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
   const global = useGlobal()
   const { sync, sdk } = global.ensureServerCtx(props.server)
+  const server = useServer()
   const dialog = useDialog()
   const language = useLanguage()
   const policy = pickerMode(props.mode ?? "directory", props.start)
@@ -79,13 +90,15 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
     { initialValue: undefined },
   )
   const home = createMemo(() => sync.data.path.home || fallbackPath()?.home || "")
+  const lastOpened = () => server.projects.forServer(ServerConnection.key(props.server)).last() ?? ""
   const start = createMemo(
     () =>
       props.start ||
-      sync.data.path.home ||
+      lastOpened() ||
       sync.data.path.directory ||
-      fallbackPath()?.home ||
-      fallbackPath()?.directory,
+      sync.data.path.home ||
+      fallbackPath()?.directory ||
+      fallbackPath()?.home,
   )
   const search = createDirectorySearch({ sdk, home, base: () => root() || start() })
   const [suggestions] = createResource(input, async (value) => {
@@ -273,6 +286,19 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
     if (!container) return
     tree.render({ containerWrapper: container })
     tree.getFileTreeContainer()?.classList.add("directory-picker-v2-tree")
+
+    // @pierre/trees toggles selection only on modifier-click; on touch there is no
+    // modifier, so intercept a plain tap on the highlighted row to unhighlight it.
+    const onContainerClick = (event: Event) => {
+      if (!(event instanceof MouseEvent) || event.button !== 0) return
+      const path = tappedRowPath(event)
+      if (!path) return
+      if (policy.selection(root(), path) !== selected()) return
+      tree?.getItem(path)?.deselect()
+      event.stopPropagation()
+    }
+    container.addEventListener("click", onContainerClick, true)
+    onCleanup(() => container?.removeEventListener("click", onContainerClick, true))
   })
 
   createEffect(() => {
