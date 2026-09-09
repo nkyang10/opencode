@@ -1033,6 +1033,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Show system notification when a permission is required",
   "settings.general.notifications.errors.title": "Errors",
   "settings.general.notifications.errors.description": "Show system notification when an error occurs",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
 
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "Play sound when the agent is complete or needs attention",

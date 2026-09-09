@@ -1062,6 +1062,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Rodyti sistemos pranešimą, kai reikalingas leidimas",
   "settings.general.notifications.errors.title": "Klaidos",
   "settings.general.notifications.errors.description": "Rodyti sistemos pranešimą, kai įvyksta klaida",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Agentas",
   "settings.general.sounds.agent.description": "Leisti garsą, kai agentas baigtas arba jam reikia dėmesio",
   "settings.general.sounds.permissions.title": "Leidimai",

@@ -9,6 +9,7 @@ import { createBrowserDraftStore } from "@/utils/draft-store"
 import { dict as en } from "@/i18n/en"
 import { dict as zh } from "@/i18n/zh"
 import { authFromToken } from "@/utils/server"
+import { webPushSupported } from "@/utils/web-push"
 import pkg from "../package.json"
 import { ServerConnection } from "./context/server"
 
@@ -160,6 +161,9 @@ if (root instanceof HTMLElement) {
         url: getCurrentUrl(),
         ...auth,
       },
+    }
+    if (webPushSupported() && !location.hostname.includes("opencode.ai")) {
+      void navigator.serviceWorker.register("/sw.js").catch(() => {})
     }
     render(
       () => (

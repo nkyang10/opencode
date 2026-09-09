@@ -8,6 +8,7 @@ export interface NotificationSettings {
   agent: boolean
   permissions: boolean
   errors: boolean
+  webPush: boolean
 }
 
 export interface SoundSettings {
@@ -210,6 +211,7 @@ const defaultSettings: Settings = {
     agent: true,
     permissions: true,
     errors: false,
+    webPush: false,
   },
   sounds: {
     agentEnabled: true,
@@ -511,6 +513,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         errors: withFallback(() => store.notifications?.errors, defaultSettings.notifications.errors),
         setErrors(value: boolean) {
           setStore("notifications", "errors", value)
+        },
+        webPush: withFallback(() => store.notifications?.webPush, defaultSettings.notifications.webPush),
+        setWebPush(value: boolean) {
+          setStore("notifications", "webPush", value)
         },
       },
       sounds: {

@@ -70,7 +70,9 @@ import { lazy } from "@/util/lazy"
 import { CorsConfig, isAllowedCorsOrigin, type CorsOptions } from "@opencode-ai/server/cors"
 import { serveUIEffect } from "@/server/shared/ui"
 import { loginPage, loginSubmit, logout } from "@/server/shared/login"
+import { pushRoute } from "@/server/push/route"
 import { ServerAuth } from "@/server/auth"
+import { Push } from "@/push/push"
 import { InstanceHttpApi, RootHttpApi } from "./api"
 import { Api } from "@opencode-ai/server/api"
 import { PublicApi } from "./public"
@@ -269,6 +271,7 @@ const app = LayerNode.group([
   ShareNext.node,
   SessionShare.node,
   InstanceStore.node,
+  Push.node,
   httpClient,
   EventV2.node,
   ProjectV2.node,
@@ -288,6 +291,7 @@ export function createRoutes(
     instanceRoutes,
     serverRoutes,
     docRoute,
+    pushRoute,
     uiRoute,
   ).pipe(
     Layer.provide([

@@ -1133,6 +1133,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Tampilkan notifikasi sistem saat izin diperlukan",
   "settings.general.notifications.errors.title": "Kesalahan",
   "settings.general.notifications.errors.description": "Tampilkan notifikasi sistem saat terjadi kesalahan",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
 
   "settings.general.sounds.agent.title": "Agen",
   "settings.general.sounds.agent.description": "Mainkan suara saat agen selesai atau memerlukan perhatian",

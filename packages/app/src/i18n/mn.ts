@@ -1058,6 +1058,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Зөвшөөрөл шаардлагатай үед системийн мэдэгдлийг харуулах",
   "settings.general.notifications.errors.title": "Алдаа",
   "settings.general.notifications.errors.description": "Алдаа гарсан үед системийн мэдэгдлийг харуулах",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Агент",
   "settings.general.sounds.agent.description":
     "Агент бүрэн дууссан эсвэл анхаарал хандуулах шаардлагатай үед дууг тоглуулаарай",

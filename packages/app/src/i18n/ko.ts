@@ -682,6 +682,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "권한이 필요할 때 시스템 알림 표시",
   "settings.general.notifications.errors.title": "오류",
   "settings.general.notifications.errors.description": "오류가 발생했을 때 시스템 알림 표시",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "에이전트",
   "settings.general.sounds.agent.description": "에이전트가 완료되거나 주의가 필요할 때 소리 재생",
   "settings.general.sounds.permissions.title": "권한",

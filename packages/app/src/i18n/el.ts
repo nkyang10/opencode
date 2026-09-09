@@ -1063,6 +1063,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Εμφάνιση ειδοποίησης συστήματος όταν απαιτείται άδεια",
   "settings.general.notifications.errors.title": "Σφάλματα",
   "settings.general.notifications.errors.description": "Εμφάνιση ειδοποίησης συστήματος όταν παρουσιαστεί σφάλμα",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Πράκτορας",
   "settings.general.sounds.agent.description": "Αναπαραγωγή ήχου όταν ο πράκτορας είναι πλήρης ή χρειάζεται προσοχή",
   "settings.general.sounds.permissions.title": "Δικαιώματα",

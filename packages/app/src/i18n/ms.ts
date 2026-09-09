@@ -1048,6 +1048,9 @@ export const dict = {
     "Tunjukkan pemberitahuan sistem apabila kebenaran diperlukan",
   "settings.general.notifications.errors.title": "Ralat",
   "settings.general.notifications.errors.description": "Tunjukkan pemberitahuan sistem apabila ralat berlaku",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Ejen",
   "settings.general.sounds.agent.description": "Mainkan bunyi apabila ejen selesai atau memerlukan perhatian",
   "settings.general.sounds.permissions.title": "Kebenaran",

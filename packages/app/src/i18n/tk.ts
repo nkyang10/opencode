@@ -1050,6 +1050,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Rugsat talap edilende ulgam habarnamasyny görkeziň",
   "settings.general.notifications.errors.title": "Rorsalňyşlyklar",
   "settings.general.notifications.errors.description": "Ýalňyşlyk ýüze çykanda ulgam habarnamasyny görkeziň",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "Agent doly bolanda ýa-da ünsi talap edende ses çalyň",
   "settings.general.sounds.permissions.title": "Rugsatlar",

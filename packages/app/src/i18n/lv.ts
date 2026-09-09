@@ -1053,6 +1053,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Rādīt sistēmas paziņojumu, kad nepieciešama atļauja",
   "settings.general.notifications.errors.title": "Kļūdas",
   "settings.general.notifications.errors.description": "Rādīt sistēmas paziņojumu, kad notiek kļūda",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Aģents",
   "settings.general.sounds.agent.description": "Atskaņot skaņu, kad aģents ir pabeigts vai nepieciešama uzmanība",
   "settings.general.sounds.permissions.title": "Atļaujas",

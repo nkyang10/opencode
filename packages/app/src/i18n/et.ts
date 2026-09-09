@@ -1042,6 +1042,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Kuva süsteemi teatis, kui luba on vaja",
   "settings.general.notifications.errors.title": "Vead",
   "settings.general.notifications.errors.description": "Kuva tõrke korral süsteemi teatis",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "Esitage heli, kui agent on valmis või vajab tähelepanu",
   "settings.general.sounds.permissions.title": "load",

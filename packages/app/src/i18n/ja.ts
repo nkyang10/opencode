@@ -957,6 +957,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "権限が必要な場合にシステム通知を表示します",
   "settings.general.notifications.errors.title": "エラー",
   "settings.general.notifications.errors.description": "エラーが発生した場合にシステム通知を表示します",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "エージェント",
   "settings.general.sounds.agent.description": "エージェントが完了したか、注意が必要な場合に音を再生します",
   "settings.general.sounds.permissions.title": "権限",

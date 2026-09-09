@@ -1014,6 +1014,8 @@ export const dict = {
   "settings.general.notifications.permissions.description": "当需要权限时显示系统通知",
   "settings.general.notifications.errors.title": "错误",
   "settings.general.notifications.errors.description": "发生错误时显示系统通知",
+  "settings.general.notifications.webPush.title": "后台通知",
+  "settings.general.notifications.webPush.description": "即使标签页已关闭，任务完成时也会收到通知",
   "settings.general.sounds.agent.title": "智能体",
   "settings.general.sounds.agent.description": "当智能体完成或需要注意时播放声音",
   "settings.general.sounds.permissions.title": "权限",

@@ -1149,6 +1149,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Показувати системне сповіщення, коли потрібен дозвіл",
   "settings.general.notifications.errors.title": "Помилки",
   "settings.general.notifications.errors.description": "Показувати системне сповіщення, коли виникає помилка",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
 
   "settings.general.sounds.agent.title": "Агент",
   "settings.general.sounds.agent.description": "Відтворювати звук, коли агент завершує роботу або потребує уваги",

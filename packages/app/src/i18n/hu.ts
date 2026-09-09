@@ -1059,6 +1059,9 @@ export const dict = {
     "Rendszerértesítés megjelenítése, ha engedélyre van szükség",
   "settings.general.notifications.errors.title": "Hibák",
   "settings.general.notifications.errors.description": "Rendszerértesítés megjelenítése hiba esetén",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Ügynök",
   "settings.general.sounds.agent.description": "Hang lejátszása, ha az ügynök befejeződött vagy figyelmet igényel",
   "settings.general.sounds.permissions.title": "Engedélyek",

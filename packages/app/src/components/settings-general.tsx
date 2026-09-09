@@ -1,4 +1,4 @@
-import { Component, Show, createMemo, createResource, onMount, type JSX } from "solid-js"
+import { Component, Show, createMemo, createResource, createSignal, onMount, type JSX } from "solid-js"
 import { Button } from "@opencode-ai/ui/button"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Select } from "@opencode-ai/ui/select"
@@ -31,6 +31,7 @@ import { decode64 } from "@/utils/base64"
 import { playSoundById, SOUND_OPTIONS } from "@/utils/sound"
 import { ExternalLink } from "./external-link"
 import { SettingsList } from "./settings-list"
+import { disableWebPush, enableWebPush, webPushSupported } from "@/utils/web-push"
 
 let demoSoundState = {
   cleanup: undefined as (() => void) | undefined,
@@ -92,6 +93,18 @@ export const SettingsGeneral: Component = () => {
   const settings = useSettings()
 
   const updater = useUpdaterAction()
+
+  const [webPushBusy, setWebPushBusy] = createSignal(false)
+
+  const selectWebPush = async (checked: boolean) => {
+    setWebPushBusy(true)
+    try {
+      const ok = checked ? await enableWebPush() : await disableWebPush()
+      if (ok) settings.notifications.setWebPush(checked)
+    } finally {
+      setWebPushBusy(false)
+    }
+  }
 
   const linux = createMemo(() => platform.platform === "desktop" && platform.os === "linux")
   const dir = createMemo(() => decode64(params.dir))
@@ -611,6 +624,21 @@ export const SettingsGeneral: Component = () => {
             <Switch
               checked={settings.notifications.errors()}
               onChange={(checked) => settings.notifications.setErrors(checked)}
+            />
+          </div>
+        </SettingsRow>
+
+        <SettingsRow
+          title={language.t("settings.general.notifications.webPush.title")}
+          description={language.t("settings.general.notifications.webPush.description")}
+        >
+          <div data-action="settings-notifications-webpush">
+            <Switch
+              checked={settings.notifications.webPush()}
+              disabled={webPushBusy() || !webPushSupported()}
+              onChange={(checked) => {
+                selectWebPush(checked)
+              }}
             />
           </div>
         </SettingsRow>

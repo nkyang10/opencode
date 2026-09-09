@@ -1047,6 +1047,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "სისტემის შეტყობინების ჩვენება, როცა საჭიროა ნებართვა",
   "settings.general.notifications.errors.title": "შეცდომები",
   "settings.general.notifications.errors.description": "სისტემის შეტყობინების ჩვენება შეცდომის დადგომისას",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "აგენტი",
   "settings.general.sounds.agent.description": "ხმის დაკვრა, როცა აგენტი დასრულებულია ან საჭიროებს ყურადღებას",
   "settings.general.sounds.permissions.title": "ნებართვები",

@@ -976,6 +976,9 @@ export const dict = {
     "Pokaż powiadomienie systemowe, gdy wymagane jest uprawnienie",
   "settings.general.notifications.errors.title": "Błędy",
   "settings.general.notifications.errors.description": "Pokaż powiadomienie systemowe, gdy wystąpi błąd",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "Odtwórz dźwięk, gdy agent zakończy pracę lub wymaga uwagi",
   "settings.general.sounds.permissions.title": "Uprawnienia",

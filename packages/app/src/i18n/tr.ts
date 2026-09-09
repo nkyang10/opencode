@@ -1049,6 +1049,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "İzin gerektiğinde sistem bildirimi göster",
   "settings.general.notifications.errors.title": "Hatalar",
   "settings.general.notifications.errors.description": "Hata oluştuğunda sistem bildirimi göster",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
 
   "settings.general.sounds.agent.title": "Ajan",
   "settings.general.sounds.agent.description": "Ajan tamamlandığında veya dikkat gerektirdiğinde ses çal",

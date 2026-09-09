@@ -967,6 +967,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "عرض إشعار النظام عند الحاجة إلى إذن",
   "settings.general.notifications.errors.title": "أخطاء",
   "settings.general.notifications.errors.description": "عرض إشعار النظام عند حدوث خطأ",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "وكيل",
   "settings.general.sounds.agent.description": "تشغيل صوت عندما يكتمل الوكيل أو يحتاج إلى اهتمام",
   "settings.general.sounds.permissions.title": "أذونات",

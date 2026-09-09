@@ -915,6 +915,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Vis systemmeddelelse når en tilladelse er påkrævet",
   "settings.general.notifications.errors.title": "Fejl",
   "settings.general.notifications.errors.description": "Vis systemmeddelelse når der opstår en fejl",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
 
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "Afspil lyd når agenten er færdig eller kræver opmærksomhed",

@@ -1010,6 +1010,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "當需要權限時顯示系統通知",
   "settings.general.notifications.errors.title": "錯誤",
   "settings.general.notifications.errors.description": "發生錯誤時顯示系統通知",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
 
   "settings.general.sounds.agent.title": "代理程式",
   "settings.general.sounds.agent.description": "當代理程式完成或需要注意時播放聲音",

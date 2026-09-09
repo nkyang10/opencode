@@ -1044,6 +1044,9 @@ export const dict: Record<string, string> = {
   "settings.general.notifications.permissions.description": "අවසරයක් අවශ්‍ය වූ විට පද්ධති දැනුම්දීම පෙන්වන්න",
   "settings.general.notifications.errors.title": "දෝෂ",
   "settings.general.notifications.errors.description": "දෝෂයක් ඇති වූ විට පද්ධති දැනුම්දීම පෙන්වන්න",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "නියෝජිතයා",
   "settings.general.sounds.agent.description": "නියෝජිතයා සම්පූර්ණ වූ විට හෝ අවධානය අවශ්‍ය වූ විට ශබ්දය වාදනය කරන්න",
   "settings.general.sounds.permissions.title": "අවසර",

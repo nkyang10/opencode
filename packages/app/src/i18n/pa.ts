@@ -1052,6 +1052,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "جدوں اجازت دی لوڑ ہووے تے سسٹم نوٹیفکیشن وکھاؤ",
   "settings.general.notifications.errors.title": "غلطیاں",
   "settings.general.notifications.errors.description": "جدوں کوئی غلطی ہوندی اے تے سسٹم نوٹیفکیشن وکھاؤ",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "جدوں ایجنٹ مکمل ہو جائے یا توجہ دی لوڑ ہووے تے آواز چلاؤ",
   "settings.general.sounds.permissions.title": "اجازتاں",

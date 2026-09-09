@@ -1060,6 +1060,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "İcazə tələb olunduqda sistem bildirişi göstər",
   "settings.general.notifications.errors.title": "Xətalar",
   "settings.general.notifications.errors.description": "Xəta baş verdikdə sistem bildirişi göstər",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "Agent tamamlandıqda və ya diqqət tələb etdikdə səs çal",
   "settings.general.sounds.permissions.title": "İcazələr",

@@ -1064,6 +1064,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "ခွင့်ပြုချက်လိုအပ်သည့်အခါ စနစ်သတိပေးချက်ကို ပြပါ။",
   "settings.general.notifications.errors.title": "အမှားများ",
   "settings.general.notifications.errors.description": "အမှားအယွင်းတစ်ခုဖြစ်ပေါ်သည့်အခါ စနစ်သတိပေးချက်ကို ပြသပါ။",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "အေးဂျင့်",
   "settings.general.sounds.agent.description":
     "အေးဂျင့်ပြီးသွားသောအခါ သို့မဟုတ် အာရုံစူးစိုက်မှုလိုအပ်သည့်အခါ အသံဖွင့်ပါ။",

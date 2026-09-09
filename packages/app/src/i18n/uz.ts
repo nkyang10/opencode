@@ -1061,6 +1061,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Ruxsat kerak bo'lganda tizim bildirishnomasini ko'rsatish",
   "settings.general.notifications.errors.title": "Xatolar",
   "settings.general.notifications.errors.description": "Xatolik yuz berganda tizim bildirishnomasini ko'rsatish",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "Agent tugallanganda yoki e'tiborga muhtoj bo'lganida ovozni ijro eting",
   "settings.general.sounds.permissions.title": "Ruxsatlar",

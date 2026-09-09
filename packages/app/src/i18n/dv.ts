@@ -1065,6 +1065,9 @@ export const dict = {
     "ހުއްދައެއް ބޭނުންވާ ވަގުތު ސިސްޓަމް ނޮޓިފިކޭޝަން ދައްކާށެވެ",
   "settings.general.notifications.errors.title": "ގޯސްތައް",
   "settings.general.notifications.errors.description": "ގޯހެއް ދިމާވުމުން ސިސްޓަމް ނޮޓިފިކޭޝަން ދައްކާށެވެ",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "އޭޖެންޓު",
   "settings.general.sounds.agent.description":
     "އޭޖެންޓް ފުރިހަމަވެފައި ނުވަތަ ސަމާލުކަން ބޭނުންވާ ވަގުތުތަކުގައި އަޑު ކުޅެން",

@@ -1045,6 +1045,9 @@ export const dict = {
     "Показывать системное уведомление, когда требуется разрешение",
   "settings.general.notifications.errors.title": "Ошибки",
   "settings.general.notifications.errors.description": "Показывать системное уведомление, когда происходит ошибка",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
 
   "settings.general.sounds.agent.title": "Агент",
   "settings.general.sounds.agent.description": "Воспроизводить звук, когда агент завершил работу или требует внимания",

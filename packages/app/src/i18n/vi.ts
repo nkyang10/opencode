@@ -1060,6 +1060,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Hiển thị thông báo hệ thống khi cần có sự cho phép",
   "settings.general.notifications.errors.title": "Lỗi",
   "settings.general.notifications.errors.description": "Hiển thị thông báo hệ thống khi xảy ra lỗi",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Tác nhân",
   "settings.general.sounds.agent.description": "Phát âm thanh khi tác nhân hoàn thành hoặc cần chú ý",
   "settings.general.sounds.permissions.title": "Quyền",

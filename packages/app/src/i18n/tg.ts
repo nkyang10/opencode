@@ -1055,6 +1055,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Вақте ки иҷозат лозим аст, огоҳии системаро нишон диҳед",
   "settings.general.notifications.errors.title": "Хатогиҳо",
   "settings.general.notifications.errors.description": "Ҳангоми рух додани хато огоҳии системаро нишон диҳед",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Агент",
   "settings.general.sounds.agent.description": "Вақте ки агент пурра аст ё ба таваҷҷӯҳ ниёз дорад, садоро пахш кунед",
   "settings.general.sounds.permissions.title": "Иҷозатҳо",

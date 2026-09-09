@@ -949,6 +949,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Näytä järjestelmäilmoitus, kun lupa vaaditaan",
   "settings.general.notifications.errors.title": "Virheet",
   "settings.general.notifications.errors.description": "Näytä järjestelmäilmoitus, kun tapahtuu virhe",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Agentti",
   "settings.general.sounds.agent.description": "Toista ääni, kun agentti on valmis tai tarvitsee huomiota",
   "settings.general.sounds.permissions.title": "Käyttöoikeudet",

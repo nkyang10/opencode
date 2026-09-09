@@ -1068,6 +1068,9 @@ export const dict: Record<string, string> = {
   "settings.general.notifications.permissions.description": "གནང་བ་ཅིག་དགོ་པའི་སྐབས་ རིམ་ལུགས་བརྡ་བསྐུལ་སྟོན།",
   "settings.general.notifications.errors.title": "འཛོལ་བ།",
   "settings.general.notifications.errors.description": "འཛོལ་བ་བྱུངམ་ད་ རིམ་ལུགས་བརྡ་བསྐུལ་སྟོན།",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "ལས་ཚབ།",
   "settings.general.sounds.agent.description": "ལས་ཚབ་འདི་མཇུག་བསྡུ་བའི་སྐབས་ཡང་ན་དོ་སྣང་དགོ་པའི་སྐབས་སྒྲ་གཏང་།",
   "settings.general.sounds.permissions.title": "གནང་བ་ཚུ།",

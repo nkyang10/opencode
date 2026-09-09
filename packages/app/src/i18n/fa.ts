@@ -1046,6 +1046,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "نمایش پرامپت سیستم در صورت نیاز به مجوز",
   "settings.general.notifications.errors.title": "خطاها",
   "settings.general.notifications.errors.description": "نمایش پرامپت سیستم در صورت بروز خطا",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "عامل",
   "settings.general.sounds.agent.description": "هنگامی که عامل کامل است یا نیاز به توجه دارد، صدا را پخش کنید",
   "settings.general.sounds.permissions.title": "مجوزها",

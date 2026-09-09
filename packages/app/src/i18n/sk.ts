@@ -1050,6 +1050,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Zobraziť systémové oznámenie, keď je potrebné oprávnenie",
   "settings.general.notifications.errors.title": "Chyby",
   "settings.general.notifications.errors.description": "Zobraziť systémové oznámenie pri výskyte chyby",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "Prehrať zvuk po dokončení agenta alebo ak vyžaduje pozornosť",
   "settings.general.sounds.permissions.title": "Oprávnenia",

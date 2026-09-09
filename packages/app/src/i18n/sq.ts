@@ -1054,6 +1054,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Shfaq njoftimin e sistemit kur kërkohet një leje",
   "settings.general.notifications.errors.title": "Gabimet",
   "settings.general.notifications.errors.description": "Shfaq njoftimin e sistemit kur ndodh një gabim",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Agjenti",
   "settings.general.sounds.agent.description": "Luaj tingullin kur agjenti është i plotë ose ka nevojë për vëmendje",
   "settings.general.sounds.permissions.title": "Lejet",

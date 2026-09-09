@@ -1061,6 +1061,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Systeemmelding weergeven wanneer toestemming vereist is",
   "settings.general.notifications.errors.title": "Fouten",
   "settings.general.notifications.errors.description": "Systeemmelding weergeven wanneer er een fout optreedt",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "Speel geluid af wanneer de agent klaar is of aandacht nodig heeft",
   "settings.general.sounds.permissions.title": "Machtigingen",

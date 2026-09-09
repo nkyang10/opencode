@@ -1023,6 +1023,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "แสดงการแจ้งเตือนระบบเมื่อต้องการสิทธิ์",
   "settings.general.notifications.errors.title": "ข้อผิดพลาด",
   "settings.general.notifications.errors.description": "แสดงการแจ้งเตือนระบบเมื่อเกิดข้อผิดพลาด",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
 
   "settings.general.sounds.agent.title": "เอเจนต์",
   "settings.general.sounds.agent.description": "เล่นเสียงเมื่อเอเจนต์เสร็จสิ้นหรือต้องการความสนใจ",

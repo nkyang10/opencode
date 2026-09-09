@@ -1045,6 +1045,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Vís skipanarfráboðan tá loyvi er kravt",
   "settings.general.notifications.errors.title": "Feilir",
   "settings.general.notifications.errors.description": "Vís skipanarfráboðan tá ein feilur hendir",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Agentur",
   "settings.general.sounds.agent.description": "Spæl ljóð, tá agenturin er liðugur ella hevur brúk fyri uppmerksemi",
   "settings.general.sounds.permissions.title": "Loyvi",

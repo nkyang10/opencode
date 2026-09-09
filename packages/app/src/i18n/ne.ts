@@ -1048,6 +1048,9 @@ export const dict: Record<string, string> = {
   "settings.general.notifications.permissions.description": "अनुमति आवश्यक हुँदा प्रणाली सूचना देखाउनुहोस्",
   "settings.general.notifications.errors.title": "त्रुटिहरू",
   "settings.general.notifications.errors.description": "त्रुटि हुँदा प्रणाली सूचना देखाउनुहोस्",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "एजेन्ट",
   "settings.general.sounds.agent.description": "जब एजेन्ट पूर्ण हुन्छ वा ध्यान चाहिन्छ ध्वनि बजाउनुहोस्",
   "settings.general.sounds.permissions.title": "अनुमतिहरू",

@@ -1055,6 +1055,9 @@ export const dict = {
     "Ցույց տալ համակարգի ծանուցումը, երբ անհրաժեշտ է թույլտվություն",
   "settings.general.notifications.errors.title": "Սխալներ",
   "settings.general.notifications.errors.description": "Ցույց տալ համակարգի ծանուցումը, երբ սխալ է տեղի ունենում",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Գործակալ",
   "settings.general.sounds.agent.description": "Նվագարկեք ձայնը, երբ գործակալն ավարտված է կամ ուշադրության կարիք ունի",
   "settings.general.sounds.permissions.title": "Թույլտվություններ",

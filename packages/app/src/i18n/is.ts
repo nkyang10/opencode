@@ -1048,6 +1048,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Sýna kerfistilkynningu þegar leyfi er krafist",
   "settings.general.notifications.errors.title": "Villur",
   "settings.general.notifications.errors.description": "Sýna kerfistilkynningu þegar villa kemur upp",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Fulltrúi",
   "settings.general.sounds.agent.description": "Spila hljóð þegar fulltrúinn lýkur verki eða þarfnast athygli",
   "settings.general.sounds.permissions.title": "Heimildir",

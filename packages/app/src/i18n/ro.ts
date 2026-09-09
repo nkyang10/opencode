@@ -1053,6 +1053,9 @@ export const dict = {
     "Afișează notificare de sistem când este necesară o permisiune",
   "settings.general.notifications.errors.title": "Erori",
   "settings.general.notifications.errors.description": "Afișează notificare de sistem când apare o eroare",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "Redă sunet când agentul a terminat sau are nevoie de atenție",
   "settings.general.sounds.permissions.title": "Permisiuni",

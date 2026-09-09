@@ -1049,6 +1049,9 @@ export const dict = {
     "Mostrar notificación del sistema cuando se requiera un permiso",
   "settings.general.notifications.errors.title": "Errores",
   "settings.general.notifications.errors.description": "Mostrar notificación del sistema cuando ocurra un error",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
 
   "settings.general.sounds.agent.title": "Agente",
   "settings.general.sounds.agent.description": "Reproducir sonido cuando el agente termine o necesite atención",

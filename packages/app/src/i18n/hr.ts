@@ -1059,6 +1059,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "Prikaži obavijest sustava kada je potrebna dozvola",
   "settings.general.notifications.errors.title": "Greške",
   "settings.general.notifications.errors.description": "Prikaži obavijest sustava kada se pojavi greška",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "Pusti zvuk kada je agent gotov ili mu treba pozornost",
   "settings.general.sounds.permissions.title": "Dozvole",

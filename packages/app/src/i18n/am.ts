@@ -1021,6 +1021,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "ፍቃድ በሚያስፈልግበት ጊዜ የስርዓት ማሳወቂያን አሳይ",
   "settings.general.notifications.errors.title": "ስህተት",
   "settings.general.notifications.errors.description": "ስህተት ሲከሰት የስርዓት ማሳወቂያን አሳይ",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "ወኪል",
   "settings.general.sounds.agent.description": "ወኪሉ ሲጠናቀቅ ወይም ትኩረት ሲፈልግ ድምጽ ያጫውቱ",
   "settings.general.sounds.permissions.title": "ፍቃዶች",

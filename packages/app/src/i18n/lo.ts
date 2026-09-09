@@ -1039,6 +1039,9 @@ export const dict = {
   "settings.general.notifications.permissions.description": "ສະແດງການແຈ້ງເຕືອນລະບົບເມື່ອຕ້ອງການການອະນຸຍາດ",
   "settings.general.notifications.errors.title": "ຄວາມຜິດພາດ",
   "settings.general.notifications.errors.description": "ສະແດງການແຈ້ງເຕືອນລະບົບເມື່ອມີຂໍ້ຜິດພາດເກີດຂຶ້ນ",
+  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.description":
+    "Get a notification when a session finishes even when the tab is closed",
   "settings.general.sounds.agent.title": "ຕົວແທນ",
   "settings.general.sounds.agent.description": "ຫຼິ້ນສຽງເມື່ອຕົວແທນສົມບູນ ຫຼືຕ້ອງການຄວາມສົນໃຈ",
   "settings.general.sounds.permissions.title": "ການອະນຸຍາດ",
