@@ -174,6 +174,18 @@ export function seedActiveSessionStatuses(
     const status = active[sessionID]
     session.set("session_status", sessionID, status?.type === "running" ? { type: "busy" } : status)
   }
+  // A session the store thinks is busy but is no longer running on the server
+  // finished while the event stream was suspended (mobile backgrounding kills
+  // the SSE without erroring it), so its `session.status idle` event was lost.
+  // Reconcile against server truth or the timeline keeps its "Thinking" row
+  // forever even though the response completed.
+  for (const [sessionID, status] of Object.entries(session.data.session_status)) {
+    if (status?.type !== "busy") continue
+    const serverStatus = active[sessionID]
+    if (!serverStatus || serverStatus.type === "idle") {
+      session.set("session_status", sessionID, { type: "idle" })
+    }
+  }
 }
 
 function makeQueryOptionsApi(
@@ -544,7 +556,9 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     if (eventType === "integration.connection.updated") void refreshProviders()
 
     if (directory === "global") {
-      if (eventType === "server.connected" && activeSessionsQuery.data === undefined && !activeSessionsQuery.isFetching)
+      if (eventType === "server.connected" && !activeSessionsQuery.isFetching)
+        // Refetch on every (re)connect, not just the first: a reconnect after a
+        // suspended stream is exactly when stale busy statuses need reconciliation.
         void activeSessionsQuery.refetch()
       applyGlobalEvent({
         event,

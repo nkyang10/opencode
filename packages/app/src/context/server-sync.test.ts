@@ -100,6 +100,19 @@ describe("active session query", () => {
       next: 10,
     })
   })
+
+  test("clears stale busy statuses the server no longer lists (missed idle event)", () => {
+    const session = createServerSession({} as OpencodeClient)
+    session.set("session_status", "ses_finished", { type: "busy" })
+    session.set("session_status", "ses_still_running", { type: "busy" })
+
+    seedActiveSessionStatuses(session, {
+      ses_still_running: { type: "running" },
+    })
+
+    expect(session.data.session_status.ses_finished).toEqual({ type: "idle" })
+    expect(session.data.session_status.ses_still_running).toEqual({ type: "busy" })
+  })
 })
 
 describe("pickDirectoriesToEvict", () => {
