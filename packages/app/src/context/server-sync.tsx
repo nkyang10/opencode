@@ -275,6 +275,18 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     }),
   )
 
+  // Status watchdog: quick Cloudflare tunnels silently buffer SSE bodies and mobile
+  // event streams drop events on suspension, so a finished session can stay "busy"
+  // (Thinking row forever) with no idle event ever arriving. While any session is
+  // busy, periodically reconcile against the server's status map so stale busy
+  // statuses recover even with a silent or suspended stream. Cheap: no network when
+  // nothing is busy.
+  const statusWatchdog = setInterval(() => {
+    const hasBusy = Object.values(session.data.session_status).some((status) => status?.type === "busy")
+    if (hasBusy && !activeSessionsQuery.isFetching) void activeSessionsQuery.refetch()
+  }, 15_000)
+  onCleanup(() => clearInterval(statusWatchdog))
+
   const [globalStore, setGlobalStore] = createStore<GlobalStore>({
     get ready() {
       return !bootstrap.isPending
