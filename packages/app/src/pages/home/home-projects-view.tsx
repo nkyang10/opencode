@@ -165,6 +165,18 @@ export function HomeUtilityNav(props: {
       <HomeProjectNavButton
         type="button"
         class="text-v2-text-text-faint [&>[data-slot=icon-svg]]:text-v2-icon-icon-muted"
+        onClick={() => {
+          if (window.confirm(props.language.t("sidebar.logoutConfirm"))) {
+            window.location.href = "/logout"
+          }
+        }}
+      >
+        <IconV2 name="log-out" size="small" />
+        <span class={HOME_PROJECT_NAV_LABEL}>{props.language.t("sidebar.logout")}</span>
+      </HomeProjectNavButton>
+      <HomeProjectNavButton
+        type="button"
+        class="text-v2-text-text-faint [&>[data-slot=icon-svg]]:text-v2-icon-icon-muted"
         onClick={props.onOpenSettings}
       >
         <IconV2 name="settings-gear" size="small" />

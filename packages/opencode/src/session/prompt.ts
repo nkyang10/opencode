@@ -1138,7 +1138,17 @@ const layer = Layer.effect(
               history: msgs,
             }).pipe(Effect.ignore, Effect.forkIn(scope))
 
-          const model = yield* getModel(lastUser.model.providerID, lastUser.model.modelID, sessionID)
+          let model = yield* getModel(lastUser.model.providerID, lastUser.model.modelID, sessionID)
+          if (model.capabilities?.input?.image === false) {
+            const userMsg = msgs.find((m) => m.info.role === "user" && m.info.id === lastUser.id)
+            const hasImage = userMsg?.parts.some(
+              (part) => part.type === "file" && (part.mime?.startsWith("image/") || part.url?.startsWith("data:image/")),
+            )
+            if (hasImage) {
+              const visual = yield* provider.getVisualModel()
+              if (visual) model = visual
+            }
+          }
           const task = tasks.pop()
 
           if (task?.type === "subtask") {

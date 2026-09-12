@@ -26,6 +26,7 @@ import {
   displayPickerPath,
   pickerParent,
   pickerRoot,
+  pickerRelativePath,
 } from "./directory-picker-domain"
 import "./dialog-select-directory-v2.css"
 import { DividerV2 } from "@opencode-ai/ui/v2/divider-v2"
@@ -38,16 +39,6 @@ interface DialogSelectDirectoryV2Props {
   server: ServerConnection.Any
   mode?: "directory" | "file"
   start?: string
-}
-
-function tappedRowPath(event: MouseEvent) {
-  for (const node of event.composedPath()) {
-    if (node instanceof HTMLElement) {
-      const path = node.dataset.itemPath
-      if (typeof path === "string" && path) return path
-    }
-  }
-  return undefined
 }
 
 export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
@@ -185,6 +176,57 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
     setLoading(false)
   }
 
+  // Reveals a possibly-deep absolute path inside the tree that is rooted at the
+  // filesystem root: expands each ancestor and selects the target, so the user
+  // still sees the tree listing from "/" (or "X:") instead of jumping into it.
+  async function reveal(path: string) {
+    const absolute = pickerAbsoluteInput(cleanPickerInput(path), home(), root() || start() || home())
+    const fileTreeRoot = pickerRoot(absolute)
+    if (!fileTreeRoot) return navigate(absolute)
+    const rel = pickerRelativePath(fileTreeRoot, absolute)
+    if (!rel) {
+      // Target is the root itself.
+      if (root() !== fileTreeRoot) return navigate(fileTreeRoot)
+      setSelected(policy.selection(fileTreeRoot, "") ?? "")
+      return
+    }
+    setLoading(true)
+    setError(false)
+    // Make sure the tree is rooted at the filesystem root, then reveal downward.
+    if (root() !== fileTreeRoot) {
+      await navigate(fileTreeRoot)
+    }
+    const segments = rel.split("/").filter(Boolean)
+    let acc = ""
+    let revealed = true
+    for (let i = 0; i < segments.length; i++) {
+      // Directory rows in the tree store a trailing slash.
+      const lookup = acc ? `${acc}/${segments[i]}/` : `${segments[i]}/`
+      await load(acc, navigation)
+      if (!activeTreeNavigation(navigation, navigation)) return
+      const child = tree?.getItem(lookup)
+      if (!child) {
+        revealed = false
+        break
+      }
+      if (i < segments.length - 1) {
+        if (child.isDirectory()) {
+          const directory = child as Extract<typeof child, { isDirectory(): true }>
+          if (!directory.isExpanded()) directory.expand()
+        }
+      } else {
+        child.select()
+        setSelected(policy.selection(root(), lookup) ?? "")
+        setInput(displayPickerPath(absolute, absolute, home()))
+        setSuggestionsOpen(false)
+        setActiveSuggestion(-1)
+      }
+      acc = acc ? `${acc}/${segments[i]}` : segments[i]
+    }
+    setLoading(false)
+    if (!revealed) setError(true)
+  }
+
   function complete() {
     const items = currentSuggestions()
     const match = items[activeSuggestion()] ?? items[0]
@@ -225,7 +267,7 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
     Enter: () => {
       const suggestion = activeSuggestionValue()
       if (suggestion) chooseSuggestion(suggestion)
-      if (!suggestion) void navigate(input())
+      if (!suggestion) void reveal(input())
     },
     Tab: complete,
   }
@@ -286,25 +328,12 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
     if (!container) return
     tree.render({ containerWrapper: container })
     tree.getFileTreeContainer()?.classList.add("directory-picker-v2-tree")
-
-    // @pierre/trees toggles selection only on modifier-click; on touch there is no
-    // modifier, so intercept a plain tap on the highlighted row to unhighlight it.
-    const onContainerClick = (event: Event) => {
-      if (!(event instanceof MouseEvent) || event.button !== 0) return
-      const path = tappedRowPath(event)
-      if (!path) return
-      if (policy.selection(root(), path) !== selected()) return
-      tree?.getItem(path)?.deselect()
-      event.stopPropagation()
-    }
-    container.addEventListener("click", onContainerClick, true)
-    onCleanup(() => container?.removeEventListener("click", onContainerClick, true))
   })
 
   createEffect(() => {
     const path = start()
     if (!path || root()) return
-    void navigate(path)
+    void navigate(pickerRoot(path) || path)
   })
 
   onCleanup(() => tree?.cleanUp())

@@ -1,5 +1,6 @@
+import { Binary } from "@opencode-ai/core/util/binary"
 import { createEffect, createMemo, on, onCleanup } from "solid-js"
-import { createStore } from "solid-js/store"
+import { createStore, produce } from "solid-js/store"
 import type { PermissionRequest, QuestionRequest, Todo } from "@opencode-ai/sdk/v2"
 import { useParams } from "@solidjs/router"
 import { showToast } from "@/utils/toast"
@@ -83,6 +84,17 @@ export function createSessionComposerController(options?: { closeMs?: number | (
     setStore("responding", perm.id)
     sdk()
       .api.permission.reply({ sessionID: perm.sessionID, requestID: perm.id, reply: response })
+      .then(() => {
+        sync().set(
+          "permission",
+          perm.sessionID,
+          produce((draft) => {
+            if (!draft) return
+            const result = Binary.search(draft, perm.id, (item) => item.id)
+            if (result.found) draft.splice(result.index, 1)
+          }),
+        )
+      })
       .catch((err: unknown) => {
         const description = err instanceof Error ? err.message : String(err)
         showToast({ title: language.t("common.requestFailed"), description })

@@ -77,6 +77,10 @@ export const Info = Schema.Struct({
   small_model: Schema.optional(Schema.String).annotate({
     description: "Small model to use for tasks like title generation in the format of provider/model",
   }),
+  visual_model: Schema.optional(Schema.String).annotate({
+    description:
+      "Vision model to use as a fallback when the session's current model cannot accept image attachments, in the format of provider/model. Applied per-turn only when the message contains images and the active model lacks image input support.",
+  }),
   default_agent: Schema.optional(Schema.String).annotate({
     description:
       "Default agent to use when none is specified. Must be a primary agent. Falls back to 'build' if not set or if the specified agent is invalid.",

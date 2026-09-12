@@ -10,6 +10,7 @@ import { arrayMove } from "@dnd-kit/helpers"
 import { tabHref, tabKey, type SessionTab, type Tab } from "@/context/tabs"
 import { ServerConnection } from "@/context/server"
 import { DraftTabItem, TabNavItem } from "@/components/titlebar-tab-nav"
+import { DragDownMenu, type DragDownAction } from "@/components/drag-down-menu"
 import { useGlobal, type ServerCtx } from "@/context/global"
 import { useLanguage } from "@/context/language"
 import { useCommand } from "@/context/command"
@@ -221,6 +222,23 @@ export function TitlebarTabStrip(props: {
   const global = useGlobal()
   const language = useLanguage()
   const command = useCommand()
+  const dragActions: DragDownAction[] = [
+    {
+      id: "reload",
+      labelKey: "common.reload",
+      icon: "outline-reset",
+      onSelect: () => window.location.reload(),
+    },
+    {
+      id: "logout",
+      labelKey: "sidebar.logout",
+      icon: "log-out",
+      confirmKey: "sidebar.logoutConfirm",
+      onSelect: () => {
+        window.location.href = "/logout"
+      },
+    },
+  ]
   let scrollRef!: HTMLDivElement
   let listRef!: HTMLDivElement
   let resizeFrame: number | undefined
@@ -285,7 +303,8 @@ export function TitlebarTabStrip(props: {
   })
 
   return (
-    <div data-slot="titlebar-tabs" class="relative min-w-0">
+    <DragDownMenu actions={dragActions} class="relative min-w-0">
+      <div data-slot="titlebar-tabs" class="relative min-w-0">
       <div
         data-slot="titlebar-tabs-scroll"
         class="flex min-w-0 flex-row items-center gap-1.5 overflow-x-auto no-scrollbar [app-region:no-drag]"
@@ -393,7 +412,8 @@ export function TitlebarTabStrip(props: {
         aria-hidden="true"
         class="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-[linear-gradient(to_left,var(--v2-background-bg-deep),transparent)]"
       />
-    </div>
+      </div>
+    </DragDownMenu>
   )
 }
 

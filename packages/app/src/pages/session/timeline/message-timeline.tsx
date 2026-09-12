@@ -33,8 +33,9 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
-import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
+import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { MenuV2 } from "@opencode-ai/ui/v2/menu-v2"
+import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { DialogFooter, DialogHeader, DialogTitleGroup, DialogV2 } from "@opencode-ai/ui/v2/dialog-v2"
 import { InlineInput } from "@opencode-ai/ui/inline-input"
@@ -65,11 +66,19 @@ import { useLanguage } from "@/context/language"
 import { useSessionKey } from "@/pages/session/session-layout"
 import { useSessionArchive } from "@/pages/session/session-archive"
 import { useServerSDK } from "@/context/server-sdk"
+import { useServerSync } from "@/context/server-sync"
+import { useTabs } from "@/context/tabs"
+import { useServer } from "@/context/server"
 import { usePlatform } from "@/context/platform"
 import { useSettings } from "@/context/settings"
 import { legacySessionHref, requireServerKey, sessionHref } from "@/utils/session-route"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
+import { useLocal } from "@/context/local"
+import { sendFollowupDraft } from "@/components/prompt-input/submit"
+import { normalizeSessionInfo } from "@/utils/session"
+import { extractPromptFromParts } from "@/utils/prompt"
+import { Identifier } from "@/utils/id"
 import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { sessionTitle } from "@/utils/session-title"
 import { scheduleConnectedMeasure } from "./measure"
@@ -260,12 +269,16 @@ export function MessageTimeline(props: {
 
   const navigate = useNavigate()
   const serverSDK = useServerSDK()
+  const serverSync = useServerSync()
   const sdk = useSDK()
   const sync = useSync()
+  const local = useLocal()
   const settings = useSettings()
   const dialog = useDialog()
   const sessionArchive = useSessionArchive()
   const language = useLanguage()
+  const serverCtx = useServer()
+  const tabsStore = useTabs()
   const { params, sessionKey } = useSessionKey()
   const ownerSessionKey = sessionKey()
   const cached = timelineCache.get(ownerSessionKey)
@@ -274,6 +287,7 @@ export function MessageTimeline(props: {
   const platform = usePlatform()
 
   const [listRoot, setListRoot] = createSignal<HTMLDivElement>()
+  const [slimming, setSlimming] = createSignal(false)
   const sessionID = createMemo(() => params.id)
   const sessionStatus = createMemo(() => {
     const id = sessionID()
@@ -884,6 +898,102 @@ export function MessageTimeline(props: {
     navigate(
       params.serverKey ? sessionHref(requireServerKey(params.serverKey), id) : legacySessionHref(sdk().directory, id),
     )
+  }
+
+  const closeSessionTab = () => {
+    const id = sessionID()
+    if (!id) return
+    const index = tabsStore.store.findIndex(
+      (item) => item.type === "session" && item.server === serverCtx.key && item.sessionId === id,
+    )
+    if (index !== -1) tabsStore.closeTab(index)
+  }
+
+  const slimSession = async () => {
+    const id = sessionID()
+    if (!id || slimming()) return
+    const model = local.model.current()
+    const agentName = local.agent.current()?.name
+    if (!model) {
+      showToast({
+        title: language.t("toast.model.none.title"),
+        description: language.t("toast.model.none.description"),
+      })
+      return
+    }
+    setSlimming(true)
+    try {
+      await sdk().api.session.compact({ sessionID: id, model: { providerID: model.provider.id, modelID: model.id } })
+      await sdk().api.session.wait({ sessionID: id }).catch(() => undefined)
+
+      const messages = sync().data.message[id] ?? []
+      const summaryMessage = [...messages].reverse().find((message) => message.role === "assistant" && message.summary)
+      const report = summaryMessage
+        ? extractPromptFromParts(sync().data.part[summaryMessage.id] ?? [], {
+            directory: sdk().directory,
+            attachmentName: language.t("common.attachment"),
+          })
+            .map((part) => ("content" in part ? part.content : ""))
+            .join("")
+            .trim()
+        : ""
+
+      const created = await sdk()
+        .api.session.create({ agent: agentName, model: { id: model.id, providerID: model.provider.id } })
+        .then(normalizeSessionInfo)
+      if (!created) throw new Error("Failed to create session")
+      const newId = created.id
+
+      const base = sessionTitle(info()?.title) ?? language.t("command.session.new")
+      const existing = new Set(
+        (sync().data.session ?? []).map((item) => item.title).filter((value): value is string => Boolean(value)),
+      )
+      let n = 1
+      let title = `${base} (${n})`
+      while (existing.has(title)) {
+        n += 1
+        title = `${base} (${n})`
+      }
+      await sdk().api.session.rename({ sessionID: newId, title }).catch(() => undefined)
+
+      navigate(
+        params.serverKey ? sessionHref(requireServerKey(params.serverKey), newId) : legacySessionHref(sdk().directory, newId),
+      )
+      requestAnimationFrame(() => {
+        const editor = document.querySelector<HTMLTextAreaElement>('[contenteditable="true"]')
+        editor?.focus()
+      })
+
+      if (report) {
+        await sendFollowupDraft({
+          api: sdk().api.session,
+          serverSync: serverSync(),
+          sync: sync(),
+          draft: {
+            sessionID: newId,
+            sessionDirectory: sdk().directory,
+            prompt: [{ type: "text", content: report, start: 0, end: report.length }],
+            context: [],
+            agent: agentName ?? "build",
+            model: { providerID: model.provider.id, modelID: model.id },
+          },
+          messageID: Identifier.ascending("message"),
+          optimisticBusy: true,
+        }).catch((err: unknown) => {
+          showToast({
+            title: language.t("prompt.toast.promptSendFailed.title"),
+            description: err instanceof Error ? err.message : language.t("common.requestFailed"),
+          })
+        })
+      }
+    } catch (err) {
+      showToast({
+        title: language.t("common.requestFailed"),
+        description: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setSlimming(false)
+    }
   }
 
   function DialogDeleteSession(props: { sessionID: string }) {
@@ -1631,6 +1741,27 @@ export function MessageTimeline(props: {
                           </MenuV2.Portal>
                         </MenuV2>
                       </Show>
+
+                      <TooltipV2 value={language.t("session.slim.title")}>
+                        <IconButtonV2
+                          icon={<IconV2 name="collapse" />}
+                          variant="ghost-muted"
+                          size="large"
+                          disabled={slimming()}
+                          onClick={() => void slimSession()}
+                          aria-label={language.t("session.slim.title")}
+                        />
+                      </TooltipV2>
+
+                      <TooltipV2 value={language.t("common.closeTab")}>
+                        <IconButtonV2
+                          icon={<IconV2 name="xmark-small" />}
+                          variant="ghost-muted"
+                          size="large"
+                          onClick={closeSessionTab}
+                          aria-label={language.t("common.closeTab")}
+                        />
+                      </TooltipV2>
 
                       <KobaltePopover
                         open={share.open}

@@ -629,19 +629,21 @@ export default function LegacyLayout(props: ParentProps) {
 
   type PrefetchQueue = {
     inflight: Set<string>
-    pending: string[]
+    pending: { id: string; limit: number; keep: number }[]
     pendingSet: Set<string>
     running: number
   }
 
   const prefetchChunk = 200
   const prefetchConcurrency = 2
-  const prefetchPendingLimit = 10
+  const prefetchPendingLimit = 30
   const span = 4
   const prefetchToken = { value: 0 }
   const prefetchQueues = new Map<string, PrefetchQueue>()
 
   const PREFETCH_MAX_SESSIONS_PER_DIR = 10
+  const previewLimit = 20
+  const PREFETCH_PREVIEW_MAX_SESSIONS_PER_DIR = 25
   const prefetchedByDir = new Map<string, Set<string>>()
 
   const lruFor = (directory: string) => {
@@ -652,12 +654,12 @@ export default function LegacyLayout(props: ParentProps) {
     return created
   }
 
-  const markPrefetched = (directory: string, sessionID: string) => {
+  const markPrefetched = (directory: string, sessionID: string, keep = PREFETCH_MAX_SESSIONS_PER_DIR) => {
     const lru = lruFor(directory)
     return pickSessionCacheEvictions({
       seen: lru,
       keep: sessionID,
-      limit: PREFETCH_MAX_SESSIONS_PER_DIR,
+      limit: keep,
       preserve: params.id && pathKey(directory) === pathKey(currentDir()) ? [params.id] : undefined,
     })
   }
@@ -702,65 +704,70 @@ export default function LegacyLayout(props: ParentProps) {
     return created
   }
 
-  async function prefetchMessages(directory: string, sessionID: string, token: number) {
+  async function prefetchMessages(directory: string, item: { id: string; limit: number; keep: number }, token: number) {
     await serverSync()
-      .session.prefetch(sessionID, prefetchChunk)
+      .session.prefetch(item.id, item.limit)
       .catch(() => {})
     if (prefetchToken.value !== token) return
-    for (const stale of markPrefetched(directory, sessionID)) serverSync().session.evict(stale)
+    for (const stale of markPrefetched(directory, item.id, item.keep)) serverSync().session.evict(stale)
   }
 
   const pumpPrefetch = (directory: string) => {
     const q = queueFor(directory)
     if (q.running >= prefetchConcurrency) return
 
-    const sessionID = q.pending.shift()
-    if (!sessionID) return
+    const item = q.pending.shift()
+    if (!item) return
 
-    q.pendingSet.delete(sessionID)
-    q.inflight.add(sessionID)
+    q.pendingSet.delete(item.id)
+    q.inflight.add(item.id)
     q.running += 1
 
     const token = prefetchToken.value
 
-    void prefetchMessages(directory, sessionID, token).finally(() => {
+    void prefetchMessages(directory, item, token).finally(() => {
       q.running -= 1
-      q.inflight.delete(sessionID)
+      q.inflight.delete(item.id)
       pumpPrefetch(directory)
     })
   }
 
-  const prefetchSession = (session: Session, priority: "high" | "low" = "low") => {
+  const prefetchSession = (
+    session: Session,
+    priority: "high" | "low" = "low",
+    opts: { limit?: number; maxPerDir?: number } = {},
+  ) => {
     const directory = session.directory
     if (!directory) return
 
-    const cached = untrack(() => !serverSync().session.shouldPrefetch(session.id, prefetchChunk))
+    const limit = opts.limit ?? prefetchChunk
+    const maxPerDir = opts.maxPerDir ?? PREFETCH_MAX_SESSIONS_PER_DIR
+
+    const cached = untrack(() => !serverSync().session.shouldPrefetch(session.id, limit))
     if (cached) return
 
     const q = queueFor(directory)
     if (q.inflight.has(session.id)) return
     if (q.pendingSet.has(session.id)) {
       if (priority !== "high") return
-      const index = q.pending.indexOf(session.id)
-      if (index > 0) {
-        q.pending.splice(index, 1)
-        q.pending.unshift(session.id)
-      }
+      const index = q.pending.findIndex((item) => item.id === session.id)
+      if (index === -1) return
+      const item = q.pending.splice(index, 1)[0]
+      q.pending.unshift({ id: session.id, limit: Math.max(item?.limit ?? limit, limit), keep: item?.keep ?? maxPerDir })
       return
     }
 
     const lru = lruFor(directory)
     const known = lru.has(session.id)
-    if (!known && lru.size >= PREFETCH_MAX_SESSIONS_PER_DIR && priority !== "high") return
+    if (!known && lru.size >= maxPerDir && priority !== "high") return
 
-    if (priority === "high") q.pending.unshift(session.id)
-    if (priority !== "high") q.pending.push(session.id)
+    q.pending[priority === "high" ? "unshift" : "push"]({ id: session.id, limit, keep: maxPerDir })
     q.pendingSet.add(session.id)
 
     while (q.pending.length > prefetchPendingLimit) {
       const dropped = q.pending.pop()
       if (!dropped) continue
-      q.pendingSet.delete(dropped)
+      q.pendingSet.delete(dropped.id)
     }
 
     pumpPrefetch(directory)
@@ -789,6 +796,17 @@ export default function LegacyLayout(props: ParentProps) {
     }
 
     warm(sessions, index)
+  })
+
+  createEffect(() => {
+    const sessions = currentSessions()
+    if (sessions.length === 0) return
+    for (const session of sessions) {
+      prefetchSession(session, "low", {
+        limit: previewLimit,
+        maxPerDir: PREFETCH_PREVIEW_MAX_SESSIONS_PER_DIR,
+      })
+    }
   })
 
   function navigateSessionByOffset(offset: number) {

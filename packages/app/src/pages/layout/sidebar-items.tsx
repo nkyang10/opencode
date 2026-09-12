@@ -15,6 +15,7 @@ import { useNotification } from "@/context/notification"
 import { usePermission } from "@/context/permission"
 import { messageAgentColor } from "@/utils/agent"
 import { sessionTitle } from "@/utils/session-title"
+import { sessionLastPrompt } from "@/utils/session-last-prompt"
 import { sessionPermissionRequest } from "../session/composer/session-request-tree"
 import { childSessionOnPath, getProjectAvatarSource, hasProjectPermissions } from "./helpers"
 
@@ -99,6 +100,7 @@ const SessionRow = (props: {
   hasPermissions: Accessor<boolean>
   hasError: Accessor<boolean>
   unseenCount: Accessor<number>
+  lastPrompt?: Accessor<string | undefined>
   clearHoverProjectSoon: () => void
   sidebarOpened: Accessor<boolean>
   warmPress: () => void
@@ -138,7 +140,14 @@ const SessionRow = (props: {
           </Switch>
         </div>
       </Show>
-      <span class="text-14-regular text-text-strong min-w-0 flex-1 truncate">{title()}</span>
+      <span
+        class={`flex-1 min-w-0 ${!props.dense && props.lastPrompt?.() ? "flex flex-col gap-0.5" : "block"}`}
+      >
+        <span class="text-14-regular text-text-strong min-w-0 truncate">{title()}</span>
+        <Show when={!props.dense && props.lastPrompt?.()}>
+          <span class="text-13-regular text-text-secondary min-w-0 truncate">{props.lastPrompt?.()}</span>
+        </Show>
+      </span>
     </A>
   )
 }
@@ -171,6 +180,7 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
   const tint = createMemo(() =>
     messageAgentColor(serverSync().session.data.message[props.session.id], sessionStore.agent),
   )
+  const lastPrompt = createMemo(() => sessionLastPrompt(serverSync(), props.session.id))
   const tooltip = createMemo(() => props.showTooltip ?? (props.mobile || !props.sidebarExpanded()))
   const currentChild = createMemo(() => {
     if (!props.showChild) return
@@ -208,6 +218,7 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
       hasPermissions={hasPermissions}
       hasError={hasError}
       unseenCount={unseenCount}
+      lastPrompt={lastPrompt}
       clearHoverProjectSoon={props.clearHoverProjectSoon}
       sidebarOpened={layout.sidebar.opened}
       warmPress={() => warm(2, "high")}
@@ -229,7 +240,7 @@ export const SessionItem = (props: SessionItemProps): JSX.Element => {
               fallback={
                 <Tooltip
                   placement={props.mobile ? "bottom" : "right"}
-                  value={sessionTitle(props.session.title)}
+                  value={props.dense || !lastPrompt() ? sessionTitle(props.session.title) : `${sessionTitle(props.session.title)}\n${lastPrompt() ?? ""}`}
                   gutter={10}
                   class="min-w-0 w-full"
                 >

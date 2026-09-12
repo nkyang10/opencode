@@ -3,7 +3,9 @@ import { createStore } from "solid-js/store"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { createMutation } from "@tanstack/solid-query"
-import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
+import { Root as DialogRoot } from "@kobalte/core/dialog"
+import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
+import { DialogBody, DialogFooter, DialogHeader, DialogTitle, DialogV2 } from "@opencode-ai/ui/v2/dialog-v2"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { MenuV2 } from "@opencode-ai/ui/v2/menu-v2"
 import { useGlobal } from "@/context/global"
@@ -44,11 +46,49 @@ export function TabNavItem(props: {
   let measureFrame: number | undefined
   const rename = createMutation(() => ({ mutationFn: props.onRename }))
 
-  const closeTab = (event: MouseEvent) => {
-    event.preventDefault()
-    event.stopPropagation()
-    props.onClose()
+  const [confirmCloseOpen, setConfirmCloseOpen] = createSignal(false)
+  const closeTab = (event?: MouseEvent) => {
+    event?.preventDefault()
+    event?.stopPropagation()
+    setConfirmCloseOpen(true)
   }
+  let longPressTimer: ReturnType<typeof setTimeout> | undefined
+  let longPressStartX = 0
+  let longPressStartY = 0
+  let touchActive = false
+
+  const clearLongPress = () => {
+    if (longPressTimer !== undefined) {
+      clearTimeout(longPressTimer)
+      longPressTimer = undefined
+    }
+  }
+
+  const beginLongPress = (event: PointerEvent) => {
+    clearLongPress()
+    touchActive = event.pointerType === "touch"
+    longPressStartX = event.clientX
+    longPressStartY = event.clientY
+    longPressTimer = setTimeout(() => {
+      longPressTimer = undefined
+      setConfirmCloseOpen(true)
+    }, 500)
+  }
+
+  const stopLongPress = () => {
+    touchActive = false
+    clearLongPress()
+  }
+
+  const moveLongPress = (event: PointerEvent) => {
+    if (longPressTimer === undefined) return
+    if (Math.hypot(event.clientX - longPressStartX, event.clientY - longPressStartY) > 10) {
+      stopLongPress()
+    }
+  }
+
+  onCleanup(clearLongPress)
+
   const global = useGlobal()
   const serverCtx = createMemo(() => {
     const conn = global.servers.list().find((item) => ServerConnection.key(item) === props.server)
@@ -199,6 +239,22 @@ export function TabNavItem(props: {
         if (event.button !== MIDDLE_MOUSE_BUTTON) return
         closeTab(event)
       }}
+      onPointerDown={(event) => {
+        if (props.dragging || editing()) return
+        if (event.pointerType === "mouse" && event.button !== 0) return
+        beginLongPress(event)
+      }}
+      onPointerUp={stopLongPress}
+      onPointerCancel={stopLongPress}
+      onPointerLeave={stopLongPress}
+      onPointerMove={moveLongPress}
+      onContextMenu={(event) => {
+        if (!touchActive) return
+        if (!confirmCloseOpen() && longPressTimer === undefined) return
+        event.preventDefault()
+        event.stopPropagation()
+        stopLongPress()
+      }}
     >
       <MenuV2.Context.Trigger
         as="a"
@@ -285,21 +341,6 @@ export function TabNavItem(props: {
           }}
         />
       </MenuV2.Context.Trigger>
-
-      <div data-slot="tab-close">
-        <IconButtonV2
-          size="small"
-          variant="ghost-muted"
-          class="hover-reveal relative z-10 group-hover:opacity-100 group-data-[active=true]:opacity-100 group-data-[editing=true]:opacity-100"
-          onPointerDown={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-          }}
-          onClick={closeTab}
-          icon={<IconV2 name="xmark-small" />}
-          aria-label={language.t("common.closeTab")}
-        />
-      </div>
     </div>
   )
 
@@ -336,9 +377,30 @@ export function TabNavItem(props: {
           <MenuV2.Item disabled={!props.session() || rename.isPending} onSelect={() => setMenu("rename", true)}>
             {language.t("common.rename")}
           </MenuV2.Item>
-          <MenuV2.Item onSelect={props.onClose}>{language.t("common.closeTab")}</MenuV2.Item>
+          <MenuV2.Item onSelect={closeTab}>{language.t("common.closeTab")}</MenuV2.Item>
         </MenuV2.Context.Content>
       </MenuV2.Context.Portal>
+
+      <DialogRoot open={confirmCloseOpen()} onOpenChange={setConfirmCloseOpen}>
+        <DialogV2>
+          <DialogHeader closeLabel={language.t("common.close")}>
+            <DialogTitle>{language.t("common.closeTab")}</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <p class="m-0 max-w-[280px] text-[13px] leading-relaxed text-v2-text-text-faint">
+              {title()}
+            </p>
+          </DialogBody>
+          <DialogFooter>
+            <ButtonV2 variant="neutral" onClick={() => setConfirmCloseOpen(false)}>
+              {language.t("common.cancel")}
+            </ButtonV2>
+            <ButtonV2 variant="danger" onClick={() => props.onClose()}>
+              {language.t("ui.common.confirm")}
+            </ButtonV2>
+          </DialogFooter>
+        </DialogV2>
+      </DialogRoot>
     </MenuV2.Context>
   )
 }
@@ -415,24 +477,6 @@ export function DraftTabItem(props: {
           {props.title}
         </span>
       </a>
-      <div data-slot="tab-close">
-        <IconButtonV2
-          size="small"
-          variant="ghost-muted"
-          onPointerDown={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-          }}
-          onMouseDown={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-          }}
-          class="hover-reveal relative z-10 group-hover:opacity-100 group-data-[active=true]:opacity-100 group-data-[editing=true]:opacity-100"
-          onClick={closeTab}
-          icon={<IconV2 name="xmark-small" />}
-          aria-label={language.t("common.closeTab")}
-        />
-      </div>
     </div>
   )
 }

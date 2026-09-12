@@ -18,9 +18,11 @@
 }
 
 @media (display-mode: standalone) {
-  /* WebKit excludes safe-area insets from dvh in installed apps. */
+  /* Fill edge-to-edge in installed apps. Use the dynamic viewport so fullscreen
+     never exceeds the visible phone screen (100vh does, causing overflow). */
   #root {
-    height: 100vh;
+    height: 100svh;
+    height: 100dvh;
   }
 }
 

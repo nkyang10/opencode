@@ -1198,6 +1198,7 @@ export interface Interface {
     query: string[],
   ) => Effect.Effect<{ providerID: ProviderV2.ID; modelID: string } | undefined>
   readonly getSmallModel: (providerID: ProviderV2.ID) => Effect.Effect<Model | undefined>
+  readonly getVisualModel: () => Effect.Effect<Model | undefined>
   readonly defaultModel: () => Effect.Effect<{ providerID: ProviderV2.ID; modelID: ModelV2.ID }, DefaultModelError>
 }
 
@@ -2036,7 +2037,18 @@ const layer = Layer.effect(
       }
     })
 
-    return Service.of({ list, getProvider, getModel, getLanguage, closest, getSmallModel, defaultModel })
+    const getVisualModel = Effect.fn("Provider.getVisualModel")(function* () {
+      const cfg = yield* config.get()
+      if (!cfg.visual_model) return undefined
+      if (cfg.visual_model === cfg.model) return undefined
+
+      const parsed = parseModel(cfg.visual_model)
+      return yield* getModel(parsed.providerID, parsed.modelID).pipe(
+        Effect.catchTag("ProviderModelNotFoundError", () => Effect.succeed(undefined)),
+      )
+    })
+
+    return Service.of({ list, getProvider, getModel, getLanguage, closest, getSmallModel, getVisualModel, defaultModel })
   }),
 )
 

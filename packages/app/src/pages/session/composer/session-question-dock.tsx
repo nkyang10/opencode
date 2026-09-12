@@ -1,5 +1,6 @@
+import { Binary } from "@opencode-ai/core/util/binary"
 import { For, Show, createEffect, createMemo, onCleanup, onMount, type Component } from "solid-js"
-import { createStore } from "solid-js/store"
+import { createStore, produce } from "solid-js/store"
 import { useMutation } from "@tanstack/solid-query"
 import { Button } from "@opencode-ai/ui/button"
 import { DockPrompt } from "@opencode-ai/session-ui/dock-prompt"
@@ -12,6 +13,7 @@ import { useSDK } from "@/context/sdk"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { useServerSDK } from "@/context/server-sdk"
+import { useSync } from "@/context/sync"
 import { ScopedKey } from "@/utils/server-scope"
 
 const cache = new Map<string, { tab: number; answers: QuestionAnswer[]; custom: string[]; customOn: boolean[] }>()
@@ -65,6 +67,7 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
   const sdk = useSDK()
   const serverSDK = useServerSDK()
   const language = useLanguage()
+  const sync = useSync()
   const cacheKey = ScopedKey.from(serverSDK().scope, props.request.id)
 
   const questions = createMemo(() => props.request.questions)
@@ -222,6 +225,18 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
     showToast({ title: language.t("common.requestFailed"), description: message })
   }
 
+  const dismiss = () => {
+    sync().set(
+      "question",
+      props.request.sessionID,
+      produce((draft) => {
+        if (!draft) return
+        const result = Binary.search(draft, props.request.id, (item) => item.id)
+        if (result.found) draft.splice(result.index, 1)
+      }),
+    )
+  }
+
   const replyMutation = useMutation(() => ({
     mutationFn: (answers: QuestionAnswer[]) =>
       sdk().api.question.reply({ sessionID: props.request.sessionID, requestID: props.request.id, answers }),
@@ -231,6 +246,7 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
     onSuccess: () => {
       replied = true
       cache.delete(cacheKey)
+      dismiss()
     },
     onError: fail,
   }))
@@ -243,6 +259,7 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
     onSuccess: () => {
       replied = true
       cache.delete(cacheKey)
+      dismiss()
     },
     onError: fail,
   }))
