@@ -174,6 +174,7 @@ function DraftTabSlot(props: {
   index: () => number
   active: () => boolean
   title: string
+  onRename: (title: string) => void
   onNavigate: (element: HTMLDivElement) => void
   onClose: () => void
 }) {
@@ -201,6 +202,7 @@ function DraftTabSlot(props: {
         }}
         href={tabHref(props.tab)}
         title={props.title}
+        onRename={props.onRename}
         onNavigate={() => props.onNavigate(ref)}
         onClose={props.onClose}
         active={props.active()}
@@ -220,6 +222,7 @@ export function TitlebarTabStrip(props: {
   onOverflowChange: (overflowing: boolean) => void
 }) {
   const global = useGlobal()
+  const tabs = useTabs()
   const language = useLanguage()
   const command = useCommand()
   const dragActions: DragDownAction[] = [
@@ -389,7 +392,10 @@ export function TitlebarTabStrip(props: {
                     id={id}
                     index={visibleIndex}
                     active={() => props.currentTab() === tab}
-                    title={language.t("command.session.new")}
+                    title={tabs.info[id]?.title || language.t("command.session.new")}
+                    onRename={(title) => {
+                      tabs.rememberDraftTitle(tab.draftID, title)
+                    }}
                     onNavigate={(element) => {
                       ref = element
                       props.onNavigate(tab, element)

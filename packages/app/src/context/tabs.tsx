@@ -354,6 +354,13 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
         if (current?.title === next.title && current.directory === next.directory) return
         setInfo(key, next)
       },
+      rememberDraftTitle(draftID: string, title: string) {
+        const key = `draft:${draftID}`
+        const current = info[key]
+        const next = { ...current, title: title || undefined }
+        if (current?.title === next.title) return
+        setInfo(key, next)
+      },
       select: navigateTab,
       remember(tab: Tab) {
         const key = tabKey(tab)
