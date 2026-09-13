@@ -3,9 +3,6 @@ import { createStore } from "solid-js/store"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { createMutation } from "@tanstack/solid-query"
-import { Root as DialogRoot } from "@kobalte/core/dialog"
-import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
-import { DialogBody, DialogFooter, DialogHeader, DialogTitle, DialogV2 } from "@opencode-ai/ui/v2/dialog-v2"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { MenuV2 } from "@opencode-ai/ui/v2/menu-v2"
 import { useGlobal } from "@/context/global"
@@ -46,48 +43,11 @@ export function TabNavItem(props: {
   let measureFrame: number | undefined
   const rename = createMutation(() => ({ mutationFn: props.onRename }))
 
-  const [confirmCloseOpen, setConfirmCloseOpen] = createSignal(false)
   const closeTab = (event?: MouseEvent) => {
     event?.preventDefault()
     event?.stopPropagation()
-    setConfirmCloseOpen(true)
+    props.onClose()
   }
-  let longPressTimer: ReturnType<typeof setTimeout> | undefined
-  let longPressStartX = 0
-  let longPressStartY = 0
-  let touchActive = false
-
-  const clearLongPress = () => {
-    if (longPressTimer !== undefined) {
-      clearTimeout(longPressTimer)
-      longPressTimer = undefined
-    }
-  }
-
-  const beginLongPress = (event: PointerEvent) => {
-    clearLongPress()
-    touchActive = event.pointerType === "touch"
-    longPressStartX = event.clientX
-    longPressStartY = event.clientY
-    longPressTimer = setTimeout(() => {
-      longPressTimer = undefined
-      setConfirmCloseOpen(true)
-    }, 500)
-  }
-
-  const stopLongPress = () => {
-    touchActive = false
-    clearLongPress()
-  }
-
-  const moveLongPress = (event: PointerEvent) => {
-    if (longPressTimer === undefined) return
-    if (Math.hypot(event.clientX - longPressStartX, event.clientY - longPressStartY) > 10) {
-      stopLongPress()
-    }
-  }
-
-  onCleanup(clearLongPress)
 
   const global = useGlobal()
   const serverCtx = createMemo(() => {
@@ -121,6 +81,21 @@ export function TabNavItem(props: {
 
   const [popoverOpen, setPopoverOpen] = createSignal(false)
   const previewBlocked = () => !!props.dragging || editing() || menu.open || !!props.pressed || !props.session()
+
+  // The preview card renders every data slot behind a Show guard, so with all
+  // fields undefined it mounts as a blank 256px card parked over the view.
+  // Compute the payload here and only allow the popover to open when it has at
+  // least one real field — this also auto-closes it if the session data goes
+  // empty while it is already open.
+  const previewData = () => {
+    const data = {
+      projectName: projectName(),
+      title: title(),
+      path: previewPath(),
+      serverName: serverLabel(),
+    }
+    return data.projectName || data.title || data.path || data.serverName ? data : undefined
+  }
 
   const measureTitleOverflow = () => {
     if (!titleEl || editing()) {
@@ -239,32 +214,22 @@ export function TabNavItem(props: {
         if (event.button !== MIDDLE_MOUSE_BUTTON) return
         closeTab(event)
       }}
-      onPointerDown={(event) => {
-        if (props.dragging || editing()) return
-        if (event.pointerType === "mouse" && event.button !== 0) return
-        beginLongPress(event)
-      }}
-      onPointerUp={stopLongPress}
-      onPointerCancel={stopLongPress}
-      onPointerLeave={stopLongPress}
-      onPointerMove={moveLongPress}
-      onContextMenu={(event) => {
-        if (!touchActive) return
-        if (!confirmCloseOpen() && longPressTimer === undefined) return
-        event.preventDefault()
-        event.stopPropagation()
-        stopLongPress()
-      }}
     >
       <MenuV2.Context.Trigger
-        as="a"
-        disabled={editing() || props.dragging}
+        as="div"
+        role="link"
+        tabindex={editing() || props.dragging ? -1 : 0}
         aria-haspopup="menu"
         aria-expanded={menu.open}
         data-slot="tab-link"
         data-titlebar-tab-link
-        href={props.href}
         draggable={false}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return
+          if (props.suppressNavigation?.()) return
+          event.preventDefault()
+          props.onNavigate()
+        }}
         onDragStart={(event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -353,17 +318,12 @@ export function TabNavItem(props: {
     >
       <TabPreviewPopover
         trigger={tab()}
-        open={popoverOpen() && !previewBlocked()}
+        open={popoverOpen() && !previewBlocked() && !!previewData()}
         onOpenChange={(value) => {
-          if (value && previewBlocked()) return
+          if (value && (previewBlocked() || !previewData())) return
           setPopoverOpen(value)
         }}
-        data={{
-          projectName: projectName(),
-          title: props.session()?.title,
-          path: previewPath(),
-          serverName: serverLabel(),
-        }}
+        data={previewData() ?? {}}
       />
       <MenuV2.Context.Portal>
         <MenuV2.Context.Content
@@ -380,27 +340,6 @@ export function TabNavItem(props: {
           <MenuV2.Item onSelect={closeTab}>{language.t("common.closeTab")}</MenuV2.Item>
         </MenuV2.Context.Content>
       </MenuV2.Context.Portal>
-
-      <DialogRoot open={confirmCloseOpen()} onOpenChange={setConfirmCloseOpen}>
-        <DialogV2>
-          <DialogHeader closeLabel={language.t("common.close")}>
-            <DialogTitle>{language.t("common.closeTab")}</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <p class="m-0 max-w-[280px] text-[13px] leading-relaxed text-v2-text-text-faint">
-              {title()}
-            </p>
-          </DialogBody>
-          <DialogFooter>
-            <ButtonV2 variant="neutral" onClick={() => setConfirmCloseOpen(false)}>
-              {language.t("common.cancel")}
-            </ButtonV2>
-            <ButtonV2 variant="danger" onClick={() => props.onClose()}>
-              {language.t("ui.common.confirm")}
-            </ButtonV2>
-          </DialogFooter>
-        </DialogV2>
-      </DialogRoot>
     </MenuV2.Context>
   )
 }
@@ -443,14 +382,21 @@ export function DraftTabItem(props: {
         closeTab(event)
       }}
     >
-      <a
+      <div
         data-slot="tab-link"
         data-titlebar-tab-link
-        href={props.href}
+        role="link"
+        tabindex={props.suppressNavigation?.() ? -1 : 0}
         draggable={false}
         onDragStart={(event) => {
           event.preventDefault()
           event.stopPropagation()
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return
+          if (props.suppressNavigation?.()) return
+          event.preventDefault()
+          props.onNavigate()
         }}
         onMouseDown={(event) => {
           // Navigate on mousedown to shave the press-release delay off tab switches.
@@ -476,7 +422,7 @@ export function DraftTabItem(props: {
         >
           {props.title}
         </span>
-      </a>
+      </div>
     </div>
   )
 }
