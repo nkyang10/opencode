@@ -50,12 +50,14 @@ import type {
   AssistantMessage,
   Message as MessageType,
   Part as PartType,
+  Session,
   ToolPart,
   UserMessage,
 } from "@opencode-ai/sdk/v2"
-import { showToast } from "@/utils/toast"
+import { dismissToast, showToast } from "@/utils/toast"
 import { downloadSessionExport, fetchSessionExport, sessionExportFilename } from "@/utils/session-export"
 import { getDirectory, getFilename } from "@opencode-ai/core/util/path"
+import { Binary } from "@opencode-ai/core/util/binary"
 import { Popover as KobaltePopover } from "@kobalte/core/popover"
 import { normalize } from "@opencode-ai/session-ui/session-diff"
 import { useFileComponent } from "@opencode-ai/ui/context/file"
@@ -922,27 +924,70 @@ export function MessageTimeline(props: {
       return
     }
     setSlimming(true)
+    const progressToastId = showToast({
+      variant: "loading",
+      persistent: true,
+      icon: "reset",
+      title: language.t("session.slim.progress.title"),
+      description: language.t("session.slim.progress.description"),
+    })
+    let progressDismissed = false
+    const dismissProgress = () => {
+      if (progressDismissed) return
+      progressDismissed = true
+      dismissToast(progressToastId)
+    }
     try {
       await sdk().api.session.compact({ sessionID: id, model: { providerID: model.provider.id, modelID: model.id } })
       await sdk().api.session.wait({ sessionID: id }).catch(() => undefined)
 
-      const messages = sync().data.message[id] ?? []
-      const summaryMessage = [...messages].reverse().find((message) => message.role === "assistant" && message.summary)
-      const report = summaryMessage
-        ? extractPromptFromParts(sync().data.part[summaryMessage.id] ?? [], {
+      const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+      const maxAttempts = 40
+      let report = ""
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        const messages = sync().data.message[id] ?? []
+        const summaryMessage = [...messages]
+          .reverse()
+          .find((message) => message.role === "assistant" && message.summary)
+        if (summaryMessage) {
+          report = extractPromptFromParts(sync().data.part[summaryMessage.id] ?? [], {
             directory: sdk().directory,
             attachmentName: language.t("common.attachment"),
           })
             .map((part) => ("content" in part ? part.content : ""))
             .join("")
             .trim()
-        : ""
+          if (report) break
+        }
+        await delay(150)
+      }
 
       const created = await sdk()
-        .api.session.create({ agent: agentName, model: { id: model.id, providerID: model.provider.id } })
+        .api.session.create({
+          agent: agentName,
+          model: { id: model.id, providerID: model.provider.id },
+          location: { directory: sdk().directory },
+        })
         .then(normalizeSessionInfo)
       if (!created) throw new Error("Failed to create session")
       const newId = created.id
+
+      // Register the new session client-side the same way the normal new-session
+      // path does (see prompt-input/submit.ts `seed`). Without this, the fresh
+      // session has no message pipeline attached, so the assistant's streamed
+      // reply parts are dropped and only appear after a reload.
+      serverSync().session.remember(created)
+      const [, setChildStore] = serverSync().child(sdk().directory)
+      setChildStore("session", (list: Session[]) => {
+        const result = Binary.search(list, created.id, (item) => item.id)
+        const next = [...list]
+        if (result.found) {
+          next[result.index] = created
+          return next
+        }
+        next.splice(result.index, 0, created)
+        return next
+      })
 
       const base = sessionTitle(info()?.title) ?? language.t("command.session.new")
       const existing = new Set(
@@ -986,7 +1031,15 @@ export function MessageTimeline(props: {
           })
         })
       }
+      dismissProgress()
+      showToast({
+        variant: "success",
+        icon: "circle-check",
+        title: language.t("session.slim.success.title"),
+        description: language.t("session.slim.success.description"),
+      })
     } catch (err) {
+      dismissProgress()
       showToast({
         title: language.t("common.requestFailed"),
         description: err instanceof Error ? err.message : String(err),
