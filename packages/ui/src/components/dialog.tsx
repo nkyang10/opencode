@@ -1,4 +1,4 @@
-import { Dialog as Kobalte } from "@kobalte/core/dialog"
+import { Dialog as Kobalte, useDialogContext } from "@kobalte/core/dialog"
 import { ComponentProps, JSXElement, Match, ParentProps, Show, Switch } from "solid-js"
 import { useI18n } from "../context/i18n"
 import { IconButton } from "./icon-button"
@@ -16,13 +16,15 @@ export interface DialogProps extends ParentProps {
 
 export function Dialog(props: DialogProps) {
   const i18n = useI18n()
+  const dialog = useDialogContext()
   return (
-    <div
-      data-component="dialog"
-      data-fit={props.fit ? true : undefined}
-      data-size={props.size || "normal"}
-      data-transition={props.transition ? true : undefined}
-    >
+    <Show when={dialog.isOpen()}>
+      <div
+        data-component="dialog"
+        data-fit={props.fit ? true : undefined}
+        data-size={props.size || "normal"}
+        data-transition={props.transition ? true : undefined}
+      >
       <div data-slot="dialog-container">
         <Kobalte.Content
           data-slot="dialog-content"
@@ -67,6 +69,7 @@ export function Dialog(props: DialogProps) {
           <div data-slot="dialog-body">{props.children}</div>
         </Kobalte.Content>
       </div>
-    </div>
+      </div>
+    </Show>
   )
 }

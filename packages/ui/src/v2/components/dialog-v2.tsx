@@ -1,4 +1,4 @@
-import { Dialog as Kobalte } from "@kobalte/core/dialog"
+import { Dialog as Kobalte, useDialogContext } from "@kobalte/core/dialog"
 import { type ComponentProps, type JSXElement, type ParentProps, Show, children, splitProps } from "solid-js"
 import { useI18n } from "../../context/i18n"
 import "./dialog-v2.css"
@@ -83,20 +83,22 @@ export function DialogHeader(props: DialogHeaderProps) {
 
 export function Dialog(props: DialogProps) {
   const [local] = splitProps(props, ["size", "variant", "class", "containerClass", "classList", "fit", "children"])
+  const dialog = useDialogContext()
 
   return (
-    <div
-      data-component="dialog-v2"
-      data-variant={local.variant === "settings" ? "settings" : undefined}
-      data-fit={local.fit ? true : undefined}
-      data-size={local.size || "normal"}
-    >
-      <div data-slot="dialog-container" class={local.containerClass}>
-        <Kobalte.Content
-          data-slot="dialog-content"
-          classList={{
-            ...local.classList,
-            [local.class ?? ""]: !!local.class,
+    <Show when={dialog.isOpen()}>
+      <div
+        data-component="dialog-v2"
+        data-variant={local.variant === "settings" ? "settings" : undefined}
+        data-fit={local.fit ? true : undefined}
+        data-size={local.size || "normal"}
+      >
+        <div data-slot="dialog-container" class={local.containerClass}>
+          <Kobalte.Content
+            data-slot="dialog-content"
+            classList={{
+              ...local.classList,
+              [local.class ?? ""]: !!local.class,
           }}
           onOpenAutoFocus={(e) => {
             const target = e.currentTarget as HTMLElement | null
@@ -110,7 +112,8 @@ export function Dialog(props: DialogProps) {
           {local.children}
         </Kobalte.Content>
       </div>
-    </div>
+      </div>
+    </Show>
   )
 }
 
