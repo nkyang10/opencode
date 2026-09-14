@@ -6,6 +6,15 @@ export function treeEntries(parent: string, nodes: ReadonlyArray<{ name: string;
   })
 }
 
+export type DirectoryPickerMode = {
+  includeFiles: boolean
+  action: "directory" | "file"
+  entries: (parent: string, nodes: ReadonlyArray<{ name: string; type: "file" | "directory" }>) => string[]
+  navigation: (path: string) => string | undefined
+  result: (root: string, selected: string, valid: boolean) => string | undefined
+  selection: (root: string, path: string) => string | undefined
+}
+
 export function pickerTreeEntries(
   parent: string,
   nodes: ReadonlyArray<{ name: string; type: "file" | "directory" }>,

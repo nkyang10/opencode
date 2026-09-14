@@ -65,24 +65,62 @@
 }
 
 .directory-picker-v2-tree {
-  display: block;
   width: 100%;
   height: 100%;
-  --trees-bg-override: transparent;
-  --trees-fg-override: var(--v2-text-text-base);
-  --trees-fg-muted-override: var(--v2-text-text-muted);
-  --trees-bg-muted-override: transparent;
-  --trees-selected-bg-override: transparent;
-  --trees-selected-fg-override: var(--v2-text-text-base);
-  --trees-selected-focused-border-color-override: transparent;
-  --trees-focus-ring-color-override: transparent;
-  --trees-focus-ring-width-override: 0px;
-  --trees-focus-ring-offset-override: 0px;
-  --trees-border-color-override: var(--v2-border-border-base);
-  --trees-font-family-override: var(--font-family-sans);
-  --trees-font-size-override: 12px;
-  --trees-item-height: 24px;
-  --trees-border-radius-override: 4px;
+  padding: 4px;
+  font-size: 13px;
+  line-height: 20px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.directory-picker-v2-row {
+  display: flex;
+  align-items: center;
+}
+
+.directory-picker-v2-row [role="treeitem"],
+.directory-picker-v2-row button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  gap: 2px;
+  padding: 0 6px;
+  border-radius: 4px;
+  color: var(--v2-text-text-base, inherit);
+  background: transparent;
+  font-size: inherit;
+  line-height: inherit;
+  text-align: left;
+}
+
+.directory-picker-v2-row [role="treeitem"][data-selected],
+.directory-picker-v2-row [role="treeitem"][aria-selected="true"],
+.directory-picker-v2-row button[aria-selected="true"] {
+  background: var(--v2-overlay-simple-overlay-selected, rgba(127, 127, 127, 0.25));
+}
+
+.directory-picker-v2-row button:hover {
+  background: var(--v2-overlay-simple-overlay-hover);
+}
+
+.directory-picker-v2-row button:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--v2-border-border-base);
+}
+
+.directory-picker-v2-chevron {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  color: var(--v2-text-text-muted);
+  font-size: 10px;
+  transition: transform 120ms ease;
+}
+
+.directory-picker-v2-chevron.is-open {
+  transform: rotate(90deg);
 }
 
 .directory-picker-v2-state {

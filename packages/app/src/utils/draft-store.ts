@@ -21,11 +21,30 @@ function blobUrl(id: string, blob: Blob) {
   return url
 }
 
-async function blobID(blob: Blob) {
-  const id = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await blob.arrayBuffer())))
+function hex(bytes: Uint8Array) {
+  return Array.from(bytes)
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("")
-  return id
+}
+
+function fallbackBlobID(bytes: Uint8Array) {
+  let hash = 0x811c9dc5
+  for (const byte of bytes) hash = (hash ^ byte) * 0x01000193 >>> 0
+  return hash.toString(16).padStart(8, "0")
+}
+
+async function blobID(blob: Blob) {
+  const bytes = await blob.arrayBuffer()
+  const c = globalThis.crypto
+  if (c?.subtle && (typeof globalThis.isSecureContext !== "boolean" || globalThis.isSecureContext)) {
+    try {
+      const digest = await c.subtle.digest("SHA-256", bytes)
+      return hex(new Uint8Array(digest))
+    } catch {
+      /* insecure context: fall through to the non-crypto hash */
+    }
+  }
+  return fallbackBlobID(new Uint8Array(bytes))
 }
 
 export async function createBlobReference(blob: Blob): Promise<BlobReference> {

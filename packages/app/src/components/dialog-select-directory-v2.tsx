@@ -1,5 +1,3 @@
-import "@pierre/trees/web-components"
-import { FileTree } from "@pierre/trees"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@opencode-ai/ui/v2/dialog-v2"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
@@ -14,7 +12,6 @@ import {
   activeTreeNavigation,
   advanceTreePreload,
   nextSuggestionIndex,
-  nextTreeScrollTop,
   pickerFileSearchQuery,
   pickerAbsoluteInput,
   pickerMode,
@@ -28,6 +25,7 @@ import {
   pickerRoot,
   pickerRelativePath,
 } from "./directory-picker-domain"
+import { DirectoryTreeZag, type DirectoryTreeZagApi } from "./directory-tree-zag"
 import "./dialog-select-directory-v2.css"
 import { DividerV2 } from "@opencode-ai/ui/v2/divider-v2"
 import { getFilename } from "@opencode-ai/core/util/path"
@@ -63,8 +61,7 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
   const listings = new Map<string, Promise<Array<{ name: string; type: "file" | "directory" }> | undefined>>()
   const loads = createPriorityTaskQueue<Array<{ name: string; type: "file" | "directory" }> | undefined>(3)
   const advanced = new Set<string>()
-  let tree: FileTree | undefined
-  let container: HTMLDivElement | undefined
+  let treeApi: DirectoryTreeZagApi | undefined
   let pathArea: HTMLDivElement | undefined
   let navigation = 0
 
@@ -149,7 +146,6 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
       if (!key) setError(true)
       return false
     }
-    tree?.batch(policy.entries(key, nodes).map((item) => ({ type: "add", path: item })))
     if (!eager && advanceTreePreload(advanced, key)) {
       for (const directory of preloadTreeDirectories(key, nodes)) void load(directory, generation, true)
     }
@@ -169,7 +165,7 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
     setInput(displayPickerPath(value, value, home()))
     listings.clear()
     advanced.clear()
-    tree?.resetPaths([])
+    treeApi?.reset()
     const valid = await load("", token)
     if (!activeTreeNavigation(token, navigation)) return
     setRootValid(valid)
@@ -197,34 +193,31 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
       await navigate(fileTreeRoot)
     }
     const segments = rel.split("/").filter(Boolean)
+    const targets: string[] = []
     let acc = ""
     let revealed = true
     for (let i = 0; i < segments.length; i++) {
       // Directory rows in the tree store a trailing slash.
       const lookup = acc ? `${acc}/${segments[i]}/` : `${segments[i]}/`
-      await load(acc, navigation)
+      targets.push(lookup)
+      const valid = await load(acc, navigation)
       if (!activeTreeNavigation(navigation, navigation)) return
-      const child = tree?.getItem(lookup)
-      if (!child) {
+      if (!valid) {
         revealed = false
         break
-      }
-      if (i < segments.length - 1) {
-        if (child.isDirectory()) {
-          const directory = child as Extract<typeof child, { isDirectory(): true }>
-          if (!directory.isExpanded()) directory.expand()
-        }
-      } else {
-        child.select()
-        setSelected(policy.selection(root(), lookup) ?? "")
-        setInput(displayPickerPath(absolute, absolute, home()))
-        setSuggestionsOpen(false)
-        setActiveSuggestion(-1)
       }
       acc = acc ? `${acc}/${segments[i]}` : segments[i]
     }
     setLoading(false)
-    if (!revealed) setError(true)
+    if (!revealed) {
+      setError(true)
+      return
+    }
+    treeApi?.reveal(targets)
+    setSelected(policy.selection(root(), targets.at(-1) ?? "") ?? "")
+    setInput(displayPickerPath(absolute, absolute, home()))
+    setSuggestionsOpen(false)
+    setActiveSuggestion(-1)
   }
 
   function complete() {
@@ -295,48 +288,25 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
     }
     document.addEventListener("pointerdown", closeSuggestions)
     onCleanup(() => document.removeEventListener("pointerdown", closeSuggestions))
-    tree = new FileTree({
-      paths: [],
-      flattenEmptyDirectories: false,
-      initialExpansion: "closed",
-      stickyFolders: true,
-      unsafeCSS: `
-        button[data-type="item"] {
-          background: transparent !important;
-          box-shadow: none !important;
-        }
-        button[data-type="item"]:hover {
-          background: var(--v2-overlay-simple-overlay-hover) !important;
-        }
-        button[data-type="item"]:focus-visible {
-          outline: none !important;
-          box-shadow: none !important;
-        }
-        [data-file-tree-virtualized-scroll] {
-          overscroll-behavior: contain;
-          scrollbar-width: thin;
-        }
-      `,
-      onExpansionChange(change) {
-        if (change.expanded) void load(change.path, navigation)
-      },
-      onSelectionChange(paths) {
-        const path = paths.at(-1)
-        setSelected(path ? (policy.selection(root(), path) ?? "") : "")
-      },
-    })
-    if (!container) return
-    tree.render({ containerWrapper: container })
-    tree.getFileTreeContainer()?.classList.add("directory-picker-v2-tree")
   })
+
+  function listDirectory(relative: string): Promise<Array<{ name: string; type: "file" | "directory" }> | undefined> {
+    const key = relative.replace(/\/+$/, "")
+    return load(key, navigation).then((valid) => (valid ? listings.get(key)?.then((nodes) => nodes ?? undefined) : undefined))
+  }
+
+  function handleTreeSelect(path: string) {
+    setSelected(path ? (policy.selection(root(), path) ?? "") : "")
+    setInput(displayPickerPath(path, path, home()))
+    setSuggestionsOpen(false)
+    setActiveSuggestion(-1)
+  }
 
   createEffect(() => {
     const path = start()
     if (!path || root()) return
     void navigate(pickerRoot(path) || path)
   })
-
-  onCleanup(() => tree?.cleanUp())
 
   return (
     <Dialog size="large" class="directory-picker-v2">
@@ -399,32 +369,22 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
             </div>
           </Show>
         </div>
-        <div
-          class="directory-picker-v2-browser"
-          ref={container}
-          onWheel={(event) => {
-            const scroller = tree
-              ?.getFileTreeContainer()
-              ?.shadowRoot?.querySelector<HTMLElement>("[data-file-tree-virtualized-scroll]")
-            if (!scroller) return
-            const next = nextTreeScrollTop(
-              scroller.scrollTop,
-              event.deltaY,
-              scroller.scrollHeight,
-              scroller.clientHeight,
-            )
-            if (next === scroller.scrollTop) return
-            event.preventDefault()
-            scroller.scrollTop = next
-            scroller.dispatchEvent(new Event("scroll"))
-          }}
-        >
+        <div class="directory-picker-v2-browser">
           <Show when={loading()}>
             <div class="directory-picker-v2-state">{language.t("common.loading")}</div>
           </Show>
           <Show when={!loading() && error()}>
             <div class="directory-picker-v2-state">{language.t("dialog.directory.readError")}</div>
           </Show>
+          <DirectoryTreeZag
+            root={root}
+            policy={policy}
+            list={listDirectory}
+            onSelect={handleTreeSelect}
+            ref={(api) => {
+              treeApi = api
+            }}
+          />
         </div>
         <div class="directory-picker-v2-selection">{policy.result(root(), selected(), rootValid())}</div>
       </DialogBody>

@@ -5,7 +5,7 @@ import { type Accessor, createMemo } from "solid-js"
 import type { PromptInputControls } from "@/components/prompt-input/contracts"
 import type { PromptProjectControls } from "@/components/prompt-project-selector"
 import { useDirectoryPicker } from "@/components/directory-picker"
-import { useGlobal } from "@/context/global"
+import { type ServerCtx, useGlobal } from "@/context/global"
 import { useLayout } from "@/context/layout"
 import { useLocal, type ModelSelection } from "@/context/local"
 import type { QueryOptionsApi } from "@/context/server-sync"
@@ -84,11 +84,29 @@ export function createPromptProjectControls() {
         .map((project) => ({ ...project, server: item }))
     })
   })
+  // Registers a (possibly brand-new) folder as a server project scope so sessions created
+  // there can stream replies. Mirrors `home-controller.ts:add` — fire-and-forget; selecting
+  // an already-known project resolves immediately via the project list.
+  const bootstrapProject = (target: ServerCtx, worktree: string) => {
+    if (target.projects.list().some((project) => project.worktree === worktree)) return
+    const location = { directory: worktree }
+    void target.sdk.api.file
+      .list({ path: ".", location })
+      .then(async (files) => {
+        if (files.data.length > 0) return target.sdk.api.project.current({ location })
+        const result = await target.sdk.client.project.initGit({ directory: worktree })
+        return result.data ?? target.sdk.api.project.current({ location })
+      })
+      .then((project) => target.sync.child(worktree, { bootstrap: false })[1]("project", project.id))
+      .catch(() => target.projects.open(worktree))
+  }
+
   const selectProject = (worktree: string, serverKey?: string) => {
     const conn = serverKey ? server.list.find((conn) => ServerConnection.key(conn) === serverKey) : projectServer()
     if (search.draftId) {
       if (!conn) return
       const target = global.ensureServerCtx(conn)
+      bootstrapProject(target, worktree)
       target.projects.open(worktree)
       target.projects.touch(worktree)
       tabs.updateDraft(search.draftId, { server: ServerConnection.key(conn), directory: worktree })
@@ -96,6 +114,7 @@ export function createPromptProjectControls() {
     }
 
     if (!serverKey) {
+      bootstrapProject(global.ensureServerCtx(projectServer()), worktree)
       layout.projects.open(worktree)
       server.projects.touch(worktree)
       navigate(`/${base64Encode(worktree)}/session`)
@@ -104,6 +123,7 @@ export function createPromptProjectControls() {
 
     if (!conn) return
     const target = global.ensureServerCtx(conn)
+    bootstrapProject(target, worktree)
     target.projects.open(worktree)
     target.projects.touch(worktree)
     server.setActive(ServerConnection.key(conn))

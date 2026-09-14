@@ -222,9 +222,26 @@ export function createPromptInputV2Attachments(
 const imageMimes = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"])
 
 async function blobReference(file: File) {
-  const id = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("")
+  let id: string
+  const bytes = await file.arrayBuffer()
+  const c = globalThis.crypto
+  if (c?.subtle && (typeof globalThis.isSecureContext !== "boolean" || globalThis.isSecureContext)) {
+    try {
+      const digest = await c.subtle.digest("SHA-256", bytes)
+      id = Array.from(new Uint8Array(digest))
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("")
+    } catch {
+      id = ""
+    }
+  } else {
+    id = ""
+  }
+  if (!id) {
+    let hash = 0x811c9dc5
+    for (const byte of new Uint8Array(bytes)) hash = (hash ^ byte) * 0x01000193 >>> 0
+    id = hash.toString(16).padStart(8, "0")
+  }
   return { id, url: URL.createObjectURL(file) }
 }
 const imageExtensions = new Map([
