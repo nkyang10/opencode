@@ -70,6 +70,10 @@ export function DirectoryTreeZag(props: DirectoryTreeZagProps) {
     selectionMode: "single",
     expandOnClick: true,
     loadChildren: (details) => listChildren(details.node?.value ?? ROOT_VALUE),
+    onLoadChildrenComplete: (details) => setCollection(details.collection),
+    onLoadChildrenError: () => {
+      // Keep the last known collection on load failure so the tree stays usable.
+    },
     onSelectionChange: (details) => {
       const path = details.selectedValue.at(-1)
       if (path) props.onSelect(path)
@@ -80,13 +84,15 @@ export function DirectoryTreeZag(props: DirectoryTreeZagProps) {
   const api = createMemo(() => treeView.connect(service, normalizeProps))
 
   // Auto-expand the hidden filesystem root so its children render immediately.
+  // Keyed on both root and collection: the initial run happens eagerly (defer:false),
+  // and runs again whenever the root or the adopted collection changes.
   createEffect(
     on(
-      collection,
+      [props.root, collection],
       () => {
         if (collection().rootNode) api().expand([ROOT_VALUE])
       },
-      { defer: true },
+      { defer: false },
     ),
   )
 
@@ -149,11 +155,39 @@ export function DirectoryTreeZag(props: DirectoryTreeZagProps) {
     for (const timer of revealTimers) clearInterval(timer)
   })
 
-  const visible = createMemo<VisibleNodeItem[]>(() => api().getVisibleNodes() as VisibleNodeItem[])
+  // Stable-keyed visible rows: reuse the same wrapper object per node.value across
+  // collection adoptions. Solid's <For> keys by item reference identity, so fresh
+  // {node,indexPath} wrappers on every getVisibleNodes() run would remount every
+  // row (and reset the scroll container to the top). Keeping references stable
+  // lets existing rows survive tree mutations; indexPath/node fields are refreshed
+  // in place and rows re-render reactively through api().
+  const visibleRows = new Map<string, VisibleNodeItem>()
+  const visible = createMemo<VisibleNodeItem[]>(() => {
+    const rows: VisibleNodeItem[] = []
+    const seen = new Set<string>()
+    for (const entry of api().getVisibleNodes() as VisibleNodeItem[]) {
+      const { node, indexPath } = entry
+      const cached = visibleRows.get(node.value)
+      if (cached) {
+        cached.node = node
+        cached.indexPath = indexPath
+        rows.push(cached)
+      } else {
+        const fresh: VisibleNodeItem = { node, indexPath }
+        visibleRows.set(node.value, fresh)
+        rows.push(fresh)
+      }
+      seen.add(node.value)
+    }
+    for (const key of visibleRows.keys()) {
+      if (!seen.has(key)) visibleRows.delete(key)
+    }
+    return rows
+  })
   const depth = (indexPath: number[]) => indexPath.length
 
   return (
-    <div class="directory-picker-v2-tree" role="tree" {...api().getRootProps()}>
+    <div class="directory-picker-v2-tree" {...api().getTreeProps()}>
       <For each={visible()}>
         {(entry) => {
           const node = entry.node
@@ -166,23 +200,28 @@ export function DirectoryTreeZag(props: DirectoryTreeZagProps) {
               class="directory-picker-v2-row"
               style={{ "padding-left": `${(depth(indexPath) - 1) * 14 + 8}px` }}
             >
-              <Show when={isBranch} fallback={null}>
-                <button {...api().getBranchProps(propsFor)}>
-                  <span
-                    class={
-                      state.expanded ? "directory-picker-v2-chevron is-open" : "directory-picker-v2-chevron"
-                    }
-                  >
-                    ▸
-                  </span>
-                  <span {...api().getBranchTextProps(propsFor)}>{String(node.label)}</span>
-                </button>
+              <Show when={isBranch}>
+                <div {...api().getBranchProps(propsFor)}>
+                  <div {...api().getBranchControlProps(propsFor)}>
+                    <button type="button" {...api().getBranchTriggerProps(propsFor)}>
+                      <span
+                        class={
+                          state.expanded
+                            ? "directory-picker-v2-chevron is-open"
+                            : "directory-picker-v2-chevron"
+                        }
+                      >
+                        ▸
+                      </span>
+                    </button>
+                    <span {...api().getBranchTextProps(propsFor)}>{String(node.label)}</span>
+                  </div>
+                </div>
               </Show>
               <Show when={!isBranch}>
-                <button {...api().getItemProps(propsFor)}>
-                  <span class="directory-picker-v2-chevron" style={{ visibility: "hidden" }} />
+                <div {...api().getItemProps(propsFor)}>
                   <span {...api().getItemTextProps(propsFor)}>{String(node.label)}</span>
-                </button>
+                </div>
               </Show>
             </div>
           )
