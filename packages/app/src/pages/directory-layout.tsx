@@ -59,13 +59,18 @@ export function DirectoryDataProvider(
   })
 
   // Returning from background (mobile app switch, bfcache restore) loses SSE updates emitted
-  // while suspended; re-fetch the open session's content once so no tab switching is needed.
+  // while suspended; re-fetch the open session's content and pending question dock once so no
+  // tab switching is needed. The question store is rebuilt from server state, never just echoed
+  // by the (possibly still-alive) event stream, so the decision dialog self-heals too.
   onMount(() => {
     const foreground = () => {
       const id = params.id
       if (!id) return
       void sync()
         .session.sync(id, { force: true })
+        .catch(() => {})
+      void sync()
+        .session.syncQuestions(id)
         .catch(() => {})
     }
     makeEventListener(document, "visibilitychange", () => {

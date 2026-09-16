@@ -1,5 +1,5 @@
 import { Binary } from "@opencode-ai/core/util/binary"
-import type { Message, Part, Session } from "@opencode-ai/sdk/v2/client"
+import type { Message, Part, QuestionRequest, Session } from "@opencode-ai/sdk/v2/client"
 import { createMemo } from "solid-js"
 import { produce, reconcile, type SetStoreFunction } from "solid-js/store"
 import type { createServerSdkContext } from "./server-sdk"
@@ -8,6 +8,10 @@ import type { State } from "./global-sync/types"
 import { normalizeSessionInfo } from "@/utils/session"
 
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
+export const sessionPendingQuestions = (questions: QuestionRequest[] | undefined, sessionID: string) =>
+  (questions ?? [])
+    .filter((q) => !!q?.id && q.sessionID === sessionID)
+    .sort((a, b) => cmp(a.id, b.id))
 const sessionFields = new Set([
   "session_status",
   "session_working",
@@ -115,6 +119,16 @@ export const createDirSyncContext = (
       async sync(sessionID: string, options?: { force?: boolean }) {
         await serverSync.session.sync(sessionID, options)
         index(sessionID)
+      },
+      async syncQuestions(sessionID: string) {
+        const questions = (
+          (await serverSDK.protocol) === "v1"
+            ? ((await serverSDK.client.question.list()).data ?? [])
+            : await serverSDK.api.question.request
+                .list({ location: { directory } })
+                .then((result) => result.data)
+        )
+        set("question", sessionID, reconcile(sessionPendingQuestions(questions, sessionID), { key: "id" }))
       },
       todo: serverSync.session.todo,
       history: serverSync.session.history,
