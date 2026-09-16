@@ -631,6 +631,9 @@ export const dict = {
 
   "toast.language.title": "Dil",
   "toast.language.description": "{{language}} diline geçildi",
+  "toast.serverUpdate.title": "Server updated",
+  "toast.serverUpdate.description": "New server version {{version}} is available",
+  "toast.serverUpdate.refresh": "Refresh",
 
   "toast.theme.title": "Tema değiştirildi",
   "toast.scheme.title": "Renk şeması",
@@ -922,6 +925,10 @@ export const dict = {
   "settings.general.section.sounds": "Ses efektleri",
   "settings.general.section.feed": "Akış",
   "settings.general.section.display": "Ekran",
+  "settings.general.section.debug": "Debug",
+  "settings.general.row.testNotification.title": "Test notification",
+  "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
+  "settings.general.row.testNotification.sendLabel": "Send test",
 
   "settings.general.row.language.title": "Dil",
   "settings.general.row.language.description": "OpenCode'un görünüm dilini değiştirin",

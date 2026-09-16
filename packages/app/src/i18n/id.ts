@@ -638,6 +638,9 @@ export const dict = {
   "language.tr": "Türkçe",
   "toast.language.title": "Bahasa",
   "toast.language.description": "Beralih ke {{language}}",
+  "toast.serverUpdate.title": "Server updated",
+  "toast.serverUpdate.description": "New server version {{version}} is available",
+  "toast.serverUpdate.refresh": "Refresh",
 
   "toast.theme.title": "Tema diganti",
   "toast.scheme.title": "Skema warna",
@@ -1011,6 +1014,10 @@ export const dict = {
   "settings.general.section.sounds": "Efek suara",
   "settings.general.section.feed": "Umpan",
   "settings.general.section.display": "Tampilan",
+  "settings.general.section.debug": "Debug",
+  "settings.general.row.testNotification.title": "Test notification",
+  "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
+  "settings.general.row.testNotification.sendLabel": "Send test",
 
   "settings.general.row.language.title": "Bahasa",
   "settings.general.row.language.description": "Ubah bahasa tampilan untuk OpenCode",

@@ -13,6 +13,7 @@ import { Schema } from "effect"
 import type { ServerConnection } from "@/context/server"
 import { sessionHref } from "@/utils/session-route"
 import { useServerSync } from "@/context/server-sync"
+import { debugLog } from "@/utils/foreground-debug"
 
 export function DirectoryDataProvider(
   props: ParentProps<{
@@ -59,28 +60,56 @@ export function DirectoryDataProvider(
   })
 
   // Returning from background (mobile app switch, bfcache restore) loses SSE updates emitted
-  // while suspended; re-fetch the open session's content and pending question dock once so no
-  // tab switching is needed. The question store is rebuilt from server state, never just echoed
-  // by the (possibly still-alive) event stream, so the decision dialog self-heals too.
+  // while suspended. Re-fetch the open session's content and rebuild the pending question dock
+  // from fresh server state, so the decision dialog self-heals without switching tabs.
+  // iOS Safari doesn't reliably fire `visibilitychange`→visible or bfcache `pageshow` on
+  // app background→foreground, so also track `pagehide` (reliably fired on iOS when leaving)
+  // and re-check on `focus`, re-syncing only if we recently left the page (not routine focus).
   onMount(() => {
+    let lastHiddenAt = 0
+    const markHidden = () => {
+      lastHiddenAt = Date.now()
+    }
     const foreground = () => {
       const id = params.id
       if (!id) return
-      void sync()
-        .session.sync(id, { force: true })
-        .catch(() => {})
-      void sync()
-        .session.syncQuestions(id)
-        .catch(() => {})
+      if (document.visibilityState !== "visible") {
+        debugLog("lyt:foreground", `skip visibility=${document.visibilityState}`)
+        return
+      }
+      debugLog("lyt:foreground", `begin id=${id}`)
+      void Promise.all([
+        sync()
+          .session.sync(id, { force: true })
+          .catch((error) => debugLog("lyt:sync-error", String(error))),
+        sync()
+          .session.syncQuestions(id)
+          .catch((error) => debugLog("lyt:syncq-error", String(error))),
+      ]).then(() => debugLog("lyt:foreground", "end"))
     }
-    makeEventListener(document, "visibilitychange", () => {
-      if (document.visibilityState !== "visible") return
-      foreground()
-    })
-    makeEventListener(window, "pageshow", (event) => {
-      if (!event.persisted) return
-      foreground()
-    })
+    onCleanup(
+      makeEventListener(document, "visibilitychange", () => {
+        debugLog("lyt:visibilitychange", `state=${document.visibilityState}`)
+        if (document.visibilityState === "hidden") {
+          markHidden()
+          return
+        }
+        foreground()
+      }),
+    )
+    onCleanup(
+      makeEventListener(window, "pageshow", (event) => {
+        debugLog("lyt:pageshow", `persisted=${event.persisted}`)
+        if (event.persisted) foreground()
+      }),
+    )
+    onCleanup(makeEventListener(window, "pagehide", markHidden))
+    onCleanup(
+      makeEventListener(window, "focus", () => {
+        debugLog("lyt:focus", `lastHiddenAt=${lastHiddenAt} age=${Date.now() - lastHiddenAt}`)
+        if (lastHiddenAt && Date.now() - lastHiddenAt < 5000) foreground()
+      }),
+    )
   })
 
   return (

@@ -1,6 +1,7 @@
 import { createEffect, Suspense, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { DebugBar } from "@/components/debug-bar"
+import { ServerUpdateRefresh } from "@/components/server-update-refresh"
 import { TabsInfoPopup } from "@/components/help-button"
 import { Titlebar, type TitlebarUpdate } from "@/components/titlebar"
 import { usePlatform } from "@/context/platform"
@@ -32,16 +33,13 @@ export default function NewLayout(props: ParentProps) {
     >
       <Titlebar
         update={update}
-        debugTools={
-          import.meta.env.DEV
-            ? { visible: state.debugTools, toggle: () => setState("debugTools", (value) => !value) }
-            : undefined
-        }
+        debugTools={{ visible: state.debugTools, toggle: () => setState("debugTools", (value) => !value) }}
       />
       <main class="flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col items-start contain-strict">
         <Suspense>{props.children}</Suspense>
       </main>
       {import.meta.env.DEV && state.debugTools && <DebugBar inline />}
+      <ServerUpdateRefresh />
       <TabsInfoPopup />
       <ToastRegion v2 />
     </div>

@@ -20,6 +20,7 @@ import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
+import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 
 import { LayoutRoute, useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
@@ -646,18 +647,32 @@ function TitlebarUpdateIconButton(props: { state: TitlebarUpdatePillState }) {
 }
 
 function ChannelIndicator(props: { debugTools?: { visible: boolean; toggle: () => void } }) {
+  const navigate = useNavigate()
   const channel = import.meta.env.VITE_OPENCODE_CHANNEL
   if (channel === "dev" && props.debugTools) {
     return (
-      <button
-        type="button"
-        class="bg-icon-interactive-base text-[#FFF] font-medium px-2 rounded-sm uppercase font-mono cursor-pointer"
-        onClick={props.debugTools.toggle}
-        aria-label="Toggle debug tools"
-        aria-pressed={props.debugTools.visible}
-      >
-        DEV
-      </button>
+      <DropdownMenu>
+        <DropdownMenu.Trigger
+          type="button"
+          class="bg-icon-interactive-base text-[#FFF] font-medium px-2 rounded-sm uppercase font-mono cursor-pointer"
+          aria-label="DEV menu"
+        >
+          DEV
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content>
+            <DropdownMenu.Item onSelect={() => navigate("/")}>
+              <DropdownMenu.ItemLabel>Home page</DropdownMenu.ItemLabel>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={() => window.location.reload()}>
+              <DropdownMenu.ItemLabel>Refresh</DropdownMenu.ItemLabel>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={props.debugTools.toggle}>
+              <DropdownMenu.ItemLabel>Debug tools</DropdownMenu.ItemLabel>
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu>
     )
   }
 

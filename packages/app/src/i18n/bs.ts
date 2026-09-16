@@ -628,6 +628,9 @@ export const dict = {
 
   "toast.language.title": "Jezik",
   "toast.language.description": "Prebačeno na {{language}}",
+  "toast.serverUpdate.title": "Server updated",
+  "toast.serverUpdate.description": "New server version {{version}} is available",
+  "toast.serverUpdate.refresh": "Refresh",
 
   "toast.theme.title": "Tema promijenjena",
   "toast.scheme.title": "Šema boja",
@@ -917,6 +920,10 @@ export const dict = {
   "settings.general.section.sounds": "Zvučni efekti",
   "settings.general.section.feed": "Feed",
   "settings.general.section.display": "Prikaz",
+  "settings.general.section.debug": "Debug",
+  "settings.general.row.testNotification.title": "Test notification",
+  "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
+  "settings.general.row.testNotification.sendLabel": "Send test",
 
   "settings.general.row.language.title": "Jezik",
   "settings.general.row.language.description": "Promijeni jezik prikaza u OpenCode-u",

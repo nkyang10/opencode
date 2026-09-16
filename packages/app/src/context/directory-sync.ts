@@ -6,6 +6,7 @@ import type { createServerSdkContext } from "./server-sdk"
 import type { createServerSyncContextInner } from "./server-sync"
 import type { State } from "./global-sync/types"
 import { normalizeSessionInfo } from "@/utils/session"
+import { debugLog } from "@/utils/foreground-debug"
 
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 export const sessionPendingQuestions = (questions: QuestionRequest[] | undefined, sessionID: string) =>
@@ -128,7 +129,9 @@ export const createDirSyncContext = (
                 .list({ location: { directory } })
                 .then((result) => result.data)
         )
-        set("question", sessionID, reconcile(sessionPendingQuestions(questions, sessionID), { key: "id" }))
+        const pending = sessionPendingQuestions(questions, sessionID)
+        set("question", sessionID, reconcile(pending, { key: "id" }))
+        debugLog("dir:syncQuestions", `sessionID=${sessionID} all=${questions.length} pending=${pending.length}`)
       },
       todo: serverSync.session.todo,
       history: serverSync.session.history,

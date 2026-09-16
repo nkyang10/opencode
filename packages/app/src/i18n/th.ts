@@ -623,6 +623,9 @@ export const dict = {
 
   "toast.language.title": "ภาษา",
   "toast.language.description": "สลับไปที่ {{language}}",
+  "toast.serverUpdate.title": "Server updated",
+  "toast.serverUpdate.description": "New server version {{version}} is available",
+  "toast.serverUpdate.refresh": "Refresh",
 
   "toast.theme.title": "สลับธีมแล้ว",
   "toast.scheme.title": "โทนสี",
@@ -904,6 +907,10 @@ export const dict = {
   "settings.general.section.sounds": "เสียงเอฟเฟกต์",
   "settings.general.section.feed": "ฟีด",
   "settings.general.section.display": "การแสดงผล",
+  "settings.general.section.debug": "Debug",
+  "settings.general.row.testNotification.title": "Test notification",
+  "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
+  "settings.general.row.testNotification.sendLabel": "Send test",
 
   "settings.general.row.language.title": "ภาษา",
   "settings.general.row.language.description": "เปลี่ยนภาษาที่แสดงสำหรับ OpenCode",

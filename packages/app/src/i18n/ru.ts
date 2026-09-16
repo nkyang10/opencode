@@ -627,6 +627,9 @@ export const dict = {
 
   "toast.language.title": "Язык",
   "toast.language.description": "Переключено на {{language}}",
+  "toast.serverUpdate.title": "Server updated",
+  "toast.serverUpdate.description": "New server version {{version}} is available",
+  "toast.serverUpdate.refresh": "Refresh",
 
   "toast.theme.title": "Тема переключена",
   "toast.scheme.title": "Цветовая схема",
@@ -919,6 +922,10 @@ export const dict = {
   "settings.general.section.sounds": "Звуковые эффекты",
   "settings.general.section.feed": "Лента",
   "settings.general.section.display": "Экран",
+  "settings.general.section.debug": "Debug",
+  "settings.general.row.testNotification.title": "Test notification",
+  "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
+  "settings.general.row.testNotification.sendLabel": "Send test",
 
   "settings.general.row.language.title": "Язык",
   "settings.general.row.language.description": "Изменить язык отображения OpenCode",

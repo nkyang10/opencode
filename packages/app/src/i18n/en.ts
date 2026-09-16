@@ -539,6 +539,9 @@ export const dict = {
 
   "toast.language.title": "Language",
   "toast.language.description": "Switched to {{language}}",
+  "toast.serverUpdate.title": "Server updated",
+  "toast.serverUpdate.description": "New server version {{version}} is available",
+  "toast.serverUpdate.refresh": "Refresh",
 
   "toast.theme.title": "Theme switched",
   "toast.scheme.title": "Color scheme",
@@ -912,6 +915,7 @@ export const dict = {
   "settings.general.section.sounds": "Sound effects",
   "settings.general.section.feed": "Feed",
   "settings.general.section.display": "Display",
+  "settings.general.section.debug": "Debug",
 
   "settings.general.row.language.title": "Language",
   "settings.general.row.language.description": "Change the display language for OpenCode",
@@ -976,6 +980,10 @@ export const dict = {
 
   "settings.general.row.releaseNotes.title": "Release notes",
   "settings.general.row.releaseNotes.description": "Show What's New popups after updates",
+
+  "settings.general.row.testNotification.title": "Test notification",
+  "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
+  "settings.general.row.testNotification.sendLabel": "Send test",
 
   "settings.updates.row.startup.title": "Check for updates on startup",
   "settings.updates.row.startup.description": "Automatically check for updates when OpenCode launches",

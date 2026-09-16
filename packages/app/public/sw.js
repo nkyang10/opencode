@@ -1,4 +1,4 @@
-const TITLE = "OpenCode"
+const TITLE = "MarkCode"
 const ICON = "/web-app-manifest-192x192.png"
 
 self.addEventListener("install", () => {

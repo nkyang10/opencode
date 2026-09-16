@@ -509,6 +509,9 @@ export const dict = {
 
   "toast.language.title": "Sprog",
   "toast.language.description": "Skiftede til {{language}}",
+  "toast.serverUpdate.title": "Server updated",
+  "toast.serverUpdate.description": "New server version {{version}} is available",
+  "toast.serverUpdate.refresh": "Refresh",
 
   "toast.theme.title": "Tema skiftet",
   "toast.scheme.title": "Farveskema",
@@ -793,6 +796,10 @@ export const dict = {
   "settings.general.section.sounds": "Lydeffekter",
   "settings.general.section.feed": "Feed",
   "settings.general.section.display": "Skærm",
+  "settings.general.section.debug": "Debug",
+  "settings.general.row.testNotification.title": "Test notification",
+  "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
+  "settings.general.row.testNotification.sendLabel": "Send test",
 
   "settings.general.row.language.title": "Sprog",
   "settings.general.row.language.description": "Ændr visningssproget for OpenCode",

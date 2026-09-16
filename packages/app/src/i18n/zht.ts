@@ -620,6 +620,9 @@ export const dict = {
 
   "toast.language.title": "語言",
   "toast.language.description": "已切換到 {{language}}",
+  "toast.serverUpdate.title": "伺服器已更新",
+  "toast.serverUpdate.description": "伺服器端已部署新版本 {{version}}",
+  "toast.serverUpdate.refresh": "重新整理",
 
   "toast.theme.title": "主題已切換",
   "toast.scheme.title": "配色方案",
@@ -896,6 +899,10 @@ export const dict = {
   "settings.general.section.sounds": "音效",
   "settings.general.section.feed": "資訊流",
   "settings.general.section.display": "顯示",
+  "settings.general.section.debug": "Debug",
+  "settings.general.row.testNotification.title": "Test notification",
+  "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
+  "settings.general.row.testNotification.sendLabel": "Send test",
 
   "settings.general.row.language.title": "語言",
   "settings.general.row.language.description": "變更 OpenCode 的顯示語言",

@@ -194,6 +194,21 @@ const docRoute = HttpRouter.use((router) => router.add("GET", "/doc", () => Effe
   Layer.provide(authOnlyRouterLayer),
 )
 
+// Temporary foreground-re-sync debug sink: the app reports lifecycle/sync events
+// via GET /__debug?m=<message> and we console.log them (server stdout is
+// redirected to testing/web-4447.log by run-web.sh). Auth-gated like /doc so the
+// mobile app's oc_creds cookie must be present, mirroring the other raw routes.
+const debugRoute = HttpRouter.use((router) =>
+  router.add("GET", "/__debug", (request) =>
+    Effect.gen(function* () {
+      const url = new URL(request.url, "http://localhost")
+      const message = url.searchParams.get("m") ?? ""
+      console.log(`[__debug] ${message}`)
+      return HttpServerResponse.empty()
+    }),
+  ),
+).pipe(Layer.provide(authOnlyRouterLayer))
+
 const uiRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
@@ -291,6 +306,7 @@ export function createRoutes(
     instanceRoutes,
     serverRoutes,
     docRoute,
+    debugRoute,
     pushRoute,
     uiRoute,
   ).pipe(

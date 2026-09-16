@@ -1,4 +1,4 @@
-import { Component, Show, createMemo, createResource } from "solid-js"
+import { Component, Show, createMemo, createResource, onCleanup } from "solid-js"
 import { createMediaQuery } from "@solid-primitives/media"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
@@ -535,6 +535,41 @@ export const SettingsGeneralV2: Component<{
     </Show>
   )
 
+  const TEST_NOTIFICATION_DELAY_MS = 5_000
+  let testNotificationTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => clearTimeout(testNotificationTimer))
+
+  const DebugSection = () => (
+    <Show when={desktop()}>
+      <div class="settings-v2-section">
+        <h3 class="settings-v2-section-title">{language.t("settings.general.section.debug")}</h3>
+
+        <SettingsListV2>
+          <SettingsRowV2
+            title={language.t("settings.general.row.testNotification.title")}
+            description={language.t("settings.general.row.testNotification.description")}
+          >
+            <ButtonV2
+              size="normal"
+              variant="neutral"
+              onClick={() => {
+                clearTimeout(testNotificationTimer)
+                testNotificationTimer = setTimeout(() => {
+                  void platform.notify(
+                    language.t("settings.general.row.testNotification.title"),
+                    language.t("settings.general.row.testNotification.description"),
+                  )
+                }, TEST_NOTIFICATION_DELAY_MS)
+              }}
+            >
+              {language.t("settings.general.row.testNotification.sendLabel")}
+            </ButtonV2>
+          </SettingsRowV2>
+        </SettingsListV2>
+      </div>
+    </Show>
+  )
+
   return (
     <>
       <div class="settings-v2-tab-header">
@@ -565,6 +600,8 @@ export const SettingsGeneralV2: Component<{
         <DisplaySection />
 
         <AdvancedSection />
+
+        <DebugSection />
       </div>
     </>
   )
