@@ -15,6 +15,7 @@ import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { useServerSDK } from "@/context/server-sdk"
 import { useSync } from "@/context/sync"
 import { ScopedKey } from "@/utils/server-scope"
+import { debugLog } from "@/utils/foreground-debug"
 
 const cache = new Map<string, { tab: number; answers: QuestionAnswer[]; custom: string[]; customOn: boolean[] }>()
 
@@ -177,6 +178,7 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
   }
 
   onMount(() => {
+    debugLog("dock:mounted", `requestId=${props.request.id} total=${total()} q=${question()?.question ?? "(none)"}`)
     let raf: number | undefined
     const update = () => {
       if (raf !== undefined) cancelAnimationFrame(raf)

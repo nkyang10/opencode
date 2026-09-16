@@ -122,16 +122,32 @@ export const createDirSyncContext = (
         index(sessionID)
       },
       async syncQuestions(sessionID: string) {
-        const questions = (
-          (await serverSDK.protocol) === "v1"
-            ? ((await serverSDK.client.question.list()).data ?? [])
-            : await serverSDK.api.question.request
-                .list({ location: { directory } })
-                .then((result) => result.data)
+        const protocol = await serverSDK.protocol
+        let fetched = false
+        let questions: QuestionRequest[] = []
+        try {
+          const response =
+            protocol === "v1"
+              ? await serverSDK.client.question.list({ directory })
+              : await serverSDK.api.question.request.list({ location: { directory } })
+          const list = (response as { data?: QuestionRequest[] }).data ?? []
+          questions = Array.isArray(list) ? list : []
+          fetched = true
+        } catch (error) {
+          debugLog("dir:syncQuestions-error", `sessionID=${sessionID} protocol=${protocol} ${String(error)}`)
+        }
+        // Never wipe a store entry we can't confirm server-side (fetch failed or a
+        // scope mismatch returned an empty/unroutable list): the live SSE stream may
+        // still hold the real pending question. Only reconcile when the query really
+        // ran against our directory workspace.
+        const pending = fetched ? sessionPendingQuestions(questions, sessionID) : undefined
+        if (pending !== undefined) set("question", sessionID, reconcile(pending, { key: "id" }))
+        const sessionIds = [...new Set(questions.map((q) => q.sessionID))].slice(0, 5)
+        const own = questions.filter((q) => q.sessionID === sessionID)
+        debugLog(
+          "dir:syncQuestions",
+          `sessionID=${sessionID} protocol=${protocol} fetched=${fetched} all=${questions.length} pending=${pending?.length ?? "-"} firstOwn=${own[0]?.id ?? "-"} otherSessions=${sessionIds.join(",")}`,
         )
-        const pending = sessionPendingQuestions(questions, sessionID)
-        set("question", sessionID, reconcile(pending, { key: "id" }))
-        debugLog("dir:syncQuestions", `sessionID=${sessionID} all=${questions.length} pending=${pending.length}`)
       },
       todo: serverSync.session.todo,
       history: serverSync.session.history,

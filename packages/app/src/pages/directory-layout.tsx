@@ -78,14 +78,24 @@ export function DirectoryDataProvider(
         return
       }
       debugLog("lyt:foreground", `begin id=${id}`)
+      const logState = () => {
+        const q = sync().data.question[id]
+        const count = q?.length ?? 0
+        debugLog(
+          "lyt:state",
+          `id=${id} questionStore=${Array.isArray(q) ? `${count} entries` : "undefined"} first=${q?.[0]?.id ?? "-"}`,
+        )
+      }
       void Promise.all([
         sync()
           .session.sync(id, { force: true })
-          .catch((error) => debugLog("lyt:sync-error", String(error))),
+          .then(logState)
+          .catch((error) => debugLog("lyt:sync-error", `id=${id} ${String(error)}`)),
         sync()
           .session.syncQuestions(id)
-          .catch((error) => debugLog("lyt:syncq-error", String(error))),
-      ]).then(() => debugLog("lyt:foreground", "end"))
+          .then(logState)
+          .catch((error) => debugLog("lyt:syncq-error", `id=${id} ${String(error)}`)),
+      ]).then(() => debugLog("lyt:foreground", `end id=${id}`))
     }
     onCleanup(
       makeEventListener(document, "visibilitychange", () => {

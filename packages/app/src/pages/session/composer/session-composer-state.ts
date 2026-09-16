@@ -4,6 +4,7 @@ import { createStore, produce } from "solid-js/store"
 import type { PermissionRequest, QuestionRequest, Todo } from "@opencode-ai/sdk/v2"
 import { useParams } from "@solidjs/router"
 import { showToast } from "@/utils/toast"
+import { debugLog } from "@/utils/foreground-debug"
 import { useServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
 import { usePermission } from "@/context/permission"
@@ -37,6 +38,16 @@ export function createSessionComposerController(options?: { closeMs?: number | (
   const questionRequest = createMemo((): QuestionRequest | undefined => {
     return sessionQuestionRequest(sync().data.session, sync().data.question, params.id)
   })
+
+  createEffect(
+    on(questionRequest, (request) => {
+      const q = request?.questions?.[0]
+      debugLog(
+        "composer:questionRequest",
+        `sessionID=${params.id} ${request ? `shown id=${request.id} q=${q?.question ?? "(empty questions)"}` : "hidden"}`,
+      )
+    }),
+  )
 
   const permissionRequest = createMemo((): PermissionRequest | undefined => {
     return sessionPermissionRequest(sync().data.session, sync().data.permission, params.id, (item) => {
