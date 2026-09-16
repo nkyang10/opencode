@@ -13,7 +13,7 @@ import {
 } from "@/context/global-sync/home-session-index"
 import type { LocalProject } from "@/context/layout"
 import { useLanguage } from "@/context/language"
-import { ServerConnection } from "@/context/server"
+import { ServerConnection, serverName } from "@/context/server"
 import { sessionHasOpenTab, useTabs } from "@/context/tabs"
 import { compareSessionTime, displayName, errorMessage, projectForSession } from "@/pages/layout/helpers"
 import { useSessionTabAvatarState } from "@/pages/layout/project-avatar-state"
@@ -176,6 +176,7 @@ export function createHomeSessionsController(home: HomeController) {
     session: {
       showProjectName: () => !home.project.selected(),
       server: () => home.selection.value().server,
+      serverName: () => serverName(home.server.focused()),
       canCreate: () => !!home.project.newSession(),
       create: home.project.openNewSession,
       open: (session: Session, options?: OpenSessionOptions) => {

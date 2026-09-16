@@ -14,6 +14,7 @@ export function HomeSessions(props: {
       groups={props.sessions.data.groups}
       showProjectName={props.sessions.session.showProjectName}
       server={props.sessions.session.server}
+      serverName={props.sessions.session.serverName}
       canCreateSession={props.sessions.session.canCreate}
       searchValue={props.search.query.value}
       searchPlaceholder={props.search.query.placeholder}

@@ -17,6 +17,7 @@ export type HomeSessionsTableProps = {
   language: ReturnType<typeof useLanguage>
   records: () => HomeSessionRecord[]
   server: () => ServerConnection.Key
+  serverName: () => string
   isOpenTab: (record: HomeSessionRecord) => boolean
   onOpenSession: (record: HomeSessionRecord, options?: OpenSessionOptions) => void
 }
@@ -37,6 +38,7 @@ export function HomeSessionsTable(props: HomeSessionsTableProps) {
           {(record) => (
             <HomeSessionTableRow
               server={props.server}
+              serverName={props.serverName}
               record={record}
               isOpenTab={props.isOpenTab}
               onOpen={props.onOpenSession}
@@ -55,6 +57,7 @@ export function HomeSessionsTable(props: HomeSessionsTableProps) {
 
 function HomeSessionTableRow(props: {
   server: Accessor<ServerConnection.Key>
+  serverName: () => string
   record: HomeSessionRecord
   isOpenTab: (record: HomeSessionRecord) => boolean
   onOpen: (record: HomeSessionRecord, options?: OpenSessionOptions) => void
@@ -106,6 +109,10 @@ function HomeSessionTableRow(props: {
 
             <Show when={projectName()}>
               <span class="flex min-w-0 items-center gap-1 text-v2-text-text-secondary">
+                <Show when={props.serverName()}>
+                  <span class="truncate text-xs text-v2-text-text-faint [font-weight:440]">{props.serverName()}</span>
+                  <span class="shrink-0 text-xs text-v2-text-text-faint"> / </span>
+                </Show>
                 <Icon name="folder" size="small" class="shrink-0 text-v2-text-text-faint" />
                 <span class="truncate text-xs [font-weight:440]">
                   {projectName()}

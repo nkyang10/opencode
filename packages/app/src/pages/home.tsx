@@ -56,6 +56,7 @@ export function NewHome() {
               language={projects.copy.language}
               records={tableSessions.data.records}
               server={tableSessions.session.server}
+              serverName={tableSessions.session.serverName}
               isOpenTab={tableSessions.tab.isOpen}
               onOpenSession={(record, options) => tableSessions.session.open(record.session, options)}
             />

@@ -8,7 +8,7 @@ import {
 } from "@/context/global-sync/home-session-index"
 import type { LocalProject } from "@/context/layout"
 import { useLanguage } from "@/context/language"
-import { ServerConnection } from "@/context/server"
+import { ServerConnection, serverName } from "@/context/server"
 import { useServerSync } from "@/context/server-sync"
 import { sessionHasOpenTab, useTabs } from "@/context/tabs"
 import { compareSessionTime, displayName, projectForSession } from "@/pages/layout/helpers"
@@ -136,6 +136,7 @@ export function createHomeSessionsTableController(home: HomeController) {
     session: {
       showProjectName: () => true,
       server,
+      serverName: () => serverName(home.server.focused()),
       open,
     },
     tab: {

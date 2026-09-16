@@ -41,6 +41,7 @@ export type HomeSessionsViewProps = {
   groups: Accessor<HomeSessionGroup[]>
   showProjectName: Accessor<boolean>
   server: Accessor<ServerConnection.Key>
+  serverName: Accessor<string>
   canCreateSession: Accessor<boolean>
   searchValue: Accessor<string>
   searchPlaceholder: Accessor<string>
@@ -385,7 +386,7 @@ function HomeSessionSearchResultRow(
       <div class="flex min-w-0 flex-1 items-center gap-1.5">
         <HomeSessionTitle title={title()} showProjectName={!!showProjectName()} search />
         <Show when={showProjectName()}>
-          <HomeSessionProjectName name={props.record.projectName} search />
+          <HomeSessionProjectName name={props.record.projectName} serverName={props.serverName()} search />
         </Show>
       </div>
     </button>
@@ -450,7 +451,7 @@ function HomeSessionRow(props: HomeSessionsViewProps & { record: HomeSessionReco
         />
         <HomeSessionTitle title={title()} showProjectName={!!showProjectName()} />
         <Show when={showProjectName()}>
-          <HomeSessionProjectName name={props.record.projectName} />
+          <HomeSessionProjectName name={props.record.projectName} serverName={props.serverName()} />
         </Show>
       </button>
       <Show when={SHOW_HOME_SESSION_ARCHIVE}>
@@ -495,12 +496,18 @@ function HomeSessionTitle(props: { title: string; showProjectName: boolean; sear
   )
 }
 
-function HomeSessionProjectName(props: { name: string; search?: boolean }) {
+function HomeSessionProjectName(props: { name: string; serverName?: string; search?: boolean }) {
   return (
     <span
       class="min-w-0 flex-[1_1_auto] overflow-hidden text-ellipsis whitespace-nowrap text-v2-text-text-muted [font-weight:440]"
       classList={{ "text-[13px] leading-4 tracking-[-0.04px]": !!props.search }}
     >
+      <Show when={props.serverName}>
+        <span class="text-v2-text-text-faint">
+          {props.serverName}
+          <span aria-hidden="true"> / </span>
+        </span>
+      </Show>
       {props.name}
     </span>
   )
