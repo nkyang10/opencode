@@ -1,5 +1,5 @@
 import { useGlobal } from "@/context/global"
-import { type HomeProjectSelection, useLayout } from "@/context/layout"
+import { type HomeProjectSelection, type LocalProject, useLayout } from "@/context/layout"
 import { ServerConnection, useServer } from "@/context/server"
 import { useServerSync } from "@/context/server-sync"
 import { useTabs } from "@/context/tabs"
@@ -22,7 +22,13 @@ export function createHomeController() {
     return global.ensureServerCtx(conn)
   })
   const focusedSync = () => focusedServerCtx()?.sync ?? sync()
-  const projects = createMemo(() => focusedServerCtx()?.projects.list() ?? layout.projects.list())
+  // The Home project list is the SOURCE OF TRUTH from the server (/project),
+  // NOT the per-device localStorage store. This keeps the "starting project
+  // selection" session list identical across devices/browsers.
+  const projects = createMemo<LocalProject[]>(() =>
+    focusedSync()
+      .data.project.map((project) => ({ ...project, expanded: false })),
+  )
   const recentlyClosed = createMemo(
     () => focusedServerCtx()?.projects.recentlyClosed() ?? layout.projects.recentlyClosed(),
   )
@@ -77,13 +83,13 @@ export function createHomeController() {
       select: (conn: ServerConnection.Any, directory: string) => {
         const key = ServerConnection.key(conn)
         if (global.servers.health[key]?.healthy === false) return
-        if (
-          !global
-            .ensureServerCtx(conn)
-            .projects.list()
-            .some((project) => project.worktree === directory)
-        )
-          return
+        // Accept any directory known to the server, even before this device has
+        // added it to its (now deprecated) local open-projects store.
+        const serverProjects =
+          conn === focusedServer()
+            ? focusedSync().data.project
+            : global.ensureServerCtx(conn).sync.data.project
+        if (!serverProjects.some((project) => project.worktree === directory)) return
         setSelection(toggleHomeProjectSelection(selection(), key, directory))
       },
       add: (conn: ServerConnection.Any, directories: string[]) => {
