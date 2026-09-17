@@ -385,6 +385,12 @@ import type {
   V2SessionWaitResponses,
   V2SkillListErrors,
   V2SkillListResponses,
+  V2SkillRemoveErrors,
+  V2SkillRemoveResponses,
+  V2SkillSetEnabledErrors,
+  V2SkillSetEnabledResponses,
+  V2SkillUpdateErrors,
+  V2SkillUpdateResponses,
   VcsApplyErrors,
   VcsApplyResponses,
   VcsDiffErrors,
@@ -6542,6 +6548,119 @@ export class Skill extends HeyApiClient {
       url: "/api/skill",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * Remove skill
+   *
+   * Delete a skill's SKILL.md file from disk.
+   */
+  public remove<ThrowOnError extends boolean = false>(
+    parameters: {
+      name: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "name" },
+            { in: "query", key: "location" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<V2SkillRemoveResponses, V2SkillRemoveErrors, ThrowOnError>({
+      url: "/api/skill/{name}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Update skill
+   *
+   * Overwrite a skill's SKILL.md content. Re-enables a disabled skill.
+   */
+  public update<ThrowOnError extends boolean = false>(
+    parameters: {
+      name: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+      content?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "name" },
+            { in: "query", key: "location" },
+            { in: "body", key: "content" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2SkillUpdateResponses, V2SkillUpdateErrors, ThrowOnError>({
+      url: "/api/skill/{name}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Enable or disable a skill
+   *
+   * Toggle a skill's enabled state via marker-file rename.
+   */
+  public setEnabled<ThrowOnError extends boolean = false>(
+    parameters: {
+      name: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+      enabled?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "name" },
+            { in: "query", key: "location" },
+            { in: "body", key: "enabled" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2SkillSetEnabledResponses, V2SkillSetEnabledErrors, ThrowOnError>({
+      url: "/api/skill/{name}/enabled",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 }

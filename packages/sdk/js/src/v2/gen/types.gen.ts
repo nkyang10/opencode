@@ -1934,6 +1934,7 @@ export type Config = {
   enabled_providers?: Array<string>
   model?: string
   small_model?: string
+  visual_model?: string
   default_agent?: string
   subagent_depth?: number
   username?: string
@@ -5022,6 +5023,7 @@ export type SkillV2Info = {
   slash?: boolean
   location: string
   content: string
+  enabled?: boolean
 }
 
 export type ModelsDevRefreshed = {
@@ -11256,6 +11258,7 @@ export type V2HealthGetResponses = {
    */
   200: {
     healthy: true
+    version: string
   }
 }
 
@@ -12967,6 +12970,136 @@ export type V2SkillListResponses = {
 }
 
 export type V2SkillListResponse = V2SkillListResponses[keyof V2SkillListResponses]
+
+export type V2SkillRemoveData = {
+  body?: never
+  path: {
+    name: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/skill/{name}"
+}
+
+export type V2SkillRemoveErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * UnknownError
+   */
+  500: UnknownError1
+}
+
+export type V2SkillRemoveError = V2SkillRemoveErrors[keyof V2SkillRemoveErrors]
+
+export type V2SkillRemoveResponses = {
+  /**
+   * <No Content>
+   */
+  204: void
+}
+
+export type V2SkillRemoveResponse = V2SkillRemoveResponses[keyof V2SkillRemoveResponses]
+
+export type V2SkillUpdateData = {
+  body: {
+    content: string
+  }
+  path: {
+    name: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/skill/{name}"
+}
+
+export type V2SkillUpdateErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * UnknownError
+   */
+  500: UnknownError1
+}
+
+export type V2SkillUpdateError = V2SkillUpdateErrors[keyof V2SkillUpdateErrors]
+
+export type V2SkillUpdateResponses = {
+  /**
+   * Success
+   */
+  200: {
+    location: LocationInfo
+    data: SkillV2Info
+  }
+}
+
+export type V2SkillUpdateResponse = V2SkillUpdateResponses[keyof V2SkillUpdateResponses]
+
+export type V2SkillSetEnabledData = {
+  body: {
+    enabled: boolean
+  }
+  path: {
+    name: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/skill/{name}/enabled"
+}
+
+export type V2SkillSetEnabledErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * UnknownError
+   */
+  500: UnknownError1
+}
+
+export type V2SkillSetEnabledError = V2SkillSetEnabledErrors[keyof V2SkillSetEnabledErrors]
+
+export type V2SkillSetEnabledResponses = {
+  /**
+   * Success
+   */
+  200: {
+    location: LocationInfo
+    data: SkillV2Info
+  }
+}
+
+export type V2SkillSetEnabledResponse = V2SkillSetEnabledResponses[keyof V2SkillSetEnabledResponses]
 
 export type V2EventSubscribeData = {
   body?: never

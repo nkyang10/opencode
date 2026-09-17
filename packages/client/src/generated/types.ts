@@ -101,7 +101,7 @@ export type ProjectCopyError = {
 export const isProjectCopyError = (value: unknown): value is ProjectCopyError =>
   typeof value === "object" && value !== null && "name" in value && value["name"] === "ProjectCopyError"
 
-export type HealthGetOutput = { readonly healthy: true }
+export type HealthGetOutput = { readonly healthy: true; readonly version: string }
 
 export type LocationGetInput = {
   readonly location?: {
@@ -2535,8 +2535,66 @@ export type SkillsListOutput = {
     readonly slash?: boolean
     readonly location: string
     readonly content: string
+    readonly enabled?: boolean
   }>
 }
+
+export type SkillsUpdateInput = {
+  readonly name: { readonly name: string }["name"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+  readonly content: { readonly content: string }["content"]
+}
+
+export type SkillsUpdateOutput = {
+  readonly location: {
+    readonly directory: string
+    readonly workspaceID?: string
+    readonly project: { readonly id: string; readonly directory: string }
+  }
+  readonly data: {
+    readonly name: string
+    readonly description?: string
+    readonly slash?: boolean
+    readonly location: string
+    readonly content: string
+    readonly enabled?: boolean
+  }
+}
+
+export type SkillsSetEnabledInput = {
+  readonly name: { readonly name: string }["name"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+  readonly enabled: { readonly enabled: boolean }["enabled"]
+}
+
+export type SkillsSetEnabledOutput = {
+  readonly location: {
+    readonly directory: string
+    readonly workspaceID?: string
+    readonly project: { readonly id: string; readonly directory: string }
+  }
+  readonly data: {
+    readonly name: string
+    readonly description?: string
+    readonly slash?: boolean
+    readonly location: string
+    readonly content: string
+    readonly enabled?: boolean
+  }
+}
+
+export type SkillsRemoveInput = {
+  readonly name: { readonly name: string }["name"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+}
+
+export type SkillsRemoveOutput = void
 
 export type EventsSubscribeOutput = OpenCodeEventEncoded
 

@@ -1,6 +1,6 @@
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
 import { SegmentedControlV2, SegmentedControlItemV2 } from "@opencode-ai/ui/v2/segmented-control-v2"
-import { createSignal, Show } from "solid-js"
+import { createSignal, Switch, Match } from "solid-js"
 import { createHomeController } from "./home/home-controller"
 import { createHomeProjectsController } from "./home/home-projects-controller"
 import { HomeUtilityNav } from "./home/home-projects-view"
@@ -9,16 +9,19 @@ import { createHomeScrollController } from "./home/home-scroll-controller"
 import { createHomeSessionSearchController } from "./home/home-session-search-controller"
 import { createHomeSessionsController } from "./home/home-sessions-controller"
 import { createHomeSessionsTableController } from "./home/home-sessions-table-controller"
+import { createHomeSkillsController } from "./home/home-skills-controller"
 import { HomeSessions } from "./home/home-sessions"
 import { HomeSessionsTable } from "./home/home-sessions-table"
+import { HomeSkills } from "./home/home-skills"
 
-type HomeTab = "projects" | "sessions"
+type HomeTab = "projects" | "sessions" | "skills"
 
 export function NewHome() {
   const home = createHomeController()
   const projects = createHomeProjectsController(home)
   const sessions = createHomeSessionsController(home)
   const tableSessions = createHomeSessionsTableController(home)
+  const skills = createHomeSkillsController(home)
   const search = createHomeSessionSearchController(home, sessions)
   const scroll = createHomeScrollController(sessions.data.groups)
   const [activeTab, setActiveTab] = createSignal<HomeTab>("sessions")
@@ -41,6 +44,9 @@ export function NewHome() {
         <SegmentedControlItemV2 value="sessions">
           {projects.copy.language.t("home.sessions.search.sessions")}
         </SegmentedControlItemV2>
+        <SegmentedControlItemV2 value="skills">
+          {projects.copy.language.t("home.skills")}
+        </SegmentedControlItemV2>
       </SegmentedControlV2>
 
       <ScrollView
@@ -49,9 +55,28 @@ export function NewHome() {
         thumbHoverTarget={scroll.viewport.hoverTarget}
         onWheel={scroll.viewport.containOuterWheel}
       >
-        <Show
-          when={activeTab() === "projects"}
-          fallback={
+        <Switch>
+          <Match when={activeTab() === "skills"}>
+            <HomeSkills skills={skills} language={projects.copy.language} />
+          </Match>
+          <Match when={activeTab() === "projects"}>
+            <div
+              class={`
+                mx-auto grid min-h-full w-full max-w-[1080px] grid-rows-[auto_minmax(0,1fr)_auto] gap-4 px-3
+                lg:grid-cols-[280px_minmax(0,720px)] lg:grid-rows-1 lg:gap-8 lg:px-6
+              `}
+            >
+              <HomeProjects projects={projects} scroll={scroll} />
+              <HomeSessions sessions={sessions} search={search} scroll={scroll} />
+              <HomeUtilityNav
+                class="flex lg:hidden"
+                onOpenSettings={projects.utility.settings}
+                onOpenHelp={projects.utility.help}
+                language={projects.copy.language}
+              />
+            </div>
+          </Match>
+          <Match when={activeTab() === "sessions"}>
             <HomeSessionsTable
               language={projects.copy.language}
               records={tableSessions.data.records}
@@ -60,24 +85,8 @@ export function NewHome() {
               isOpenTab={tableSessions.tab.isOpen}
               onOpenSession={(record, options) => tableSessions.session.open(record.session, options)}
             />
-          }
-        >
-          <div
-            class={`
-              mx-auto grid min-h-full w-full max-w-[1080px] grid-rows-[auto_minmax(0,1fr)_auto] gap-4 px-3
-              lg:grid-cols-[280px_minmax(0,720px)] lg:grid-rows-1 lg:gap-8 lg:px-6
-            `}
-          >
-            <HomeProjects projects={projects} scroll={scroll} />
-            <HomeSessions sessions={sessions} search={search} scroll={scroll} />
-            <HomeUtilityNav
-              class="flex lg:hidden"
-              onOpenSettings={projects.utility.settings}
-              onOpenHelp={projects.utility.help}
-              language={projects.copy.language}
-            />
-          </div>
-        </Show>
+          </Match>
+        </Switch>
       </ScrollView>
     </div>
   )

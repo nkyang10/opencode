@@ -77,12 +77,14 @@ describe("SkillV2", () => {
               slash: true,
               location: AbsolutePath.make(path.join(first, "foo.md")),
               content: "# foo",
+              enabled: true,
             }),
             {
               name: "review",
               description: "Second",
               location: AbsolutePath.make(path.join(second, "review", "SKILL.md")),
               content: "# review",
+              enabled: true,
             },
           ])
         }),
@@ -118,6 +120,49 @@ describe("SkillV2", () => {
           expect((yield* skill.list()).map((item) => item.name)).toEqual(["deploy"])
           expect(pulls).toBe(1)
           expect(SkillV2.available(yield* skill.list(), (yield* agents.get(AgentV2.ID.make("reviewer")))!)).toEqual([])
+        }),
+      ),
+    ),
+  )
+
+  it.live("updates, enables/disables, and removes skills on disk", () =>
+    Effect.acquireRelease(
+      Effect.promise(() => tmpdir()),
+      (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
+    ).pipe(
+      Effect.flatMap((tmp) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(async () => {
+            await fs.mkdir(path.join(tmp.path, "review"), { recursive: true })
+            await write(tmp.path, "review", "Second")
+          })
+
+          const skill = yield* SkillV2.Service
+          yield* skill.transform((editor) => editor.source({ type: "directory", path: AbsolutePath.make(tmp.path) }))
+
+          const list = () => skill.list()
+
+          expect((yield* list()).map((item) => item.name)).toEqual(["review"])
+
+          const updated = yield* skill.update("review", "---\nname: review\ndescription: Edited\n---\n# Edited")
+          expect(updated.content).toBe("# Edited")
+          expect(updated.enabled).toBe(true)
+          expect(yield* Effect.promise(() => fs.readFile(path.join(tmp.path, "review", "SKILL.md"), "utf8"))).toContain("# Edited")
+
+          const disabled = yield* skill.setEnabled("review", false)
+          expect(disabled.enabled).toBe(false)
+          expect(disabled.location.endsWith(".SKILL.md.disabled")).toBe(true)
+          const disabledList = yield* list()
+          expect(disabledList).toHaveLength(1)
+          expect(disabledList[0].name).toBe("review")
+          expect(disabledList[0].enabled).toBe(false)
+
+          const reenabled = yield* skill.setEnabled("review", true)
+          expect(reenabled.enabled).toBe(true)
+          expect(reenabled.location.endsWith("SKILL.md")).toBe(true)
+
+          yield* skill.remove("review")
+          expect(yield* list()).toHaveLength(0)
         }),
       ),
     ),

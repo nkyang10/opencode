@@ -85,6 +85,12 @@ import type {
   CommandsListOutput,
   SkillsListInput,
   SkillsListOutput,
+  SkillsUpdateInput,
+  SkillsUpdateOutput,
+  SkillsSetEnabledInput,
+  SkillsSetEnabledOutput,
+  SkillsRemoveInput,
+  SkillsRemoveOutput,
   EventsSubscribeOutput,
   PtysListInput,
   PtysListOutput,
@@ -804,6 +810,44 @@ export function make(options: ClientOptions) {
             successStatus: 200,
             declaredStatuses: [401, 400],
             empty: false,
+          },
+          requestOptions,
+        ),
+      update: (input: SkillsUpdateInput, requestOptions?: RequestOptions) =>
+        request<SkillsUpdateOutput>(
+          {
+            method: "POST",
+            path: `/api/skill/${encodeURIComponent(input.name)}`,
+            query: { location: input["location"] },
+            body: { content: input["content"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      setEnabled: (input: SkillsSetEnabledInput, requestOptions?: RequestOptions) =>
+        request<SkillsSetEnabledOutput>(
+          {
+            method: "POST",
+            path: `/api/skill/${encodeURIComponent(input.name)}/enabled`,
+            query: { location: input["location"] },
+            body: { enabled: input["enabled"] },
+            successStatus: 200,
+            declaredStatuses: [400, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      remove: (input: SkillsRemoveInput, requestOptions?: RequestOptions) =>
+        request<SkillsRemoveOutput>(
+          {
+            method: "DELETE",
+            path: `/api/skill/${encodeURIComponent(input.name)}`,
+            query: { location: input["location"] },
+            successStatus: 204,
+            declaredStatuses: [400, 500, 401],
+            empty: true,
           },
           requestOptions,
         ),
