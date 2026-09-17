@@ -70,6 +70,13 @@
     font-weight: var(--font-weight-regular);
   }
 
+  [data-slot="session-turn-thinking-elapsed"] {
+    flex: none;
+    color: var(--text-weaker);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
   .error-card {
     color: var(--v2-text-text-base);
     max-height: 240px;

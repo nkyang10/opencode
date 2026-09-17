@@ -140,12 +140,32 @@ const markBoundaryGesture = (input: {
   }
 }
 
-function TimelineThinkingRow(props: { reasoningHeading?: string; showReasoningSummaries: boolean }) {
+function TimelineThinkingRow(props: {
+  reasoningHeading?: string
+  showReasoningSummaries: boolean
+  baseTime?: number
+}) {
   const language = useLanguage()
+  const [now, setNow] = createSignal(Date.now())
+
+  createEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    onCleanup(() => window.clearInterval(id))
+  })
+
+  const elapsedSeconds = createMemo(() => {
+    if (typeof props.baseTime !== "number") return 0
+    return Math.max(0, Math.floor((now() - props.baseTime) / 1000))
+  })
 
   return (
     <div data-slot="session-turn-thinking">
       <TextShimmer text={language.t("ui.sessionTurn.status.thinking")} />
+      <Show when={elapsedSeconds() > 0}>
+        <span data-slot="session-turn-thinking-elapsed">
+          {language.t("ui.message.duration.seconds", { count: elapsedSeconds() })}
+        </span>
+      </Show>
       <Show when={!props.showReasoningSummaries}>
         <TextReveal text={props.reasoningHeading} class="session-turn-thinking-heading" travel={25} duration={700} />
       </Show>
@@ -1343,12 +1363,16 @@ export function MessageTimeline(props: {
       }
       case "Thinking": {
         const thinkingRow = row as Accessor<TimelineRowByTag<"Thinking">>
+        const turnAssistantMessages = assistantMessagesByParent().get(thinkingRow().userMessageID)
+        const baseTime =
+          turnAssistantMessages?.at(-1)?.time.created ?? messageByID().get(thinkingRow().userMessageID)?.time.created
         return (
           <TimelineRowFrame row={thinkingRow}>
             <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
               <TimelineThinkingRow
                 reasoningHeading={thinkingRow().reasoningHeading}
                 showReasoningSummaries={settings.general.showReasoningSummaries()}
+                baseTime={baseTime}
               />
             </div>
           </TimelineRowFrame>
