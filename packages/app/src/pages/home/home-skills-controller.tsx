@@ -23,7 +23,7 @@ export function createHomeSkillsController(home: HomeController) {
       const current = client()
       if (!current) return []
       const result = await current.v2.skill.list({}, { signal })
-      return (result as { data?: SkillV2Info[] }).data ?? []
+      return (result.data as { data?: SkillV2Info[] } | undefined)?.data ?? []
     },
   }))
 
