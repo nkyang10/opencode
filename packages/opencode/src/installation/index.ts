@@ -1,7 +1,9 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
-import { Effect, Layer, Schema, Context, Stream } from "effect"
+import { Effect, Layer, Schema, Context } from "effect"
+import { mkdir as fsMkdir, writeFile as fsWriteFile } from "fs/promises"
+import { tmpdir, platform as osPlatform, arch as osArch } from "os"
 import { serviceUse } from "@opencode-ai/core/effect/service-use"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { withTransientReadRetry } from "@/util/effect-http-client"
@@ -62,6 +64,14 @@ export class UpgradeFailedError extends Schema.TaggedErrorClass<UpgradeFailedErr
 
 // Response schemas for external version APIs
 const GitHubRelease = Schema.Struct({ tag_name: Schema.String })
+const GitHubAsset = Schema.Struct({
+  name: Schema.String,
+  browser_download_url: Schema.String,
+})
+const GitHubReleaseDetailed = Schema.Struct({
+  tag_name: Schema.String,
+  assets: Schema.Array(GitHubAsset),
+})
 const NpmPackage = Schema.Struct({ version: Schema.String })
 const BrewFormula = Schema.Struct({ versions: Schema.Struct({ stable: Schema.String }) })
 const BrewInfoV2 = Schema.Struct({
@@ -142,18 +152,44 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
       return "sh"
     })
 
+    const forkAssetName = () => {
+      const osName = osPlatform() === "win32" ? "windows" : osPlatform()
+      const arch = osArch()
+      const ext = osPlatform() === "win32" ? "zip" : "tar.gz"
+      return `opencode-${osName}-${arch}.${ext}`
+    }
+
     const upgradeCurl = Effect.fnUntraced(
       function* (target: string) {
-        const response = yield* httpOk.execute(HttpClientRequest.get("https://opencode.ai/install"))
-        const body = yield* response.text
-        const bodyBytes = new TextEncoder().encode(body)
+        const response = yield* httpOk.execute(
+          HttpClientRequest.get("https://api.github.com/repos/nkyang10/opencode/releases/latest").pipe(
+            HttpClientRequest.acceptJson,
+            HttpClientRequest.setHeader("user-agent", USER_AGENT),
+          ),
+        )
+        const release = yield* HttpClientResponse.schemaBodyJson(GitHubReleaseDetailed)(response)
+        const asset = release.assets.find((a) => a.name === forkAssetName())
+        if (!asset) return yield* new UpgradeFailedError({ stderr: `no matching asset found for ${forkAssetName()}` })
+
+        const archive = yield* httpOk.execute(HttpClientRequest.get(asset.browser_download_url))
+        const bytes = yield* archive.arrayBuffer
+
+        const installDir = path.dirname(process.execPath)
+        const work = path.join(tmpdir(), `opencode-upgrade-${target}`)
+        yield* Effect.promise(() =>
+          fsMkdir(work, { recursive: true }).then(() =>
+            fsWriteFile(`${work}/archive.${osPlatform() === "win32" ? "zip" : "tar.gz"}`, new Uint8Array(bytes)),
+          ),
+        )
+
         const shell = yield* upgradeScriptShell()
+        const unpack =
+          osPlatform() === "win32"
+            ? `cd /d ${work} && unzip -o archive.zip opencode`
+            : `tar -xzf ${work}/archive.tar.gz -C ${work} opencode`
+        const move = `chmod +x ${work}/opencode && mv -f ${work}/opencode ${installDir}/opencode.new && mv -f ${installDir}/opencode.new ${process.execPath}`
         const result = yield* appProcess.run(
-          ChildProcess.make(shell, [], {
-            stdin: Stream.make(bodyBytes),
-            env: { VERSION: target },
-            extendEnv: true,
-          }),
+          ChildProcess.make(shell, ["-lc", `${unpack} && ${move}`], { extendEnv: true }),
         )
         return {
           code: result.exitCode,
@@ -255,7 +291,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
         }
 
         const response = yield* httpOk.execute(
-          HttpClientRequest.get("https://api.github.com/repos/anomalyco/opencode/releases/latest").pipe(
+          HttpClientRequest.get("https://api.github.com/repos/nkyang10/opencode/releases/latest").pipe(
             HttpClientRequest.acceptJson,
           ),
         )
