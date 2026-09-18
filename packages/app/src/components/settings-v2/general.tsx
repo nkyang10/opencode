@@ -540,34 +540,32 @@ export const SettingsGeneralV2: Component<{
   onCleanup(() => clearTimeout(testNotificationTimer))
 
   const DebugSection = () => (
-    <Show when={desktop()}>
-      <div class="settings-v2-section">
-        <h3 class="settings-v2-section-title">{language.t("settings.general.section.debug")}</h3>
+    <div class="settings-v2-section">
+      <h3 class="settings-v2-section-title">{language.t("settings.general.section.debug")}</h3>
 
-        <SettingsListV2>
-          <SettingsRowV2
-            title={language.t("settings.general.row.testNotification.title")}
-            description={language.t("settings.general.row.testNotification.description")}
+      <SettingsListV2>
+        <SettingsRowV2
+          title={language.t("settings.general.row.testNotification.title")}
+          description={language.t("settings.general.row.testNotification.description")}
+        >
+          <ButtonV2
+            size="normal"
+            variant="neutral"
+            onClick={() => {
+              clearTimeout(testNotificationTimer)
+              testNotificationTimer = setTimeout(() => {
+                void platform.notify(
+                  language.t("settings.general.row.testNotification.title"),
+                  language.t("settings.general.row.testNotification.description"),
+                )
+              }, TEST_NOTIFICATION_DELAY_MS)
+            }}
           >
-            <ButtonV2
-              size="normal"
-              variant="neutral"
-              onClick={() => {
-                clearTimeout(testNotificationTimer)
-                testNotificationTimer = setTimeout(() => {
-                  void platform.notify(
-                    language.t("settings.general.row.testNotification.title"),
-                    language.t("settings.general.row.testNotification.description"),
-                  )
-                }, TEST_NOTIFICATION_DELAY_MS)
-              }}
-            >
-              {language.t("settings.general.row.testNotification.sendLabel")}
-            </ButtonV2>
-          </SettingsRowV2>
-        </SettingsListV2>
-      </div>
-    </Show>
+            {language.t("settings.general.row.testNotification.sendLabel")}
+          </ButtonV2>
+        </SettingsRowV2>
+      </SettingsListV2>
+    </div>
   )
 
   return (
