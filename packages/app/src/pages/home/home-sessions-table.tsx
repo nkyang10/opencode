@@ -110,11 +110,16 @@ function HomeSessionTableRow(props: {
             <Show when={projectName()}>
               <span class="flex min-w-0 items-center gap-1 text-v2-text-text-secondary">
                 <Show when={props.serverName()}>
-                  <span class="truncate text-xs text-v2-text-text-faint [font-weight:440]">{props.serverName()}</span>
+                  <span
+                    class="max-w-[40%] min-w-0 shrink truncate text-xs text-v2-text-text-faint [font-weight:440]"
+                    title={props.serverName()}
+                  >
+                    {props.serverName()}
+                  </span>
                   <span class="shrink-0 text-xs text-v2-text-text-faint"> / </span>
                 </Show>
                 <Icon name="folder" size="small" class="shrink-0 text-v2-text-text-faint" />
-                <span class="truncate text-xs [font-weight:440]">
+                <span class="min-w-0 flex-1 truncate text-xs [font-weight:440]" title={projectName()}>
                   {projectName()}
                 </span>
               </span>
