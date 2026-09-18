@@ -487,7 +487,7 @@ function HomeSessionTitle(props: { title: string; showProjectName: boolean; sear
       class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-v2-text-text-base [font-weight:530]"
       classList={{
         "text-[13px] leading-4 tracking-[-0.04px]": !!props.search,
-        "max-w-[min(55%,440px)] flex-[0_1_auto]": props.showProjectName,
+        "max-w-[min(70%,480px)] flex-[0_1_auto]": props.showProjectName,
         "flex-[1_1_auto]": !props.showProjectName,
       }}
     >
@@ -499,23 +499,16 @@ function HomeSessionTitle(props: { title: string; showProjectName: boolean; sear
 function HomeSessionProjectName(props: { name: string; serverName?: string; search?: boolean }) {
   return (
     <span
-      class="flex min-w-0 flex-[1_1_auto] items-center text-v2-text-text-muted [font-weight:440]"
+      class="min-w-0 flex-[1_1_auto] overflow-hidden text-ellipsis whitespace-nowrap text-v2-text-text-muted [font-weight:440]"
       classList={{ "text-[13px] leading-4 tracking-[-0.04px]": !!props.search }}
     >
       <Show when={props.serverName}>
-        <span
-          class="max-w-[40%] min-w-0 shrink overflow-hidden text-ellipsis whitespace-nowrap text-v2-text-text-faint"
-          title={props.serverName}
-        >
+        <span class="text-v2-text-text-faint">
           {props.serverName}
-        </span>
-        <span aria-hidden="true" class="shrink-0 text-v2-text-text-faint">
-          {" / "}
+          <span aria-hidden="true"> / </span>
         </span>
       </Show>
-      <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap" title={props.name}>
-        {props.name}
-      </span>
+      {props.name}
     </span>
   )
 }
