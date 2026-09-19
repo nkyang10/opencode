@@ -1,5 +1,10 @@
 # Contributing to OpenCode
 
+> **Fork notice:** This repository is **MarkCode**, a fork of
+> [opencode](https://github.com/anomalyco/opencode). The guide below is inherited from upstream. To
+> contribute to this fork, open a pull request against `nkyang10/opencode` (branch `dev`); contributions to
+> the upstream project go to `anomalyco/opencode`. See [README.md](./README.md) for what this fork changes.
+
 We want to make it easy for you to contribute to OpenCode. Here are the most common type of changes that get merged:
 
 - Bug fixes

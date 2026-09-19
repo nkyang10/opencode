@@ -1,5 +1,9 @@
 # Security
 
+> **Fork notice:** This repository is **MarkCode**, a fork of
+> [opencode](https://github.com/anomalyco/opencode). The policy below is inherited from upstream; security
+> issues affecting this fork may also be reported to the fork maintainers.
+
 ## IMPORTANT
 
 We do not accept AI generated security reports. We receive a large number of
