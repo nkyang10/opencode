@@ -1,5 +1,6 @@
 import path from "path"
 import fs from "fs/promises"
+import { existsSync, readFileSync } from "fs"
 import { xdgData, xdgCache, xdgConfig, xdgState } from "xdg-basedir"
 import os from "os"
 import { Context, Effect, Layer } from "effect"
@@ -14,13 +15,53 @@ const config = path.join(xdgConfig!, app)
 const state = path.join(xdgState!, app)
 const tmp = path.join(os.tmpdir(), app)
 
+function compiledBinary() {
+  return path.basename(process.execPath).replace(/\.exe$/i, "") !== "bun"
+}
+
+function repoRoot() {
+  const starts = [import.meta.dirname, process.cwd(), path.dirname(process.execPath)]
+  for (const start of starts) {
+    let dir = path.resolve(start)
+    for (let i = 0; i < 8; i++) {
+      if (existsSync(path.join(dir, "AGENTS.md")) && existsSync(path.join(dir, "packages", "core"))) return dir
+      const parent = path.dirname(dir)
+      if (parent === dir) break
+      dir = parent
+    }
+  }
+}
+
+function logDirectory() {
+  const fromEnv = process.env.OPENCODE_LOG_DIR?.trim()
+  if (fromEnv) return path.resolve(fromEnv)
+  try {
+    const marker = path.join(path.dirname(process.execPath), "deploy-log-dir.txt")
+    const text = readFileSync(marker, "utf8").trim()
+    if (text) return path.resolve(text)
+  } catch {
+    // Deployed binaries opt in by sitting next to deploy-log-dir.txt.
+  }
+  const repo = repoRoot()
+  if (repo) return path.join(repo, "logs", compiledBinary() ? "deploy" : "debug")
+  return path.join(data, "log")
+}
+
+function forkLogDirs() {
+  const repo = repoRoot()
+  if (!repo) return []
+  return [path.join(repo, "logs", "debug"), path.join(repo, "logs", "deploy")]
+}
+
 const paths = {
   get home() {
     return process.env.OPENCODE_TEST_HOME ?? os.homedir()
   },
   data,
   bin: path.join(cache, "bin"),
-  log: path.join(data, "log"),
+  get log() {
+    return logDirectory()
+  },
   repos: path.join(data, "repos"),
   cache,
   config,
@@ -38,6 +79,7 @@ await Promise.all([
   fs.mkdir(Path.state, { recursive: true }),
   fs.mkdir(Path.tmp, { recursive: true }),
   fs.mkdir(Path.log, { recursive: true }),
+  ...forkLogDirs().map((dir) => fs.mkdir(dir, { recursive: true })),
   fs.mkdir(Path.bin, { recursive: true }),
   fs.mkdir(Path.repos, { recursive: true }),
 ])

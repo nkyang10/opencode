@@ -50,6 +50,14 @@ function authConfigLayer(input?: { password?: string; username?: string }) {
   })
 }
 
+const localWebUi = "http://127.0.0.1:9"
+
+function useLocalWebUi() {
+  const previous = process.env.OPENCODE_WEB_UI
+  process.env.OPENCODE_WEB_UI = localWebUi
+  return Effect.addFinalizer(() => Effect.sync(() => restoreEnv("OPENCODE_WEB_UI", previous)))
+}
+
 function restoreEnv(key: string, value: string | undefined) {
   if (value === undefined) {
     delete process.env[key]
@@ -184,8 +192,25 @@ function responseText(response: Response) {
 }
 
 describe("HttpApi UI fallback", () => {
-  it.live("serves the web UI through the HTTP API app", () =>
+  it.live("does not fetch an upstream site when no local UI is configured", () =>
     Effect.gen(function* () {
+      let proxiedUrl: string | undefined
+
+      const response = yield* uiApp({
+        disableEmbeddedWebUi: true,
+        client: httpClient(new Response("<html>opencode</html>", { headers: { "content-type": "text/html" } }), (request) => {
+          proxiedUrl = request.url
+        }),
+      }).request("/")
+
+      expect(response.status).toBe(404)
+      expect(proxiedUrl).toBeUndefined()
+    }),
+  )
+
+  it.live("serves a configured local web UI through the HTTP API app", () =>
+    Effect.gen(function* () {
+      yield* useLocalWebUi()
       let proxiedUrl: string | undefined
 
       const response = yield* uiApp({
@@ -201,12 +226,13 @@ describe("HttpApi UI fallback", () => {
       expect(response.status).toBe(200)
       expect(response.headers.get("content-type")).toContain("text/html")
       expect(yield* responseText(response)).toBe("<html>opencode</html>")
-      expect(proxiedUrl).toBe("https://app.opencode.ai/")
+      expect(proxiedUrl).toBe(`${localWebUi}/`)
     }),
   )
 
   it.live("strips upstream transfer encoding headers from proxied assets", () =>
     Effect.gen(function* () {
+      yield* useLocalWebUi()
       let proxiedUrl: string | undefined
 
       const response = yield* Effect.gen(function* () {
@@ -246,7 +272,7 @@ describe("HttpApi UI fallback", () => {
       )
 
       expect(response.status).toBe(200)
-      expect(proxiedUrl).toBe("https://app.opencode.ai/assets/app.js")
+      expect(proxiedUrl).toBe(`${localWebUi}/assets/app.js`)
       expect(response.headers.get("content-encoding")).toBeNull()
       expect(response.headers.get("content-length")).not.toBe("999")
       expect(response.headers.get("content-type")).toContain("text/javascript")
@@ -259,6 +285,7 @@ describe("HttpApi UI fallback", () => {
   // causing browsers to fail with `ERR_INVALID_CHUNKED_ENCODING`.
   it.live("strips upstream transfer-encoding header from proxied assets", () =>
     Effect.gen(function* () {
+      yield* useLocalWebUi()
       const response = yield* Effect.gen(function* () {
         const fs = yield* FSUtil.Service
         const client = yield* HttpClient.HttpClient
@@ -381,6 +408,7 @@ describe("HttpApi UI fallback", () => {
 
   it.live("accepts auth token for the web UI", () =>
     Effect.gen(function* () {
+      yield* useLocalWebUi()
       const response = yield* uiApp({
         password: "secret",
         username: "opencode",
@@ -395,6 +423,7 @@ describe("HttpApi UI fallback", () => {
 
   it.live("accepts basic auth for the web UI", () =>
     Effect.gen(function* () {
+      yield* useLocalWebUi()
       const response = yield* uiApp({
         password: "secret",
         username: "opencode",
@@ -409,6 +438,7 @@ describe("HttpApi UI fallback", () => {
 
   it.live("accepts basic auth passwords containing colons for the web UI", () =>
     Effect.gen(function* () {
+      yield* useLocalWebUi()
       const response = yield* uiApp({
         password: "sec:ret",
         username: "opencode",
@@ -428,6 +458,7 @@ describe("HttpApi UI fallback", () => {
   // should bypass auth.
   it.live("serves the PWA manifest without auth even when a server password is set", () =>
     Effect.gen(function* () {
+      yield* useLocalWebUi()
       for (const path of ["/site.webmanifest", "/web-app-manifest-192x192.png", "/web-app-manifest-512x512.png"]) {
         const response = yield* uiApp({
           password: "secret",

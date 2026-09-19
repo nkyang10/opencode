@@ -25,6 +25,7 @@ a.out
 target
 .scripts
 .direnv/
+packages/desktop/resources/deploy-log-dir.txt
 
 # Local dev files
 opencode-dev

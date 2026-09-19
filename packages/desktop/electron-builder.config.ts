@@ -43,6 +43,8 @@ const APP_IDS = {
 
 const getBase = (appId: string): Configuration => ({
   artifactName: "opencode-desktop-${os}-${arch}.${ext}",
+  // Avoid null publish channel crashes during local packaging.
+  publish: null,
   directories: {
     output: "dist",
     buildResources: "resources",
@@ -55,14 +57,14 @@ const getBase = (appId: string): Configuration => ({
   extraMetadata: {
     desktopName: `${appId}.desktop`,
   },
-  files: ["out/**/*", "resources/**/*", "!resources/opencode-cli*"],
+  files: ["out/**/*", "resources/**/*", "!resources/opencode-cli*", "!resources/opencode.exe"],
   extraResources: [
-    ...(channel === "dev"
+    ...(channel === "dev" || process.env.OPENCODE_EMBED_CLI === "1"
       ? [
           {
             from: "resources/",
             to: "",
-            filter: ["opencode-cli*"],
+            filter: ["opencode-cli*", "opencode.exe"],
           },
         ]
       : []),

@@ -1,8 +1,42 @@
 - To regenerate the legacy JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit `src/generated` or `src/generated-effect` directly.
 - Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk-next` composes Client, Core, and Server.
-- The default branch in this repo is `dev`.
+- The default branch in this repo is `dev`. `origin` is `https://github.com/nkyang10/opencode.git`. Do not add extra local branches.
 - Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
+
+## This fork
+
+UI customizations live in `packages/app`. That includes the project-picker directory selector and every later change in that package. A run or deploy that does not build this checkout's `packages/app` is not this fork.
+
+Do not fetch `https://app.opencode.ai`. A normal run is one CLI binary. It serves the page and does the work on port 4446. The page is `packages/app` baked into that binary by `packages/opencode/script/build.ts`. There is no second dev server and no official website.
+
+- Do not pass `--skip-embed-web-ui`.
+- Do not set `OPENCODE_DISABLE_EMBEDDED_WEB_UI` on a CLI `web` process. Desktop main sets it because Electron serves its own renderer from local `packages/app`. That does not allow skipping the app build.
+- If 4446 is already taken, stop the process listening there and start again.
+
+From `packages/opencode`, with `OPENCODE_REQUIRE_EMBEDDED_WEB_UI=1`:
+
+```
+bun run script/build.ts --single
+```
+
+The log line `Building Web UI to embed in the binary` means this checkout's app was baked in. Then:
+
+```
+packages\opencode\dist\opencode-windows-x64\bin\opencode.exe web --port 4446 --hostname 127.0.0.1
+```
+
+Open `http://127.0.0.1:4446`.
+
+A source run (`bun`, process name `bun`) writes `logs/debug/opencode.log`. A compiled binary writes `logs/deploy/opencode.log`. Startup creates both folders when this repo is found. `logs/` is gitignored, so those files are not committed. `OPENCODE_LOG_DIR` still overrides the active folder.
+
+Windows deploy uses `script/build-windows-installer.cmd` from the repo root. That one command builds this checkout: it stops a CLI already on port 4446, compiles `opencode.exe` from local `packages/opencode` with `packages/app` embedded, compiles the background CLI from local `packages/cli`, builds the Windows app from that same app, and writes the NSIS installer plus `opencode.exe` into `package-dist`. Pass `-SyncGh` only when GitHub must replace the checkout first.
+
+- The portable CLI step must run `packages/opencode/script/build.ts --single` with `OPENCODE_REQUIRE_EMBEDDED_WEB_UI=1`. The log line `Building Web UI to embed in the binary` means `packages/app` was baked in. Without that embed, `opencode web` has no page.
+- Linux has no local installer script. On a Linux machine, the same `packages/opencode/script/build.ts --single` command with `OPENCODE_REQUIRE_EMBEDDED_WEB_UI=1` embeds `packages/app`. `--single` on Windows builds Windows only. GitHub publish jobs run only for `anomalyco/opencode`, so this fork does not publish Linux artifacts by pushing `dev`.
+- The desktop window comes from `electron-vite` of local `packages/app`, not from the sidecar embed.
+- `packages/desktop/scripts/prepare.ts` may download a prebuilt CLI on the dev channel. Copy the locally compiled CLI back over that download before packaging. Do not ship the downloaded CLI.
+- Put published files in `package-dist`. The installer creates `logs/debug` and `logs/deploy`. `deploy-log-dir.txt` and `OPENCODE_LOG_DIR` point the published binary at `logs/deploy`. Source runs use `logs/debug`.
 
 ## Branch Names
 

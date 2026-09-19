@@ -6,8 +6,6 @@ import { ProxyUtil } from "../proxy-util"
 
 let embeddedUIPromise: Promise<Record<string, string> | null> | undefined
 
-export const UI_UPSTREAM = new URL("https://app.opencode.ai")
-
 export const csp = (hash = "") =>
   `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'${hash ? ` 'sha256-${hash}'` : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; media-src 'self' data:; connect-src * data: blob:`
 export const DEFAULT_CSP = csp()
@@ -37,8 +35,10 @@ function proxyResponseHeaders(headers: Record<string, string>) {
   return result
 }
 
-export function upstreamURL(path: string) {
-  return new URL(path, UI_UPSTREAM).toString()
+function localWebUi() {
+  const configured = process.env.OPENCODE_WEB_UI?.trim()
+  if (!configured) return
+  return new URL(configured)
 }
 
 export function embeddedUI(disableEmbeddedWebUi: boolean) {
@@ -85,9 +85,12 @@ export function serveUIEffect(
 
     if (embeddedWebUI) return yield* serveEmbeddedUIEffect(path, services.fs, embeddedWebUI)
 
+    const local = localWebUi()
+    if (!local) return notFound()
+
     const response = yield* services.client.execute(
-      HttpClientRequest.make(request.method)(upstreamURL(path), {
-        headers: ProxyUtil.headers(request.headers, { host: UI_UPSTREAM.host }),
+      HttpClientRequest.make(request.method)(new URL(path, local).toString(), {
+        headers: ProxyUtil.headers(request.headers, { host: local.host }),
         body: requestBody(request),
       }),
     )

@@ -22,6 +22,11 @@ const skipInstall = process.argv.includes("--skip-install")
 const sourcemapsFlag = process.argv.includes("--sourcemaps")
 const plugin = createSolidTransformPlugin()
 const skipEmbedWebUi = process.argv.includes("--skip-embed-web-ui")
+if (skipEmbedWebUi && process.env.OPENCODE_REQUIRE_EMBEDDED_WEB_UI === "1") {
+  throw new Error(
+    "Refusing --skip-embed-web-ui while OPENCODE_REQUIRE_EMBEDDED_WEB_UI=1. This deploy must embed packages/app.",
+  )
+}
 
 const createEmbeddedWebUIBundle = async () => {
   console.log(`Building Web UI to embed in the binary`)

@@ -9,11 +9,10 @@
 
 ## Local Dev
 
-- `opencode dev web` proxies `https://app.opencode.ai`, so local UI/CSS changes will not show there.
-- For local UI changes, run the backend and app dev servers separately.
-- Backend (from `packages/opencode`): `bun run ./src/index.ts serve --port 4096`
-- App (from `packages/app`): `bun dev -- --port 4444`
-- Open `http://localhost:4444` to verify UI changes (it targets the backend at `http://localhost:4096`).
+- The page and the API come from one compiled CLI. Do not use the official website.
+- Build from `packages/opencode`: `OPENCODE_REQUIRE_EMBEDDED_WEB_UI=1 bun run script/build.ts --single`
+- Run `dist\opencode-windows-x64\bin\opencode.exe web --port 4446 --hostname 127.0.0.1`
+- Open `http://127.0.0.1:4446`. If 4446 is already taken, stop the process listening there and start again.
 
 ## SolidJS
 
