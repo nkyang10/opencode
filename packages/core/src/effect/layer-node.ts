@@ -85,9 +85,14 @@ export function make<
 >(
   input: MakeInput<Implementation, Items, T>,
 ): Node<Layer.Success<Implementation>, Layer.Error<Implementation> | Error<Items[number]>, T> {
+  const name = input.service !== undefined ? input.service.key : input.name
+  const missing = input.deps.findIndex((dep) => !dep?.name)
+  if (missing !== -1) {
+    throw new Error(`Layer node ${name} dependency ${missing} is undefined`)
+  }
   return {
     kind: "layer",
-    name: input.service !== undefined ? input.service.key : input.name,
+    name,
     service: input.service,
     implementation: input.layer,
     dependencies: input.deps,
@@ -108,6 +113,8 @@ export function unbound<R, Shape, const T extends Tag>(service: Context.Key<R, S
 export function group<const Items extends readonly AnyNode[]>(
   dependencies: Items,
 ): Node<Output<Items[number]>, Error<Items[number]>, NodeTag<Items[number]>> {
+  const missing = dependencies.findIndex((dep) => !dep?.name)
+  if (missing !== -1) throw new Error(`Layer group dependency ${missing} is undefined`)
   return { kind: "group", name: "group", dependencies }
 }
 
@@ -182,6 +189,10 @@ function walk<Result>(
   const stack: AnyNode[] = []
 
   const recur = (node: AnyNode): Result => {
+    if (!node?.name) {
+      const trail = stack.map((item) => item.name).join(" -> ") || "<root>"
+      throw new Error(`Layer walk received an empty node. Trail: ${trail}`)
+    }
     const target = options.resolve?.(node) ?? node
     const cached = cache.get(target)
     if (cached !== undefined || cache.has(target)) return cached!
@@ -290,6 +301,11 @@ function rewriteReplacementDependencies(root: AnyNode, replacements: ReadonlyMap
   const stack: AnyNode[] = []
 
   const recur = (node: AnyNode, isRoot = false): AnyNode => {
+    if (!node?.name) {
+      throw new Error(
+        `Layer replacement walk received an empty node. Trail: ${stack.map((item) => item.name).join(" -> ") || "<root>"}`,
+      )
+    }
     const target = isRoot ? node : (replacements.get(node.name) ?? node)
     const cached = cache.get(target)
     if (cached !== undefined || cache.has(target)) return cached!

@@ -7,7 +7,7 @@
 .DESCRIPTION
   1) Sync repo from origin
   2) Install deps
-  3) Compile portable CLI (packages/opencode -> opencode.exe)
+  3) Compile portable CLI (packages/opencode -> opencode.exe) with local packages/app embedded
   4) Compile desktop background CLI (packages/cli -> opencode-cli.exe) and embed it
   5) Build Windows NSIS installer
   6) Print output file locations
@@ -155,10 +155,13 @@ try {
   $compileRoot = Join-Path $layoutRoot "compile"
   $publishRoot = Join-Path $layoutRoot "package-dist"
   $logRoot = Join-Path $layoutRoot "logs"
-  New-Item -ItemType Directory -Force -Path $compileRoot, $publishRoot, $logRoot | Out-Null
+  $debugLog = Join-Path $logRoot "debug"
+  $deployLog = Join-Path $logRoot "deploy"
+  New-Item -ItemType Directory -Force -Path $compileRoot, $publishRoot, $debugLog, $deployLog | Out-Null
   Write-Host "Compile dir: $compileRoot"
   Write-Host "Publish dir: $publishRoot"
-  Write-Host "Log dir: $logRoot"
+  Write-Host "Debug log : $debugLog"
+  Write-Host "Deploy log: $deployLog"
 
   Ensure-Bun
 
@@ -217,8 +220,7 @@ try {
       "-e", "compile",
       "-e", "package-dist",
       "-e", "logs",
-      "-e", "source",
-      "-e", "AGENT.md"
+      "-e", "source"
     ) -Label "git clean -fd"
 
     $sha = (git rev-parse --short HEAD).Trim()
@@ -246,8 +248,9 @@ try {
   $embeddedOpencode = $null
 
   if (-not $SkipCli) {
-    Write-Step "Compile portable CLI (packages/opencode)"
+    Write-Step "Compile portable CLI (packages/opencode) with local packages/app embedded"
     Set-Location (Join-Path $root "packages\opencode")
+    $env:OPENCODE_REQUIRE_EMBEDDED_WEB_UI = "1"
     Invoke-BunChecked @("run", "script/build.ts", "--single")
 
     $cliExe = Join-Path $root "packages\opencode\dist\opencode-windows-x64\bin\opencode.exe"
@@ -325,7 +328,7 @@ try {
 
   Write-Step "Build desktop (electron-vite)"
   $logMarker = Join-Path $desktop "resources\deploy-log-dir.txt"
-  Set-Content -LiteralPath $logMarker -Value $logRoot -Encoding ascii
+  Set-Content -LiteralPath $logMarker -Value $deployLog -Encoding ascii
   Invoke-BunChecked @("run", "build")
 
   Write-Step "Package Windows NSIS installer"
@@ -366,11 +369,11 @@ try {
   if (Test-Path $blockmap) {
     Copy-Item -LiteralPath $blockmap -Destination (Join-Path $publishRoot "opencode-desktop-win-x64.exe.blockmap") -Force
   }
-  Set-Content -LiteralPath (Join-Path $publishRoot "deploy-log-dir.txt") -Value $logRoot -Encoding ascii
+  Set-Content -LiteralPath (Join-Path $publishRoot "deploy-log-dir.txt") -Value $deployLog -Encoding ascii
   $launcher = @"
 @echo off
 setlocal
-set OPENCODE_LOG_DIR=$logRoot
+set OPENCODE_LOG_DIR=$deployLog
 set OPENCODE_LOG_LEVEL=DEBUG
 "%~dp0opencode.exe" web --port 4446 --hostname 127.0.0.1
 endlocal
@@ -380,8 +383,9 @@ endlocal
   Write-Host ""
   Write-Host "==== OUTPUT ====" -ForegroundColor Green
   Write-Host "Publish dir: $publishRoot"
-  Write-Host "Log dir    : $logRoot"
-  Write-Host "Prompt failures are written to $logRoot\opencode.log"
+  Write-Host "Debug log  : $debugLog"
+  Write-Host "Deploy log : $deployLog"
+  Write-Host "Prompt failures are written to $deployLog\opencode.log"
 
   if ($cliExe -and (Test-Path $cliExe)) {
     $item = Get-Item $cliExe
