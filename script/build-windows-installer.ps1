@@ -1,16 +1,21 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Sync latest GitHub source, compile Windows CLI, and build the desktop NSIS installer
-  with the compiled CLI embedded.
+  One-off Windows installer build from this checkout.
 
 .DESCRIPTION
-  1) Sync repo from origin
-  2) Install deps
-  3) Compile portable CLI (packages/opencode -> opencode.exe) with local packages/app embedded
-  4) Compile desktop background CLI (packages/cli -> opencode-cli.exe) and embed it
-  5) Build Windows NSIS installer
-  6) Print output file locations
+  Run script\build-windows-installer.cmd from the repo root.
+  That builds the files on disk. Pass -SyncGh only when GitHub must replace this checkout first.
+
+  1) Create compile, package-dist, logs\debug, and logs\deploy
+  2) Optional: fetch origin and reset this checkout (-SyncGh)
+  3) Install dependencies
+  4) Stop opencode.exe if it is listening on port 4446, so the compile can replace the binary
+  5) Compile opencode.exe from this checkout's packages/opencode, with packages/app embedded
+  6) Compile the desktop background CLI from local packages/cli
+  7) Prepare the desktop package. Do not keep a downloaded CLI; copy the locally compiled binaries back
+  8) Build the Windows app from local packages/app
+  9) Package the NSIS installer and copy it, opencode.exe, and launch-web.cmd into package-dist
 
   Aborts immediately if any step fails.
 
@@ -18,10 +23,7 @@
   .\script\build-windows-installer.cmd
 
 .EXAMPLE
-  powershell -NoProfile -ExecutionPolicy Bypass -File .\script\build-windows-installer.ps1
-
-.EXAMPLE
-  .\script\build-windows-installer.cmd -SkipSync -Channel prod
+  .\script\build-windows-installer.cmd -SyncGh
 #>
 [CmdletBinding()]
 param(
@@ -29,6 +31,8 @@ param(
   [string]$Channel = "dev",
 
   [string]$Version = "",
+
+  [switch]$SyncGh,
 
   [switch]$SkipSync,
 
@@ -93,6 +97,21 @@ function Ensure-Bun {
 function Invoke-BunChecked {
   param([Parameter(Mandatory = $true)][string[]]$BunArgs)
   Invoke-Native -FilePath "bun" -ArgumentList $BunArgs -Label "bun $($BunArgs -join ' ')"
+}
+
+function Stop-WebCli {
+  $listeners = netstat -ano | Select-String ":4446\s.*LISTENING"
+  foreach ($line in $listeners) {
+    $procId = ($line.ToString().Trim() -split "\s+")[-1]
+    if (-not $procId) { continue }
+    $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$procId" -ErrorAction SilentlyContinue
+    if (-not $proc -or $proc.Name -ne "opencode.exe") { continue }
+    Write-Host "Stopping opencode.exe on port 4446 (pid $procId)"
+    $kill = Start-Process -FilePath taskkill.exe -ArgumentList @("/F", "/T", "/PID", $procId) -Wait -PassThru -WindowStyle Hidden
+    if ($kill.ExitCode -ne 0 -and $kill.ExitCode -ne 128) {
+      throw "Could not stop opencode.exe pid $procId (exit $($kill.ExitCode))"
+    }
+  }
 }
 
 function Ensure-ElectronBuilderLocalPatches {
@@ -178,7 +197,7 @@ try {
   $env:OPENCODE_VERSION = $Version
   Write-Host "Channel=$Channel Version=$Version EmbedCli=$($env:OPENCODE_EMBED_CLI)"
 
-  if (-not $SkipSync) {
+  if ($SyncGh -and -not $SkipSync) {
     Write-Step "Sync latest source from GitHub (always overwrite local changes)"
     if (-not (Test-Path (Join-Path $root ".git"))) {
       throw "Not a git repo: $root"
@@ -228,7 +247,7 @@ try {
     Write-Host "Synced to: $sha ($remoteRef) — local changes overwritten"
   }
   else {
-    Write-Step "Skip sync (-SkipSync)"
+    Write-Step "Using files on disk (pass -SyncGh to replace this checkout from GitHub)"
   }
 
   # Re-apply after hard reset so packaging still embeds CLI / avoids publish crash.
@@ -243,36 +262,38 @@ try {
   }
 
   $cliZip = $null
-  $cliExe = $null
   $embeddedCli = $null
   $embeddedOpencode = $null
 
+  Write-Step "Stop CLI holding port 4446"
+  Stop-WebCli
+
+  Write-Step "Compile opencode.exe from local packages/opencode"
+  Set-Location (Join-Path $root "packages\opencode")
+  $env:OPENCODE_REQUIRE_EMBEDDED_WEB_UI = "1"
+  Invoke-BunChecked @("run", "script/build.ts", "--single")
+
+  $cliExe = Join-Path $root "packages\opencode\dist\opencode-windows-x64\bin\opencode.exe"
+  if (-not (Test-Path $cliExe)) {
+    throw "Portable CLI missing: $cliExe"
+  }
+
+  $cliZip = Join-Path $root "packages\opencode\dist\opencode-windows-x64.zip"
+  if (Test-Path $cliZip) { Remove-Item $cliZip -Force }
+  Compress-Archive -Path (Join-Path (Split-Path $cliExe) "*") -DestinationPath $cliZip -Force
+  if (-not (Test-Path $cliZip)) {
+    throw "Failed to create CLI zip: $cliZip"
+  }
+  Write-Host "Portable CLI ready: $cliExe"
+
+  $resourcesDir = Join-Path $root "packages\desktop\resources"
+  New-Item -ItemType Directory -Force -Path $resourcesDir | Out-Null
+  $embeddedOpencode = Join-Path $resourcesDir "opencode.exe"
+  Copy-Item -Force $cliExe $embeddedOpencode
+  Write-Host "Staged local opencode.exe: $embeddedOpencode"
+
   if (-not $SkipCli) {
-    Write-Step "Compile portable CLI (packages/opencode) with local packages/app embedded"
-    Set-Location (Join-Path $root "packages\opencode")
-    $env:OPENCODE_REQUIRE_EMBEDDED_WEB_UI = "1"
-    Invoke-BunChecked @("run", "script/build.ts", "--single")
-
-    $cliExe = Join-Path $root "packages\opencode\dist\opencode-windows-x64\bin\opencode.exe"
-    if (-not (Test-Path $cliExe)) {
-      throw "Portable CLI missing: $cliExe"
-    }
-
-    $cliZip = Join-Path $root "packages\opencode\dist\opencode-windows-x64.zip"
-    if (Test-Path $cliZip) { Remove-Item $cliZip -Force }
-    Compress-Archive -Path (Join-Path (Split-Path $cliExe) "*") -DestinationPath $cliZip -Force
-    if (-not (Test-Path $cliZip)) {
-      throw "Failed to create CLI zip: $cliZip"
-    }
-    Write-Host "Portable CLI ready: $cliExe"
-
-    $resourcesDir = Join-Path $root "packages\desktop\resources"
-    New-Item -ItemType Directory -Force -Path $resourcesDir | Out-Null
-    $embeddedOpencode = Join-Path $resourcesDir "opencode.exe"
-    Copy-Item -Force $cliExe $embeddedOpencode
-    Write-Host "Staged portable CLI into installer resources: $embeddedOpencode"
-
-    Write-Step "Compile desktop background CLI (packages/cli)"
+    Write-Step "Compile desktop background CLI from local packages/cli"
     Set-Location (Join-Path $root "packages\cli")
     Invoke-BunChecked @("run", "script/build.ts", "--single")
 
@@ -288,9 +309,11 @@ try {
       throw "Failed to stage embedded CLI: $embeddedCli"
     }
     Write-Host "Embedded background CLI staged: $($builtBg.FullName) -> $embeddedCli"
+    $env:OPENCODE_SKIP_CLI_DOWNLOAD = "1"
   }
   else {
-    Write-Step "Skip CLI compile (-SkipCli)"
+    Write-Step "Skip background CLI compile (-SkipCli)"
+    Remove-Item Env:OPENCODE_SKIP_CLI_DOWNLOAD -ErrorAction SilentlyContinue
   }
 
   $desktop = Join-Path $root "packages\desktop"
@@ -299,16 +322,15 @@ try {
   Write-Step "Prepare desktop package"
   Invoke-BunChecked @("./scripts/prepare.ts")
 
-  # prepare (dev) may download a prebuilt CLI; prefer our freshly compiled binaries
-  if (-not $SkipCli) {
-    Write-Step "Re-apply compiled CLIs into desktop resources"
-    if (-not (Test-Path $cliExe)) {
-      throw "Portable CLI missing after prepare: $cliExe"
-    }
-    $embeddedOpencode = Join-Path $desktop "resources\opencode.exe"
-    Copy-Item -Force $cliExe $embeddedOpencode
-    Write-Host "Re-copied portable CLI: $embeddedOpencode"
+  Write-Step "Put the locally compiled opencode.exe back into the installer"
+  if (-not (Test-Path $cliExe)) {
+    throw "Local opencode.exe missing after prepare: $cliExe"
+  }
+  $embeddedOpencode = Join-Path $desktop "resources\opencode.exe"
+  Copy-Item -Force $cliExe $embeddedOpencode
+  Write-Host "Re-copied local opencode.exe: $embeddedOpencode"
 
+  if (-not $SkipCli) {
     $builtBg = Get-ChildItem -Path (Join-Path $root "packages\cli\dist") -Recurse -Filter "lildax.exe" |
       Select-Object -First 1
     if (-not $builtBg) {
@@ -316,7 +338,7 @@ try {
     }
     $embeddedCli = Join-Path $desktop "resources\opencode-cli.exe"
     Copy-Item -Force $builtBg.FullName $embeddedCli
-    Write-Host "Re-copied background CLI: $embeddedCli"
+    Write-Host "Re-copied local background CLI: $embeddedCli"
   }
 
   if (-not (Test-Path (Join-Path $desktop "resources\opencode.exe"))) {

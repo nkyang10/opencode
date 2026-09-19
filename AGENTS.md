@@ -30,7 +30,7 @@ Open `http://127.0.0.1:4446`.
 
 A source run (`bun`, process name `bun`) writes `logs/debug/opencode.log`. A compiled binary writes `logs/deploy/opencode.log`. Startup creates both folders when this repo is found. `logs/` is gitignored, so those files are not committed. `OPENCODE_LOG_DIR` still overrides the active folder.
 
-Windows deploy uses `script/build-windows-installer.ps1` (or `script/build-windows-installer.cmd`).
+Windows deploy uses `script/build-windows-installer.cmd` from the repo root. That one command builds this checkout: it stops a CLI already on port 4446, compiles `opencode.exe` from local `packages/opencode` with `packages/app` embedded, compiles the background CLI from local `packages/cli`, builds the Windows app from that same app, and writes the NSIS installer plus `opencode.exe` into `package-dist`. Pass `-SyncGh` only when GitHub must replace the checkout first.
 
 - The portable CLI step must run `packages/opencode/script/build.ts --single` with `OPENCODE_REQUIRE_EMBEDDED_WEB_UI=1`. The log line `Building Web UI to embed in the binary` means `packages/app` was baked in. Without that embed, `opencode web` has no page.
 - Linux has no local installer script. On a Linux machine, the same `packages/opencode/script/build.ts --single` command with `OPENCODE_REQUIRE_EMBEDDED_WEB_UI=1` embeds `packages/app`. `--single` on Windows builds Windows only. GitHub publish jobs run only for `anomalyco/opencode`, so this fork does not publish Linux artifacts by pushing `dev`.
