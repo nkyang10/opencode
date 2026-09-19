@@ -1,5 +1,6 @@
 import path from "path"
 import fs from "fs/promises"
+import { readFileSync } from "fs"
 import { xdgData, xdgCache, xdgConfig, xdgState } from "xdg-basedir"
 import os from "os"
 import { Context, Effect, Layer } from "effect"
@@ -14,13 +15,28 @@ const config = path.join(xdgConfig!, app)
 const state = path.join(xdgState!, app)
 const tmp = path.join(os.tmpdir(), app)
 
+function logDirectory() {
+  const fromEnv = process.env.OPENCODE_LOG_DIR?.trim()
+  if (fromEnv) return path.resolve(fromEnv)
+  try {
+    const marker = path.join(path.dirname(process.execPath), "deploy-log-dir.txt")
+    const text = readFileSync(marker, "utf8").trim()
+    if (text) return path.resolve(text)
+  } catch {
+    // Deployed binaries opt in by sitting next to deploy-log-dir.txt.
+  }
+  return path.join(data, "log")
+}
+
 const paths = {
   get home() {
     return process.env.OPENCODE_TEST_HOME ?? os.homedir()
   },
   data,
   bin: path.join(cache, "bin"),
-  log: path.join(data, "log"),
+  get log() {
+    return logDirectory()
+  },
   repos: path.join(data, "repos"),
   cache,
   config,

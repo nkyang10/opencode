@@ -98,8 +98,30 @@ export function tail(): string {
   }
 }
 
+function deployLogDir() {
+  const fromEnv = process.env.OPENCODE_LOG_DIR?.trim()
+  if (fromEnv) return fromEnv
+  const candidates = [
+    join(process.resourcesPath, "deploy-log-dir.txt"),
+    join(dirname(process.execPath), "deploy-log-dir.txt"),
+  ]
+  for (const file of candidates) {
+    try {
+      if (!existsSync(file)) continue
+      const text = readFileSync(file, "utf8").trim()
+      if (!text) continue
+      process.env.OPENCODE_LOG_DIR = text
+      return text
+    } catch {
+      continue
+    }
+  }
+  return ""
+}
+
 function initRunDirectory() {
-  root = join(app.getPath("userData"), "logs")
+  const deploy = deployLogDir()
+  root = deploy ? join(deploy, "desktop") : join(app.getPath("userData"), "logs")
   run = join(root, stamp())
   mkdirSync(run, { recursive: true })
 }

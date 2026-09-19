@@ -3,6 +3,7 @@ import { UI } from "../ui"
 import { effectCmd } from "../effect-cmd"
 import { withNetworkOptions, resolveNetworkOptions } from "../network"
 import { Flag } from "@opencode-ai/core/flag/flag"
+import { Global } from "@opencode-ai/core/global"
 import open from "open"
 import { networkInterfaces } from "os"
 
@@ -45,6 +46,8 @@ export const WebCommand = effectCmd({
     UI.empty()
     UI.println(UI.logo("  "))
     UI.empty()
+
+    UI.println(UI.Style.TEXT_INFO_BOLD + "  Logs:             ", UI.Style.TEXT_NORMAL, Global.Path.log)
 
     if (opts.hostname === "0.0.0.0") {
       // Show localhost for local access
