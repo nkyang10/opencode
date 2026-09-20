@@ -1229,6 +1229,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       model: props.controls.model.selection,
     })
 
+  const isTouchDevice = () =>
+    typeof window === "undefined"
+      ? false
+      : window.matchMedia?.("(pointer: coarse)").matches || window.navigator.maxTouchPoints > 0
+
   const handleKeyDown = (event: KeyboardEvent) => {
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "u") {
       event.preventDefault()
@@ -1377,6 +1382,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     // Note: Shift+Enter is handled earlier, before IME check
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
+      // On touch/mobile devices, pressing Enter inserts a newline instead of submitting.
+      // Users can submit via the send button.
+      if (isTouchDevice()) {
+        if (event.repeat) return
+        addPart({ type: "text", content: "\n", start: 0, end: 0 })
+        return
+      }
       if (event.repeat) return
       if (
         working() &&

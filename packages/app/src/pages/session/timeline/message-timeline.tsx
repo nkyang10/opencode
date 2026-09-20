@@ -69,8 +69,8 @@ import { useSessionKey } from "@/pages/session/session-layout"
 import { useSessionArchive } from "@/pages/session/session-archive"
 import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
-import { useTabs } from "@/context/tabs"
-import { useServer } from "@/context/server"
+import { useTabs, tabKey, type SessionTab } from "@/context/tabs"
+import { useServer, ServerConnection } from "@/context/server"
 import { usePlatform } from "@/context/platform"
 import { useSettings } from "@/context/settings"
 import { legacySessionHref, requireServerKey, sessionHref } from "@/utils/session-route"
@@ -100,6 +100,54 @@ type TimelineRowByTag<T extends TimelineRow.TimelineRow["_tag"]> = Extract<Timel
 
 const timelineFallbackItemSize = 60
 const timelineCache = new Map<string, { measurements: VirtualItem[]; toolOpen: Record<string, boolean | undefined> }>()
+
+// After "Compact and start a new session", re-places the fresh tab directly
+// after the just-ended session's tab, then renames the ended session and closes
+// its tab so the new tab lands exactly where the old one sat.
+async function rearrangeTabsAfterSlim(options: {
+  tabsStore: ReturnType<typeof useTabs>
+  server: ServerConnection.Key
+  originalId: string
+  newId: string
+  renameOriginalSession: () => Promise<void>
+}) {
+  const { tabsStore, server, originalId, newId, renameOriginalSession } = options
+  const originalTab = { type: "session" as const, server, sessionId: originalId }
+  const newTab = { type: "session" as const, server, sessionId: newId }
+  const newKey = tabKey(newTab)
+  const origKey = tabKey(originalTab)
+
+  // Guarantee the new tab is registered (titlebar also does this via route
+  // change; addSessionTab dedupes, so this is idempotent). It is pushed via
+  // startTransition, so poll until it is committed to the store.
+  tabsStore.addSessionTab(newTab)
+  const deadline = performance.now() + 2000
+  while (!tabsStore.store.some((tab) => tabKey(tab) === newKey)) {
+    if (performance.now() > deadline) return
+    await new Promise((resolve) => setTimeout(resolve, 16))
+  }
+
+  const keys = tabsStore.store.map(tabKey)
+  const origIndex = keys.indexOf(origKey)
+  const newIndex = keys.indexOf(newKey)
+  if (origIndex === -1 || newIndex === -1) return
+
+  if (newIndex !== origIndex + 1) {
+    const withoutNew = keys.filter((key) => key !== newKey)
+    const insertAfter = withoutNew.indexOf(origKey)
+    const reordered = [
+      ...withoutNew.slice(0, insertAfter + 1),
+      newKey,
+      ...withoutNew.slice(insertAfter + 1),
+    ]
+    tabsStore.reorder(reordered)
+  }
+
+  void renameOriginalSession().catch(() => undefined)
+
+  const closeIndex = tabsStore.store.findIndex((tab) => tabKey(tab) === origKey)
+  if (closeIndex !== -1) tabsStore.closeTab(closeIndex)
+}
 
 const taskDescription = (part: PartType, sessionID: string) => {
   if (part.type !== "tool" || part.tool !== "task") return
@@ -1010,6 +1058,7 @@ export function MessageTimeline(props: {
       })
 
       const base = sessionTitle(info()?.title) ?? language.t("command.session.new")
+      const originalTitle = info()?.title ?? base
       const existing = new Set(
         (sync().data.session ?? []).map((item) => item.title).filter((value): value is string => Boolean(value)),
       )
@@ -1027,6 +1076,15 @@ export function MessageTimeline(props: {
       requestAnimationFrame(() => {
         const editor = document.querySelector<HTMLTextAreaElement>('[contenteditable="true"]')
         editor?.focus()
+      })
+
+      void rearrangeTabsAfterSlim({
+        tabsStore,
+        server: serverCtx.key,
+        originalId: id,
+        newId,
+        renameOriginalSession: () =>
+          sdk().api.session.rename({ sessionID: id, title: originalTitle.endsWith(" [ended]") ? originalTitle : `${originalTitle} [ended]` }),
       })
 
       if (report) {
