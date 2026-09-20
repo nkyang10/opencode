@@ -1232,7 +1232,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const isTouchDevice = () =>
     typeof window === "undefined"
       ? false
-      : window.matchMedia?.("(pointer: coarse)").matches || window.navigator.maxTouchPoints > 0
+      : window.matchMedia?.("(pointer: coarse)").matches ||
+        window.navigator.maxTouchPoints > 0 ||
+        "ontouchstart" in window
 
   const handleKeyDown = (event: KeyboardEvent) => {
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "u") {
