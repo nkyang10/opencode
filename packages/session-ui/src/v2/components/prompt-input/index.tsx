@@ -24,6 +24,15 @@ import type {
 import type { PromptInputV2Interaction, PromptInputV2SelectControl } from "./interaction"
 import "./attachments.css"
 
+function isTouchDevice() {
+  if (typeof window === "undefined") return false
+  return (
+    window.matchMedia?.("(pointer: coarse)").matches ||
+    window.navigator.maxTouchPoints > 0 ||
+    "ontouchstart" in window
+  )
+}
+
 export type {
   PromptInputV2Attachment,
   PromptInputV2Comment,
@@ -172,6 +181,7 @@ export function PromptInputV2(props: PromptInputV2Props) {
             onKeyDown={(event) => {
               if (props.controller.onKeyDown(event)) return
               if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+                if (isTouchDevice()) return
                 event.preventDefault()
                 if (event.repeat) return
                 props.controller.submit()
