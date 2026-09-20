@@ -43,6 +43,9 @@ export function HomeSessions(props: {
       onSearchSelectActive={props.search.result.selectActive}
       onSearchHighlight={props.search.result.highlight}
       onSearchSelect={props.search.result.select}
+      canLoadMore={props.sessions.pagination.canLoadMore}
+      loadingMore={props.sessions.pagination.loadingMore}
+      onLoadMore={props.sessions.pagination.onLoadMore}
     />
   )
 }

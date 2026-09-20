@@ -84,6 +84,9 @@ export function NewHome() {
               serverName={tableSessions.session.serverName}
               isOpenTab={tableSessions.tab.isOpen}
               onOpenSession={(record, options) => tableSessions.session.open(record.session, options)}
+              canLoadMore={tableSessions.pagination.canLoadMore}
+              loadingMore={tableSessions.pagination.loadingMore}
+              onLoadMore={tableSessions.pagination.onLoadMore}
             />
           </Match>
         </Switch>

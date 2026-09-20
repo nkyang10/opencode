@@ -23,6 +23,38 @@ export const homeSessionEventsKey = (server: string) => ["home", "session-events
 
 type HomeSessionPage = { data?: V2SessionListResponse }
 
+export type HomeSessionFetchPage = {
+  list: (
+    input: { limit: number; order: "desc"; cursor?: string },
+    options: { signal?: AbortSignal },
+  ) => Promise<HomeSessionPage>
+}
+
+export type HomeSessionPageSlice = {
+  sessions: Session[]
+  nextCursor?: string
+  hasMore: boolean
+}
+
+export async function fetchHomeSessionPage(
+  list: HomeSessionFetchPage["list"],
+  pageLimit: number,
+  cursor?: string,
+  signal?: AbortSignal,
+): Promise<HomeSessionPageSlice> {
+  const response = await list(
+    { limit: pageLimit, order: "desc", ...(cursor ? { cursor } : {}) },
+    { signal },
+  )
+  const page = response.data!
+  const sessions = parseHomeSessionIndex(page.data)
+  return {
+    sessions,
+    nextCursor: page.cursor.next,
+    hasMore: !!page.cursor.next,
+  }
+}
+
 export async function loadHomeSessionIndex(
   list: (
     input: { limit: number; order: "desc"; cursor?: string },

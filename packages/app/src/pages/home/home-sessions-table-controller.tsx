@@ -1,11 +1,6 @@
 import type { Session } from "@opencode-ai/sdk/v2/client"
-import { useQuery } from "@tanstack/solid-query"
 import { createEffect, createMemo, startTransition } from "solid-js"
-import {
-  loadHomeSessionIndex,
-  retainHomeSessions,
-  type HomeSessionEvents,
-} from "@/context/global-sync/home-session-index"
+import { retainHomeSessions } from "@/context/global-sync/home-session-index"
 import type { LocalProject } from "@/context/layout"
 import { useLanguage } from "@/context/language"
 import { ServerConnection, serverName } from "@/context/server"
@@ -15,8 +10,10 @@ import { compareSessionTime, displayName, projectForSession } from "@/pages/layo
 import { pathKey } from "@/utils/path-key"
 import type { HomeController } from "./home-controller"
 import type { HomeSessionRecord } from "./home-sessions-controller"
+import { createPagedHomeSessions } from "./home-sessions-paged"
 
 export const HOME_SESSION_TABLE_LIMIT = 64
+export const HOME_SESSION_TABLE_PAGE_LIMIT = 15
 
 const HOME_SESSION_PREVIEW_LIMIT = 20
 const HOME_SESSION_PREVIEW_CONCURRENCY = 3
@@ -29,41 +26,19 @@ export function createHomeSessionsTableController(home: HomeController) {
   )
   const homeSessions = () => home.server.focusedSync().homeSessions
 
-  const sessionEventLoad = useQuery(() => ({
-    queryKey: homeSessions().eventsKey,
-    queryFn: async (): Promise<HomeSessionEvents> => ({ sequence: 0, entries: [] }),
-    initialData: { sequence: 0, entries: [] } satisfies HomeSessionEvents,
-    enabled: false,
-  }))
-
-  const sessionLoad = useQuery(() => ({
-    queryKey: homeSessions().indexKey,
-    enabled: !!home.server.focusedContext(),
-    queryFn: async ({ signal }) => {
+  const paged = createPagedHomeSessions({
+    queryKey: () => [...homeSessions().indexKey, "paged-table"],
+    enabled: () => !!home.server.focusedContext(),
+    list: () => {
       const ctx = home.server.focusedContext()
-      if (!ctx) return { sessions: [], eventSequence: 0 }
-      const cache = homeSessions()
-      const eventSequence = cache.eventSequence()
-      const index = await loadHomeSessionIndex(
-        (input, options) => ctx.sdk.client.v2.session.list(input, options),
-        eventSequence,
-        signal,
-      )
-      cache.complete(eventSequence)
-      return index
+      return (input, options) => ctx!.sdk.client.v2.session.list(input, options)
     },
-    retry: false,
-    staleTime: 30_000,
-    refetchOnMount: true,
-    refetchOnReconnect: true,
-  }))
+    pageLimit: HOME_SESSION_TABLE_PAGE_LIMIT,
+    eventsKey: () => homeSessions().eventsKey,
+  })
 
   const indexedSessions = createMemo(() =>
-    retainHomeSessions(
-      homeSessions().sessions(sessionLoad.data, sessionEventLoad.data),
-      HOME_SESSION_TABLE_LIMIT,
-      Date.now(),
-    ),
+    retainHomeSessions(paged.sessions(), HOME_SESSION_TABLE_LIMIT, Date.now()),
   )
 
   const records = createMemo(() => buildAllFolderRecords(indexedSessions, home.project.list, projectByID))
@@ -131,7 +106,11 @@ export function createHomeSessionsTableController(home: HomeController) {
     copy: { language },
     data: {
       records,
-      loading: () => sessionLoad.isLoading,
+    },
+    pagination: {
+      canLoadMore: paged.hasMore,
+      loadingMore: paged.loadingMore,
+      onLoadMore: () => void paged.loadMore(),
     },
     session: {
       showProjectName: () => true,

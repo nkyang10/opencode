@@ -1,16 +1,11 @@
 import type { Session } from "@opencode-ai/sdk/v2/client"
 import { preloadMarkdown } from "@opencode-ai/session-ui/markdown-cache"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { useQuery } from "@tanstack/solid-query"
 import { DateTime } from "luxon"
 import { type Accessor, createEffect, createMemo, createRoot, type JSX, startTransition } from "solid-js"
 import { produce } from "solid-js/store"
 import { useCommand } from "@/context/command"
-import {
-  loadHomeSessionIndex,
-  retainHomeSessions,
-  type HomeSessionEvents,
-} from "@/context/global-sync/home-session-index"
+import { retainHomeSessions } from "@/context/global-sync/home-session-index"
 import { useLanguage } from "@/context/language"
 import { ServerConnection, serverName } from "@/context/server"
 import { sessionHasOpenTab, useTabs } from "@/context/tabs"
@@ -21,6 +16,7 @@ import { showToast } from "@/utils/toast"
 import { Binary } from "@opencode-ai/core/util/binary"
 import { archiveHomeSession } from "../home-session-archive"
 import type { HomeController } from "./home-controller"
+import { createPagedHomeSessions } from "./home-sessions-paged"
 import {
   buildHomeSessionRecords,
   homeSessionSearchKey,
@@ -29,6 +25,7 @@ import {
 } from "./home-session-records"
 
 const HOME_SESSION_LIMIT = 64
+const HOME_SESSION_PAGE_LIMIT = 15
 export type { HomeSessionRecord } from "./home-session-records"
 export { homeSessionSearchKey } from "./home-session-records"
 
@@ -54,41 +51,20 @@ export function createHomeSessionsController(home: HomeController) {
     () => new Map(home.project.list().flatMap((project) => (project.id ? [[project.id, project] as const] : []))),
   )
   const homeSessions = () => home.server.focusedSync().homeSessions
-  const sessionEventLoad = useQuery(() => ({
-    queryKey: homeSessions().eventsKey,
-    queryFn: async (): Promise<HomeSessionEvents> => ({ sequence: 0, entries: [] }),
-    initialData: { sequence: 0, entries: [] } satisfies HomeSessionEvents,
-    enabled: false,
-  }))
-  const sessionLoad = useQuery(() => ({
-    queryKey: homeSessions().indexKey,
-    enabled: !!home.server.focusedContext(),
-    queryFn: async ({ signal }) => {
+  const paged = createPagedHomeSessions({
+    queryKey: () => [...homeSessions().indexKey, "paged-list"],
+    enabled: () => !!home.server.focusedContext(),
+    list: () => {
       const ctx = home.server.focusedContext()
-      if (!ctx) return { sessions: [], eventSequence: 0 }
-      const cache = homeSessions()
-      const eventSequence = cache.eventSequence()
-      const index = await loadHomeSessionIndex(
-        (input, options) => ctx.sdk.client.v2.session.list(input, options),
-        eventSequence,
-        signal,
-      )
-      cache.complete(eventSequence)
-      return index
+      return (input, options) => ctx!.sdk.client.v2.session.list(input, options)
     },
-    retry: false,
-    staleTime: 30_000,
-    refetchOnMount: true,
-    refetchOnReconnect: true,
-  }))
+    pageLimit: HOME_SESSION_PAGE_LIMIT,
+    eventsKey: () => homeSessions().eventsKey,
+  })
   const indexedSessions = createMemo(() =>
-    retainHomeSessions(
-      homeSessions().sessions(sessionLoad.data, sessionEventLoad.data),
-      HOME_SESSION_LIMIT,
-      Date.now(),
-    ),
+    retainHomeSessions(paged.sessions(), HOME_SESSION_LIMIT, Date.now()),
   )
-  const allRecords = createMemo(() =>
+  const records = createMemo(() =>
     buildHomeSessionRecords({
       sessions: indexedSessions,
       projectDirectories,
@@ -96,7 +72,6 @@ export function createHomeSessionsController(home: HomeController) {
       projectByID,
     }),
   )
-  const records = createMemo(() => allRecords().slice(0, HOME_SESSION_LIMIT))
   const groups = createMemo(() => groupSessions(records(), language))
   const prefetched = new Set<string>()
 
@@ -172,8 +147,11 @@ export function createHomeSessionsController(home: HomeController) {
     data: {
       records,
       groups,
-      loading: () => sessionLoad.isLoading,
-      searchRecords: allRecords,
+    },
+    pagination: {
+      canLoadMore: paged.hasMore,
+      loadingMore: paged.loadingMore,
+      onLoadMore: () => void paged.loadMore(),
     },
     session: {
       showProjectName: () => !home.project.selected(),

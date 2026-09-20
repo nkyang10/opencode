@@ -1,6 +1,7 @@
 import { type Accessor, createMemo, For, Show } from "solid-js"
 import { DateTime } from "luxon"
 import { Icon } from "@opencode-ai/ui/v2/icon"
+import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { SessionTabAvatarView } from "@/pages/layout/session-tab-avatar"
 import { sessionTitle } from "@/utils/session-title"
 import { sessionLastPrompt } from "@/utils/session-last-prompt"
@@ -20,6 +21,9 @@ export type HomeSessionsTableProps = {
   serverName: () => string
   isOpenTab: (record: HomeSessionRecord) => boolean
   onOpenSession: (record: HomeSessionRecord, options?: OpenSessionOptions) => void
+  canLoadMore?: Accessor<boolean>
+  loadingMore?: Accessor<boolean>
+  onLoadMore?: () => void
 }
 
 export function HomeSessionsTable(props: HomeSessionsTableProps) {
@@ -45,6 +49,22 @@ export function HomeSessionsTable(props: HomeSessionsTableProps) {
             />
           )}
         </For>
+        <Show when={props.canLoadMore?.()}>
+          <div class="flex justify-center pt-3">
+            <ButtonV2
+              data-action="home-sessions-table-load-more"
+              variant={props.loadingMore?.() ? "loading" : "ghost-muted"}
+              size="normal"
+              icon={props.loadingMore?.() ? undefined : "plus"}
+              class="shrink-0 [font-weight:530]"
+              onClick={() => {
+                if (!props.loadingMore?.()) props.onLoadMore?.()
+              }}
+            >
+              {props.language.t("common.loadMore")}
+            </ButtonV2>
+          </div>
+        </Show>
         <Show when={rows().length === 0}>
           <div class="flex flex-1 items-center justify-center text-v2-text-text-faint [font-weight:440]">
             {props.language.t("home.sessions.empty")}

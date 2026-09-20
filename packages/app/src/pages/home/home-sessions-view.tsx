@@ -70,6 +70,9 @@ export type HomeSessionsViewProps = {
   onSearchSelectActive: () => void
   onSearchHighlight: (record: HomeSessionRecord) => void
   onSearchSelect: (record: HomeSessionRecord, options?: OpenSessionOptions) => void
+  canLoadMore: Accessor<boolean>
+  loadingMore: Accessor<boolean>
+  onLoadMore: () => void
 }
 
 export function HomeSessionsView(props: HomeSessionsViewProps) {
@@ -140,6 +143,22 @@ export function HomeSessionsView(props: HomeSessionsViewProps) {
                   </>
                 )}
               </For>
+              <Show when={props.canLoadMore()}>
+                <div class="flex justify-center pt-6">
+                  <ButtonV2
+                    data-action="home-sessions-load-more"
+                    variant={props.loadingMore() ? "loading" : "ghost-muted"}
+                    size="normal"
+                    icon={props.loadingMore() ? undefined : "plus"}
+                    class="shrink-0 [font-weight:530]"
+                    onClick={() => {
+                      if (!props.loadingMore()) props.onLoadMore()
+                    }}
+                  >
+                    {props.language.t("common.loadMore")}
+                  </ButtonV2>
+                </div>
+              </Show>
             </div>
           </Show>
         </Suspense>
