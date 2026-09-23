@@ -642,6 +642,8 @@ export const SettingsGeneral: Component = () => {
             />
           </div>
         </SettingsRow>
+
+        <RssFeedRow language={language} />
       </SettingsList>
     </div>
   )
@@ -819,5 +821,41 @@ const SettingsRow: Component<SettingsRowProps> = (props) => {
       </div>
       <div class="flex w-full justify-end sm:w-auto sm:shrink-0">{props.children}</div>
     </div>
+  )
+}
+
+type RssFeedRowProps = {
+  language: ReturnType<typeof useLanguage>
+}
+
+// FE-019: shows the authed RSS feed URL for this server instance with a copy button.
+// The feed itself is public-by-token (/rss/<token>), so the URL must only be shared
+// with people who are allowed to read the non-sensitive notification stream.
+const RssFeedRow: Component<RssFeedRowProps> = (props) => {
+  const [url] = createResource<string | undefined>(
+    async () => {
+      const response = await fetch("/api/rss/url", { credentials: "same-origin" })
+      if (!response.ok) return undefined
+      const body = (await response.json()) as { url?: string }
+      return body.url ? `${window.location.origin}${body.url}` : undefined
+    },
+    { initialValue: undefined },
+  )
+
+  return (
+    <SettingsRow
+      title={props.language.t("settings.general.notifications.rss.title")}
+      description={props.language.t("settings.general.notifications.rss.description")}
+    >
+      <div data-action="settings-notifications-rss" class="flex w-full items-center sm:w-auto">
+        <TextField
+          value={url()}
+          readOnly
+          copyable
+          class="w-full min-w-0 sm:w-80"
+          aria-label={props.language.t("settings.general.notifications.rss.title")}
+        />
+      </div>
+    </SettingsRow>
   )
 }

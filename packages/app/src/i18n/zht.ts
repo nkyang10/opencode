@@ -1042,7 +1042,9 @@ export const dict = {
   "settings.general.notifications.webPush.title": "Background notifications",
   "settings.general.notifications.webPush.description":
     "Get a notification when a session finishes even when the tab is closed",
-
+  "settings.general.notifications.rss.title": "RSS 訂閱網址",
+  "settings.general.notifications.rss.description":
+    "訂閱會話通知的 RSS 來源（完成、錯誤、提問、權限請求）。無需登入即可存取；請勿公開分享此網址",
   "settings.general.sounds.agent.title": "代理程式",
   "settings.general.sounds.agent.description": "當代理程式完成或需要注意時播放聲音",
   "settings.general.sounds.permissions.title": "權限",

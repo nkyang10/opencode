@@ -1045,6 +1045,9 @@ export const dict = {
   "settings.general.notifications.errors.description": "发生错误时显示系统通知",
   "settings.general.notifications.webPush.title": "后台通知",
   "settings.general.notifications.webPush.description": "即使标签页已关闭，任务完成时也会收到通知",
+  "settings.general.notifications.rss.title": "RSS 订阅地址",
+  "settings.general.notifications.rss.description":
+    "订阅会话通知的 RSS 源（完成、错误、提问、权限请求）。无需登录即可访问；请勿公开分享此地址",
   "settings.general.sounds.agent.title": "智能体",
   "settings.general.sounds.agent.description": "当智能体完成或需要注意时播放声音",
   "settings.general.sounds.permissions.title": "权限",

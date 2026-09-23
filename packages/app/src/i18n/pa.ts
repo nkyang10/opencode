@@ -1085,6 +1085,9 @@ export const dict = {
   "settings.general.notifications.webPush.title": "Background notifications",
   "settings.general.notifications.webPush.description":
     "Get a notification when a session finishes even when the tab is closed",
+  "settings.general.notifications.rss.title": "RSS feed URL",
+  "settings.general.notifications.rss.description":
+    "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "جدوں ایجنٹ مکمل ہو جائے یا توجہ دی لوڑ ہووے تے آواز چلاؤ",
   "settings.general.sounds.permissions.title": "اجازتاں",

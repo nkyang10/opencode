@@ -695,6 +695,9 @@ export const dict = {
   "settings.general.notifications.webPush.title": "Background notifications",
   "settings.general.notifications.webPush.description":
     "Get a notification when a session finishes even when the tab is closed",
+  "settings.general.notifications.rss.title": "RSS feed URL",
+  "settings.general.notifications.rss.description":
+    "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
   "settings.general.sounds.agent.title": "에이전트",
   "settings.general.sounds.agent.description": "에이전트가 완료되거나 주의가 필요할 때 소리 재생",
   "settings.general.sounds.permissions.title": "권한",
