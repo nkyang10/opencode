@@ -667,6 +667,31 @@ function ChannelIndicator(props: { debugTools?: { visible: boolean; toggle: () =
             <DropdownMenu.Item onSelect={() => window.location.reload()}>
               <DropdownMenu.ItemLabel>Refresh</DropdownMenu.ItemLabel>
             </DropdownMenu.Item>
+            <DropdownMenu.Item
+              onSelect={() => {
+                document.cookie.split(";").forEach((cookie) => {
+                  const name = cookie.split("=")[0]!.trim()
+                  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/`
+                })
+                window.localStorage.clear()
+                window.sessionStorage.clear()
+                const clear = async () => {
+                  if ("indexedDB" in window) {
+                    const dbs = await indexedDB.databases()
+                    await Promise.all(dbs.map((db) => db.name && indexedDB.deleteDatabase(db.name)))
+                  }
+                  if ("caches" in window) {
+                    const names = await caches.keys()
+                    await Promise.all(names.map((name) => caches.delete(name)))
+                  }
+                }
+                void clear().finally(() => {
+                  window.location.href = "/logout"
+                })
+              }}
+            >
+              <DropdownMenu.ItemLabel>Clear cache</DropdownMenu.ItemLabel>
+            </DropdownMenu.Item>
             <DropdownMenu.Item onSelect={props.debugTools.toggle}>
               <DropdownMenu.ItemLabel>Debug tools</DropdownMenu.ItemLabel>
             </DropdownMenu.Item>
