@@ -94,6 +94,9 @@ const require = __cjs_mod__.createRequire(import.meta.url);
     plugins: [appPlugin, sentry],
     publicDir: "../../../app/public",
     root: "src/renderer",
+    define: {
+      "import.meta.env.VITE_APP_VERSION": JSON.stringify(process.env.OPENCODE_VERSION ?? ""),
+    },
     build: {
       sourcemap: true,
       rollupOptions: {
