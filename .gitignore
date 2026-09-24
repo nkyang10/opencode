@@ -33,3 +33,6 @@ UPCOMING_CHANGELOG.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
+
+# Per-deploy dev version counter (release.ts dev channel)
+packages/script/state/

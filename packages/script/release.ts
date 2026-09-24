@@ -52,6 +52,32 @@ function parseArgs(argv = Bun.argv) {
   }
 }
 
+// Date-versioned dev channel (DEC-037 superseded for dev, s064): dev deploys
+// get `1.0.YYYYMMDD-N` where N is a per-day counter that increments on each
+// build/deploy. The counter lives in a local state file (gitignored) and resets
+// to 1 on a new UTC day. Real release channels (beta/stable) keep DEC-037's
+// monotonic `-fork.<N>` scheme.
+async function devDateVersion(cwdPath: string): Promise<string> {
+  const now = new Date()
+  const yyyymmdd =
+    now.getUTCFullYear().toString() +
+    String(now.getUTCMonth() + 1).padStart(2, "0") +
+    String(now.getUTCDate()).padStart(2, "0")
+  const stateDir = path.join(cwdPath, "packages/script/state")
+  const statePath = path.join(stateDir, "dev-version.json")
+  let n = 0
+  try {
+    const prev = await Bun.file(statePath).json()
+    if ((prev as { day?: string; n?: unknown } | null)?.day === yyyymmdd && typeof (prev as { n?: unknown }).n === "number")
+      n = (prev as { n: number }).n
+  } catch {
+    // no prior state yet — fresh counter
+  }
+  n += 1
+  await Bun.write(statePath, JSON.stringify({ day: yyyymmdd, n }, null, 2) + "\n")
+  return `1.0.${yyyymmdd}-${String(n).padStart(2, "0")}`
+}
+
 function readBase(version: string): string {
   const m = /^(\d+)\.(\d+)\.(\d+)/.exec(version)
   if (!m) throw new Error(`version ${version} is not parseable as MAJOR.MINOR.PATCH pre-release`)
@@ -93,7 +119,7 @@ async function main() {
   }
   if ((opts.bump && opts.syncUpstream) || (opts.bump && opts.channel === "dev")) {
     throw new Error(
-      `invalid combo: --bump with channel=${opts.channel} — dev floats (never bumped); ` +
+      `invalid combo: --bump with channel=${opts.channel} — dev is date-versioned (1.0.YYYYMMDD-N, never hand-bumped); ` +
         `--bump and --sync-upstream are mutually exclusive`,
     )
   }
@@ -125,7 +151,7 @@ async function main() {
     ? `${base}-fork.${forkN}`
     : opts.channel === "beta"
       ? `${base}-fork.${forkN}-beta.${readBetaM(current) || 1}`
-      : `${base}-fork.${forkN}-dev`
+      : await devDateVersion(cwd)
 
   if (opts.bump && opts.channel === "stable") {
     await writeVersions(version, opts.dry || false)
