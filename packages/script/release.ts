@@ -52,11 +52,28 @@ function parseArgs(argv = Bun.argv) {
   }
 }
 
-// Date-versioned dev channel (DEC-037 superseded for dev, s064): dev deploys
-// get `1.0.YYYYMMDD-N` where N is a per-day counter that increments on each
-// build/deploy. The counter lives in a local state file (gitignored) and resets
-// to 1 on a new UTC day. Real release channels (beta/stable) keep DEC-037's
-// monotonic `-fork.<N>` scheme.
+// Date-versioned dev channel: dev deploys get `1.0.YYYYMMDD-N-HHHH` where N is a
+// per-day counter that increments on each build/deploy and HHHH is a build-unique
+// hex suffix derived from wall-clock time + entropy. The counter lives in a local
+// state file (gitignored) and resets to 1 on a new UTC day; the time+entropy
+// suffix guarantees every build emits a globally distinct version string no
+// matter how many machines build in parallel or whether a day's counter resets —
+// so the client's health-version change (deploy notification) always fires.
+// Real release channels (beta/stable) keep DEC-037's monotonic `-fork.<N>` scheme.
+function buildUniqueSuffix(now: Date): string {
+  const ts =
+    now.getUTCFullYear().toString() +
+    String(now.getUTCMonth() + 1).padStart(2, "0") +
+    String(now.getUTCDate()).padStart(2, "0") +
+    String(now.getUTCHours()).padStart(2, "0") +
+    String(now.getUTCMinutes()).padStart(2, "0") +
+    String(now.getUTCSeconds()).padStart(2, "0") +
+    "000"
+  const millis = String(now.getUTCMilliseconds()).padStart(3, "0")
+  const random = Math.random().toString(16).slice(2, 8).padEnd(6, "0")
+  return ts + millis + random
+}
+
 async function devDateVersion(cwdPath: string): Promise<string> {
   const now = new Date()
   const yyyymmdd =
@@ -75,7 +92,7 @@ async function devDateVersion(cwdPath: string): Promise<string> {
   }
   n += 1
   await Bun.write(statePath, JSON.stringify({ day: yyyymmdd, n }, null, 2) + "\n")
-  return `1.0.${yyyymmdd}-${String(n).padStart(2, "0")}`
+  return `1.0.${yyyymmdd}-${String(n).padStart(2, "0")}-${buildUniqueSuffix(now)}`
 }
 
 function readBase(version: string): string {
@@ -119,7 +136,7 @@ async function main() {
   }
   if ((opts.bump && opts.syncUpstream) || (opts.bump && opts.channel === "dev")) {
     throw new Error(
-      `invalid combo: --bump with channel=${opts.channel} — dev is date-versioned (1.0.YYYYMMDD-N, never hand-bumped); ` +
+      `invalid combo: --bump with channel=${opts.channel} — dev is date-versioned (1.0.YYYYMMDD-N-HHHH, never hand-bumped); ` +
         `--bump and --sync-upstream are mutually exclusive`,
     )
   }
