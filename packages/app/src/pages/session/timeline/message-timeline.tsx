@@ -57,7 +57,6 @@ import type {
 import { dismissToast, showToast } from "@/utils/toast"
 import { downloadSessionExport, fetchSessionExport, sessionExportFilename } from "@/utils/session-export"
 import { getDirectory, getFilename } from "@opencode-ai/core/util/path"
-import { Binary } from "@opencode-ai/core/util/binary"
 import { Popover as KobaltePopover } from "@kobalte/core/popover"
 import { normalize } from "@opencode-ai/session-ui/session-diff"
 import { useFileComponent } from "@opencode-ai/ui/context/file"
@@ -77,10 +76,6 @@ import { legacySessionHref, requireServerKey, sessionHref } from "@/utils/sessio
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { useLocal } from "@/context/local"
-import { sendFollowupDraft } from "@/components/prompt-input/submit"
-import { normalizeSessionInfo } from "@/utils/session"
-import { extractPromptFromParts } from "@/utils/prompt"
-import { Identifier } from "@/utils/id"
 import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { sessionTitle } from "@/utils/session-title"
 import { scheduleConnectedMeasure } from "./measure"
@@ -104,51 +99,6 @@ const timelineCache = new Map<string, { measurements: VirtualItem[]; toolOpen: R
 // After "Compact and start a new session", re-places the fresh tab directly
 // after the just-ended session's tab, then renames the ended session and closes
 // its tab so the new tab lands exactly where the old one sat.
-async function rearrangeTabsAfterSlim(options: {
-  tabsStore: ReturnType<typeof useTabs>
-  server: ServerConnection.Key
-  originalId: string
-  newId: string
-  renameOriginalSession: () => Promise<void>
-}) {
-  const { tabsStore, server, originalId, newId, renameOriginalSession } = options
-  const originalTab = { type: "session" as const, server, sessionId: originalId }
-  const newTab = { type: "session" as const, server, sessionId: newId }
-  const newKey = tabKey(newTab)
-  const origKey = tabKey(originalTab)
-
-  // Guarantee the new tab is registered (titlebar also does this via route
-  // change; addSessionTab dedupes, so this is idempotent). It is pushed via
-  // startTransition, so poll until it is committed to the store.
-  tabsStore.addSessionTab(newTab)
-  const deadline = performance.now() + 2000
-  while (!tabsStore.store.some((tab) => tabKey(tab) === newKey)) {
-    if (performance.now() > deadline) return
-    await new Promise((resolve) => setTimeout(resolve, 16))
-  }
-
-  const keys = tabsStore.store.map(tabKey)
-  const origIndex = keys.indexOf(origKey)
-  const newIndex = keys.indexOf(newKey)
-  if (origIndex === -1 || newIndex === -1) return
-
-  if (newIndex !== origIndex + 1) {
-    const withoutNew = keys.filter((key) => key !== newKey)
-    const insertAfter = withoutNew.indexOf(origKey)
-    const reordered = [
-      ...withoutNew.slice(0, insertAfter + 1),
-      newKey,
-      ...withoutNew.slice(insertAfter + 1),
-    ]
-    tabsStore.reorder(reordered)
-  }
-
-  void renameOriginalSession().catch(() => undefined)
-
-  const closeIndex = tabsStore.store.findIndex((tab) => tabKey(tab) === origKey)
-  if (closeIndex !== -1) tabsStore.closeTab(closeIndex)
-}
-
 const taskDescription = (part: PartType, sessionID: string) => {
   if (part.type !== "tool" || part.tool !== "task") return
   const metadata = "metadata" in part.state ? part.state.metadata : undefined
@@ -983,7 +933,6 @@ export function MessageTimeline(props: {
     const id = sessionID()
     if (!id || slimming()) return
     const model = local.model.current()
-    const agentName = local.agent.current()?.name
     if (!model) {
       showToast({
         title: language.t("toast.model.none.title"),
@@ -1008,107 +957,6 @@ export function MessageTimeline(props: {
     try {
       await sdk().api.session.compact({ sessionID: id, model: { providerID: model.provider.id, modelID: model.id } })
       await sdk().api.session.wait({ sessionID: id }).catch(() => undefined)
-
-      const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
-      const maxAttempts = 40
-      let report = ""
-      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-        const messages = sync().data.message[id] ?? []
-        const summaryMessage = [...messages]
-          .reverse()
-          .find((message) => message.role === "assistant" && message.summary)
-        if (summaryMessage) {
-          report = extractPromptFromParts(sync().data.part[summaryMessage.id] ?? [], {
-            directory: sdk().directory,
-            attachmentName: language.t("common.attachment"),
-          })
-            .map((part) => ("content" in part ? part.content : ""))
-            .join("")
-            .trim()
-          if (report) break
-        }
-        await delay(150)
-      }
-
-      const created = await sdk()
-        .api.session.create({
-          agent: agentName,
-          model: { id: model.id, providerID: model.provider.id },
-          location: { directory: sdk().directory },
-        })
-        .then(normalizeSessionInfo)
-      if (!created) throw new Error("Failed to create session")
-      const newId = created.id
-
-      // Register the new session client-side the same way the normal new-session
-      // path does (see prompt-input/submit.ts `seed`). Without this, the fresh
-      // session has no message pipeline attached, so the assistant's streamed
-      // reply parts are dropped and only appear after a reload.
-      serverSync().session.remember(created)
-      const [, setChildStore] = serverSync().child(sdk().directory)
-      setChildStore("session", (list: Session[]) => {
-        const result = Binary.search(list, created.id, (item) => item.id)
-        const next = [...list]
-        if (result.found) {
-          next[result.index] = created
-          return next
-        }
-        next.splice(result.index, 0, created)
-        return next
-      })
-
-      const base = sessionTitle(info()?.title) ?? language.t("command.session.new")
-      const originalTitle = info()?.title ?? base
-      const existing = new Set(
-        (sync().data.session ?? []).map((item) => item.title).filter((value): value is string => Boolean(value)),
-      )
-      let n = 1
-      let title = `${base} (${n})`
-      while (existing.has(title)) {
-        n += 1
-        title = `${base} (${n})`
-      }
-      await sdk().api.session.rename({ sessionID: newId, title }).catch(() => undefined)
-
-      navigate(
-        params.serverKey ? sessionHref(requireServerKey(params.serverKey), newId) : legacySessionHref(sdk().directory, newId),
-      )
-      requestAnimationFrame(() => {
-        const editor = document.querySelector<HTMLTextAreaElement>('[contenteditable="true"]')
-        editor?.focus()
-      })
-
-      void rearrangeTabsAfterSlim({
-        tabsStore,
-        server: serverCtx.key,
-        originalId: id,
-        newId,
-        renameOriginalSession: () =>
-          sdk().api.session.rename({ sessionID: id, title: originalTitle.endsWith(" [ended]") ? originalTitle : `${originalTitle} [ended]` }),
-      })
-
-      if (report) {
-        await sendFollowupDraft({
-          api: sdk().api.session,
-          serverSync: serverSync(),
-          sync: sync(),
-          draft: {
-            sessionID: newId,
-            sessionDirectory: sdk().directory,
-            prompt: [{ type: "text", content: report, start: 0, end: report.length }],
-            context: [],
-            agent: agentName ?? "build",
-            model: { providerID: model.provider.id, modelID: model.id },
-          },
-          messageID: Identifier.ascending("message"),
-          optimisticBusy: true,
-        }).catch((err: unknown) => {
-          showToast({
-            title: language.t("prompt.toast.promptSendFailed.title"),
-            description: err instanceof Error ? err.message : language.t("common.requestFailed"),
-          })
-        })
-      }
       dismissProgress()
       showToast({
         variant: "success",
