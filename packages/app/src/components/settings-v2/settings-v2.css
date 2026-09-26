@@ -178,12 +178,94 @@
   background-color: var(--v2-background-bg-layer-01);
 }
 
+.settings-v2-nav {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+}
+
+.settings-v2-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Narrow screens: dialog-settings-v2.tsx switches TabsV2 to orientation="horizontal"
+   below 640px, so the categories become a compact scrollable tab strip across the top
+   and the key/value content underneath gets the full dialog width. */
+.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"] [data-slot="tabs-v2-list"] {
+  flex-shrink: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background-color: transparent;
+  border-inline-end: none;
+  border-bottom: 1px solid var(--v2-border-border-base);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"]
+  [data-slot="tabs-v2-list"]::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"] .settings-v2-nav {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  width: max-content;
+  min-width: 100%;
+  padding: 6px 8px;
+  box-sizing: border-box;
+}
+
+/* Flatten the two section groups so their triggers sit in one row. */
+.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"] .settings-v2-nav-group {
+  display: contents;
+}
+
+.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"] .settings-v2-nav
+  [data-slot="tabs-v2-section-title"],
+.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"] .settings-v2-nav-footer {
+  display: none;
+}
+
+.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"]
+  [data-slot="tabs-v2-trigger-wrapper"] {
+  height: 32px;
+  padding-inline: 8px;
+  border-radius: 4px;
+}
+
+.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"] [data-slot="tabs-v2-trigger"] {
+  gap: 6px;
+  color: var(--v2-text-text-muted);
+}
+
+.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"]
+  [data-slot="tabs-v2-trigger-wrapper"]:hover:not(:disabled):not(:has([data-selected])) {
+  background-color: var(--v2-background-bg-layer-03);
+  color: var(--v2-text-text-base);
+}
+
+.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"]
+  [data-slot="tabs-v2-trigger-wrapper"]:has([data-selected]) {
+  background-color: var(--v2-background-bg-layer-03);
+  color: var(--v2-text-text-base);
+}
+
+/* Give the key/value rows the recovered width back on narrow screens. */
 @media (max-width: 639px) {
-  .settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="vertical"]
-    [data-slot="tabs-v2-list"] {
-    width: 144px;
-    min-width: 144px;
-    padding-inline: 8px;
+  .settings-v2-tab-header {
+    padding: 24px 16px 16px;
+  }
+
+  .settings-v2-tab-body {
+    padding: 0 16px 24px;
   }
 }
 

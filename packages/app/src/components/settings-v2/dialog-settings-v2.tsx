@@ -1,4 +1,4 @@
-import { Component, createMemo, createSignal, startTransition } from "solid-js"
+import { Component, createMemo, createSignal, onCleanup, onMount, startTransition } from "solid-js"
 import { Dialog } from "@opencode-ai/ui/v2/dialog-v2"
 import { TabsV2 } from "@opencode-ai/ui/v2/tabs-v2"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -41,51 +41,51 @@ export const DialogSettings: Component<{
     void dialog.show(() => <DialogSettings sessionID={props.sessionID} defaultValue="providers" />)
   }
 
+  const [narrow, setNarrow] = createSignal(false)
+  onMount(() => {
+    const mql = window.matchMedia("(max-width: 639px)")
+    setNarrow(mql.matches)
+    const update = (e: MediaQueryListEvent) => setNarrow(e.matches)
+    mql.addEventListener("change", update)
+    onCleanup(() => mql.removeEventListener("change", update))
+  })
+
   return (
     <Dialog size="x-large" variant="settings" class="settings-v2-dialog">
       <TabsV2
-        orientation="vertical"
+        orientation={narrow() ? "horizontal" : "vertical"}
         variant="settings"
         value={tab()}
         onChange={(value) => void startTransition(() => setTab(value))}
         class="settings-v2"
       >
         <TabsV2.List>
-          <div class="flex flex-col justify-between h-full w-full">
-            <div class="flex flex-col gap-3 w-full">
-              <div class="flex flex-col gap-3">
-                <div class="flex flex-col gap-1.5">
-                  <TabsV2.SectionTitle>{language.t("settings.section.desktop")}</TabsV2.SectionTitle>
-                  <div class="flex flex-col gap-1.5 w-full">
-                    <TabsV2.Trigger value="general">
-                      <Icon name="sliders" />
-                      {language.t("settings.tab.general")}
-                    </TabsV2.Trigger>
-                    <TabsV2.Trigger value="shortcuts">
-                      <Icon name="keyboard" />
-                      {language.t("settings.tab.shortcuts")}
-                    </TabsV2.Trigger>
-                  </div>
-                </div>
-
-                <div class="flex flex-col gap-1.5">
-                  <TabsV2.SectionTitle>{language.t("settings.section.server")}</TabsV2.SectionTitle>
-                  <div class="flex flex-col gap-1.5 w-full">
-                    <TabsV2.Trigger value="servers">
-                      <Icon name="server" />
-                      {language.t("status.popover.tab.servers")}
-                    </TabsV2.Trigger>
-                    <TabsV2.Trigger value="providers">
-                      <Icon name="providers" />
-                      {language.t("settings.providers.title")}
-                    </TabsV2.Trigger>
-                    <TabsV2.Trigger value="models">
-                      <Icon name="models" />
-                      {language.t("settings.models.title")}
-                    </TabsV2.Trigger>
-                  </div>
-                </div>
-              </div>
+          <div class="settings-v2-nav">
+            <div class="settings-v2-nav-group">
+              <TabsV2.SectionTitle>{language.t("settings.section.desktop")}</TabsV2.SectionTitle>
+              <TabsV2.Trigger value="general">
+                <Icon name="sliders" />
+                {language.t("settings.tab.general")}
+              </TabsV2.Trigger>
+              <TabsV2.Trigger value="shortcuts">
+                <Icon name="keyboard" />
+                {language.t("settings.tab.shortcuts")}
+              </TabsV2.Trigger>
+            </div>
+            <div class="settings-v2-nav-group">
+              <TabsV2.SectionTitle>{language.t("settings.section.server")}</TabsV2.SectionTitle>
+              <TabsV2.Trigger value="servers">
+                <Icon name="server" />
+                {language.t("status.popover.tab.servers")}
+              </TabsV2.Trigger>
+              <TabsV2.Trigger value="providers">
+                <Icon name="providers" />
+                {language.t("settings.providers.title")}
+              </TabsV2.Trigger>
+              <TabsV2.Trigger value="models">
+                <Icon name="models" />
+                {language.t("settings.models.title")}
+              </TabsV2.Trigger>
             </div>
             <div class="settings-v2-nav-footer">
               <span>{language.t("app.name.desktop")}</span>
