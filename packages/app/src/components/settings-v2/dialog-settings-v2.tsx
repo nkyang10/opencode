@@ -1,4 +1,5 @@
-import { Component, createMemo, createSignal, onCleanup, onMount, startTransition } from "solid-js"
+import { Component, createMemo, createSignal, startTransition } from "solid-js"
+import { createMediaQuery } from "@solid-primitives/media"
 import { Dialog } from "@opencode-ai/ui/v2/dialog-v2"
 import { TabsV2 } from "@opencode-ai/ui/v2/tabs-v2"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -41,14 +42,7 @@ export const DialogSettings: Component<{
     void dialog.show(() => <DialogSettings sessionID={props.sessionID} defaultValue="providers" />)
   }
 
-  const [narrow, setNarrow] = createSignal(false)
-  onMount(() => {
-    const mql = window.matchMedia("(max-width: 639px)")
-    setNarrow(mql.matches)
-    const update = (e: MediaQueryListEvent) => setNarrow(e.matches)
-    mql.addEventListener("change", update)
-    onCleanup(() => mql.removeEventListener("change", update))
-  })
+  const narrow = createMediaQuery("(max-width: 639px)")
 
   return (
     <Dialog size="x-large" variant="settings" class="settings-v2-dialog">

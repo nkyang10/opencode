@@ -195,27 +195,28 @@
 
 /* Narrow screens: dialog-settings-v2.tsx switches TabsV2 to orientation="horizontal"
    below 640px, so the categories become a compact scrollable tab strip across the top
-   and the key/value content underneath gets the full dialog width. */
+   and the key/value content underneath gets the full dialog width. The list's own
+   width/overflow/scrollbar rules come from tabs-v2.css (horizontal list). */
 .settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"] [data-slot="tabs-v2-list"] {
   flex-shrink: 0;
-  overflow-x: auto;
   overflow-y: hidden;
   background-color: transparent;
-  border-inline-end: none;
   border-bottom: 1px solid var(--v2-border-border-base);
-  scrollbar-width: none;
-  -ms-overflow-style: none;
 }
 
-.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"]
-  [data-slot="tabs-v2-list"]::-webkit-scrollbar {
-  display: none;
+/* Keep the side nav from eating the content column on medium widths (it is a fixed
+   240px above 640px, which squeezed the key/value rows on tablets/split screens). */
+.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="vertical"] [data-slot="tabs-v2-list"] {
+  width: clamp(168px, 24vw, 240px);
+  min-width: 0;
 }
 
 .settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"] .settings-v2-nav {
   flex-direction: row;
   align-items: center;
-  justify-content: flex-start;
+  /* "safe" so a locale whose labels overflow scrolls from the start instead of
+     clipping the first tab off the left edge (plain center would). */
+  justify-content: safe center;
   gap: 4px;
   width: max-content;
   min-width: 100%;
@@ -239,11 +240,12 @@
   height: 32px;
   padding-inline: 8px;
   border-radius: 4px;
+  color: var(--v2-text-text-muted);
 }
 
-.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"] [data-slot="tabs-v2-trigger"] {
-  gap: 6px;
-  color: var(--v2-text-text-muted);
+/* Labels only: the icons cost ~28px per tab, which pushed the 5th tab off a 390px screen. */
+.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"] [data-component="icon"] {
+  display: none;
 }
 
 .settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"]
