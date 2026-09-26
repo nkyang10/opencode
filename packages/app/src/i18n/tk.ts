@@ -1086,6 +1086,13 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Göçürildi!",
+  "settings.general.notifications.rss.copy": "RSS URL-ni göçüriň",
+  "settings.general.notifications.rss.dialog.title": "RSS iýmit URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Buferine göçürildi. URL aşakda el bilen göçürmek üçin saýlanyp bilner",
+  "settings.general.notifications.rss.dialog.copyAll": "URL göçüriň",
+  "settings.general.notifications.rss.dialog.done": "Taýýar",
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "Agent doly bolanda ýa-da ünsi talap edende ses çalyň",
   "settings.general.sounds.permissions.title": "Rugsatlar",

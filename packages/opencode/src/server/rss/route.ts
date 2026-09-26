@@ -1,7 +1,7 @@
 import { Rss } from "@/rss/rss"
 import { ServerAuth } from "@/server/auth"
 import { authorizationRouterMiddleware } from "@/server/routes/instance/httpapi/middleware/authorization"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Option } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 
 // FE-019: RSS feed routes.
@@ -56,10 +56,11 @@ const rssDocument = (origin: string, items: ReadonlyArray<Rss.RssItem>) => {
 </rss>`
 }
 
-const originOf = (request: HttpServerRequest.HttpServerRequest) => {
-  const url = new URL(request.url, "http://localhost")
-  return url.origin
-}
+// Origin for the RSS feed links. Use the request's Host (+x-forwarded-proto) so
+// the feed echoes the origin the reader actually used (e.g. http://192.168.1.249:4447)
+// instead of a hard-coded localhost. Falls back to the URL when no Host is present.
+const originOf = (request: HttpServerRequest.HttpServerRequest) =>
+  Option.getOrElse(HttpServerRequest.toURL(request), () => new URL(request.url, "http://localhost")).origin
 
 const authOnlyRouterLayer = authorizationRouterMiddleware.layer.pipe(Layer.provide(ServerAuth.Config.layer))
 

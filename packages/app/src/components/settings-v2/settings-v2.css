@@ -727,3 +727,10 @@
   line-height: 1;
   color: var(--v2-state-fg-danger);
 }
+
+.settings-v2-rss-dialog-description {
+  font-size: 12px;
+  font-weight: 440;
+  line-height: 1.45;
+  color: var(--v2-text-text-secondary);
+}

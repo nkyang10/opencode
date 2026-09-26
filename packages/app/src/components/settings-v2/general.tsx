@@ -1,4 +1,4 @@
-import { Component, Show, createMemo, createResource, onCleanup } from "solid-js"
+import { Component, Show, createMemo, createResource, createSignal, onCleanup } from "solid-js"
 import { createMediaQuery } from "@solid-primitives/media"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
@@ -12,6 +12,7 @@ import { useSettings } from "@/context/settings"
 import { ExternalLink } from "../external-link"
 import { SettingsListV2 } from "./parts/list"
 import { SettingsRowV2 } from "./parts/row"
+import { DialogRssV2 } from "./dialog-rss-v2"
 import { LayoutRetirementNotice, LayoutTransitionToggle } from "./interface-transition"
 import {
   createAppearanceSettingsController,
@@ -442,6 +443,47 @@ export const SettingsGeneralV2: Component<{
     </div>
   )
 
+  const [rssUrl] = createResource<string | undefined>(
+    async () => {
+      const response = await fetch("/api/rss/url", { credentials: "same-origin" })
+      if (!response.ok) return undefined
+      const body = (await response.json()) as { url?: string }
+      return body.url ? `${window.location.origin}${body.url}` : undefined
+    },
+    { initialValue: undefined },
+  )
+
+  const [rssCopied, setRssCopied] = createSignal(false)
+  let rssCopyTimer: ReturnType<typeof setTimeout> | undefined
+
+  const copyToClipboard = (value: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      return navigator.clipboard.writeText(value)
+    }
+    // Fallback for non-secure contexts (plain HTTP over LAN has no navigator.clipboard).
+    const textarea = document.createElement("textarea")
+    textarea.value = value
+    textarea.style.position = "fixed"
+    textarea.style.opacity = "0"
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand("copy")
+    textarea.remove()
+    return Promise.resolve()
+  }
+
+  const copyRssUrl = () => {
+    const value = rssUrl()
+    if (!value || typeof navigator === "undefined") return
+    setRssCopied(true)
+    if (rssCopyTimer) clearTimeout(rssCopyTimer)
+    rssCopyTimer = setTimeout(() => setRssCopied(false), 1500)
+    void copyToClipboard(value)
+    void dialog.show(() => <DialogRssV2 url={value} />)
+  }
+
+  onCleanup(() => clearTimeout(rssCopyTimer))
+
   const NotificationsSection = () => (
     <div class="settings-v2-section">
       <h3 class="settings-v2-section-title">{language.t("settings.general.section.notifications")}</h3>
@@ -480,6 +522,24 @@ export const SettingsGeneralV2: Component<{
               checked={settings.notifications.errors()}
               onChange={(checked) => settings.notifications.setErrors(checked)}
             />
+          </div>
+        </SettingsRowV2>
+
+        <SettingsRowV2
+          title={language.t("settings.general.notifications.rss.title")}
+          description={language.t("settings.general.notifications.rss.description")}
+        >
+          <div data-action="settings-notifications-rss">
+            <ButtonV2
+              variant="outline"
+              icon={rssCopied() ? "check" : "outline-copy"}
+              onClick={() => copyRssUrl()}
+              disabled={!rssUrl()}
+            >
+              {rssCopied()
+                ? language.t("settings.general.notifications.rss.copied")
+                : language.t("settings.general.notifications.rss.copy")}
+            </ButtonV2>
           </div>
         </SettingsRowV2>
       </SettingsListV2>

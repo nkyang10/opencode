@@ -38,6 +38,72 @@ Windows deploy uses `script/build-windows-installer.cmd` from the repo root. Tha
 - `packages/desktop/scripts/prepare.ts` may download a prebuilt CLI on the dev channel. Copy the locally compiled CLI back over that download before packaging. Do not ship the downloaded CLI.
 - Put published files in `package-dist`. The installer creates `logs/debug` and `logs/deploy`. `deploy-log-dir.txt` and `OPENCODE_LOG_DIR` point the published binary at `logs/deploy`. Source runs use `logs/debug`.
 
+### Settings UI: there are TWO settings surfaces — keep both in sync
+
+There are **two** parallel settings UIs in `packages/app`, and a feature added to one is NOT
+automatically in the other:
+
+- **v1 ("legacy"):** `packages/app/src/components/settings-general.tsx` — still the default `/settings`
+  page. Uses `SettingsRow` / `TextField` from `@opencode-ai/ui`.
+- **v2 ("new interface designs"):** `packages/app/src/components/settings-v2/general.tsx` — rendered when
+  the user enables the "New interface designs" toggle (the lazy `import("@/components/settings-v2")` in
+  `settings-general.tsx`). Uses `SettingsRowV2` / `TextInputV2` from `@opencode-ai/ui/v2`.
+
+**Gap found (2026-09-25):** the per-user **RSS feed URL** row was added only to v1's Notifications section
+(`RssFeedRow`, `settings-general.tsx:646`, i18n `settings.general.notifications.rss.*`). The v2
+`NotificationsSection` (`settings-v2/general.tsx`) only had agent/permissions/errors and was missing the
+RSS row, so it did NOT appear in the redesigned settings. **Fixed** by porting the row into
+`settings-v2/general.tsx` (fetches `/api/rss/url`, prefixed with `window.location.origin`). The v2 row is a
+single **"Copy RSS URL"** `ButtonV2` (fixed label; the URL is never the button label). v1 still uses a
+read-only copyable `TextField`.
+
+Rule: when touching a notifications/settings row, check BOTH `settings-general.tsx` and
+`settings-v2/general.tsx` and keep them in sync.
+
+### Linux deploy for this fork (web UI on :4447)
+
+This fork serves its web UI on **port 4447** (NOT the upstream default 4446). Source-of-truth scripts
+live in `fork-root/scripts/` (one level above the `opencode/` clone):
+
+- `deploy-web-4447.sh` — one-shot rebuild + redeploy. Kills whatever listens on `:4447`, runs
+  `build-linux.sh`, then `run-web.sh 4447`. Safe to re-run; writes a pidfile `testing/.web-4447.pid`.
+- `build-linux.sh` — compiles the fork (pins **bun 1.3.14**) into
+  `opencode/packages/opencode/dist/opencode-linux-arm64/bin/opencode`.
+- `run-web.sh` — `setsid nohup <binary> web --port 4447 --hostname 0.0.0.0`, working dir `testing/`.
+  If `OPENCODE_SERVER_PASSWORD` is set, any URL redirects to `/login` (FE-001 login page); the server
+  otherwise stays open.
+
+Gate: whenever a change touches `packages/app` (the web UI), the embedded app must be REBUILT into the
+binary or the running server serves stale assets. Deploy log: `fork-root/testing/deploy-4447.log`;
+server log: `fork-root/testing/web-4447.log`.
+
+**RSS origin (2026-09-26):** the feed's `originOf` in `packages/opencode/src/server/rss/route.ts` now uses
+`HttpServerRequest.toURL(request)` (honors the request **Host** header / `x-forwarded-proto`), so the `<link>`
+entries echo the origin the reader actually used (verified: `Host: 192.168.1.249:4447` → links on that origin;
+was hard-coded to `http://localhost` before). The copy button still builds the URL from `window.location.origin`.
+
+**v2 copy button (2026-09-26):** clicking the "Copy RSS URL" row `ButtonV2` in `settings-v2/general.tsx` now
+copies the URL via `copyToClipboard()` (which falls back to a temp `textarea` + `document.execCommand("copy")`
+because `navigator.clipboard` is `undefined` in non-secure plain-HTTP LAN contexts) and **opens `DialogRssV2`**
+(a confirmation dialog, open already in "Copied!" state, with a selectable URL textarea, a "Copy URL" button,
+and a "Done" button to dismiss). The `rssCopied` signal also flips the row button to "Copied!" for ~1.5s.
+
+**Settings v2 responsive nav (2026-09-26, DEC-043):** `settings-v2/dialog-settings-v2.tsx` switches the
+`TabsV2` `orientation` prop from a `matchMedia("(max-width: 639px)")` signal — `vertical` (left category column)
+on wide screens, `horizontal` on narrow ones, where the categories render as a scrollable tab strip **on top** and
+the key/value content gets the full dialog width. Kobalte holds `orientation` as a context accessor, so the flip
+updates `data-orientation`, `aria-orientation` and arrow-key direction together (no remount, no lost tab state);
+the `TabsV2` component in `packages/ui` is unchanged. The nav list content was flattened to `.settings-v2-nav` >
+`.settings-v2-nav-group` (×2) + `.settings-v2-nav-footer`; on narrow screens the groups become `display: contents`,
+and the section titles + app-name/version footer are hidden (they do not fit a strip). New CSS is scoped under
+`.settings-v2[data-variant="settings"][data-orientation="horizontal"]` in `settings-v2.css`, plus a
+`max-width: 639px` header/body padding reduction (40px → 16px). The old `144px` side-nav media block was deleted.
+
+**Last deploy (2026-09-26):** rebuilt + redeployed :4447 with the Settings v2 responsive nav (binary via
+`build-linux.sh`, version `1.1.20260926074652`, server pid 2922029 on :4447, `/login` healthy — HTTP 401 before auth
+is expected). Playwright-measured: desktop 1280px unchanged (nav 240px left / panel 740px); 390px phone → strip
+358×45 on top, panel 358px full width, key/value row 286px (was ~134px), ArrowRight moves between tabs.
+
 ## Branch Names
 
 Use a short branch name of at most three words, separated by hyphens. Do not use slashes or type prefixes such as `feat/` or `fix/`.
