@@ -18,7 +18,6 @@ import type {
   CommandListOutput,
   ProjectCurrentInput,
   ProjectCurrentOutput,
-  ProjectDirectories,
   ProjectListOutput,
   ReferenceListInput,
   ReferenceListOutput,
@@ -45,7 +44,8 @@ import { NormalizedProviderListResponse } from "@opencode-ai/session-ui/context"
 import { ScopedKey, type ServerScope } from "@/utils/server-scope"
 import { normalizeSessionInfo } from "@/utils/session"
 import type { ServerProtocol } from "@/utils/server-protocol"
-import type { ServerApi } from "@/utils/server"
+import type { ServerConnection } from "@/context/server"
+import { fetchProjectDirectories, type ServerApi } from "@/utils/server"
 
 type GlobalStore = {
   ready: boolean
@@ -123,7 +123,6 @@ export const loadGlobalConfigQuery = (scope: ServerScope, sdk: OpencodeClient, p
 type ProjectApi = {
   readonly list: () => Promise<ProjectListOutput>
   readonly current: (input?: ProjectCurrentInput) => Promise<ProjectCurrentOutput>
-  readonly directories: (input: { projectID: string }) => Promise<ProjectDirectories>
 }
 
 type McpApi = ServerApi["mcp"]
@@ -154,15 +153,15 @@ export const loadProjectsQuery = (scope: ServerScope, api: ProjectApi) =>
  * a folder that is not a repository. A server that does not know the endpoint yet must not break
  * the project list, so the failure resolves to nothing rather than rejecting.
  */
-export const loadProjectFoldersQuery = (scope: ServerScope, api: ProjectApi) =>
+export const loadProjectFoldersQuery = (
+  scope: ServerScope,
+  server: ServerConnection.HttpBase,
+  fetcher?: typeof globalThis.fetch,
+) =>
   queryOptions({
     queryKey: [scope, "project-folder"],
     queryFn: () =>
-      retry(() =>
-        api
-          .directories({ projectID: GLOBAL_PROJECT_ID })
-          .then((folders) => folders.map((folder) => folder.directory).filter((directory) => !!directory)),
-      ).catch(() => []),
+      retry(() => fetchProjectDirectories({ server, projectID: GLOBAL_PROJECT_ID, fetch: fetcher })).catch(() => []),
   })
 
 export async function bootstrapGlobal(input: {

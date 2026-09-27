@@ -135,7 +135,7 @@ describe("Project.fromDirectory", () => {
     }),
   )
 
-  it.live("should record a directory without a repository for the global project", () =>
+  it.live("should not record a directory without a repository just for resolving it", () =>
     Effect.gen(function* () {
       const project = yield* Project.Service
       const tmp = yield* tmpdirScoped()
@@ -144,21 +144,46 @@ describe("Project.fromDirectory", () => {
 
       expect(result.project.id).toBe(ProjectV2.ID.global)
       expect(result.project.worktree).toBe("/")
+      // Listing a directory in the picker resolves a project without the user ever
+      // opening it; recording that would list every browsed folder (/usr, /boot, ...).
+      expect(yield* globalDirectoryRows()).toEqual([])
+    }),
+  )
 
-      // The row has to be the directory that was opened: `ProjectV2.resolve`
-      // collapses a repository-less directory to "/", so recording the resolved
-      // directory would remember the root instead of the folder.
+  it.live("should record an opened directory without a repository for the global project", () =>
+    Effect.gen(function* () {
+      const project = yield* Project.Service
+      const tmp = yield* tmpdirScoped()
+      const { project: info } = yield* project.fromDirectory(tmp)
+
+      yield* project.recordOpenedDirectory({ project: info, directory: tmp })
+
+      // The row is the directory that was opened: `ProjectV2.resolve` collapses a
+      // repository-less directory to "/", so the resolved value would remember the root.
       expect((yield* globalDirectoryRows()).map((row) => String(row.directory))).toEqual([tmp])
     }),
   )
 
-  it.live("should not record a path that is not a directory", () =>
+  it.live("should not record an opened path that is not a directory", () =>
     Effect.gen(function* () {
       const project = yield* Project.Service
       const tmp = yield* tmpdirScoped()
+      const { project: info } = yield* project.fromDirectory(tmp)
 
       // A stale tab or a typo must not leave a row the user can never open again.
-      yield* project.fromDirectory(path.join(tmp, "gone"))
+      yield* project.recordOpenedDirectory({ project: info, directory: path.join(tmp, "gone") })
+      expect(yield* globalDirectoryRows()).toEqual([])
+    }),
+  )
+
+  it.live("should not record a directory that has a repository of its own", () =>
+    Effect.gen(function* () {
+      const project = yield* Project.Service
+      const tmp = yield* tmpdirScoped({ git: true })
+      const { project: info } = yield* project.fromDirectory(tmp)
+
+      // A repository is listed from its own project row, so nothing is added for it.
+      yield* project.recordOpenedDirectory({ project: info, directory: tmp })
       expect(yield* globalDirectoryRows()).toEqual([])
     }),
   )

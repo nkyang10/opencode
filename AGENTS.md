@@ -102,31 +102,37 @@ and the section titles + app-name/version footer are hidden (they do not fit a s
 **Project identity = git, not path (2026-09-26, DEC-045 / FE-020):** a project id is derived from git
 (`ProjectV2.resolve`: remote-url hash → id cached in `<git-common-dir>/opencode` → **first root commit sha**).
 A directory with no repository resolves to the shared `global` project, which is why it used to vanish from the
-server-truth Home project list when picked in the folder selector. `Project.saveProjectDirectory` now records
-**every opened** directory — the global project included, which is the only place a plain folder is
-remembered — and `fromDirectory` emits `project.directories.updated` on the **global** bus (same shape as
-`emitUpdated`) when a row is new. Record the directory that was **requested**, not `ProjectV2.resolve`'s
-`data.directory`: for a repository-less directory that field is `/`, so it would remember the filesystem root
-instead of the folder (`data.vcs ? data.directory : directory`; test: `test/project/project.test.ts` ▸ *"should
-record a directory without a repository"*). On the app side the list is a **query**
-(`[scope, "project-folder"]` → `GET /project/global/directories`) whose result backs the `folder` store slice
+server-truth Home project list when picked in the folder selector. It is now remembered by
+`Project.recordOpenedDirectory`, called from the **`project/current` handler** — i.e. when a client *opens* a
+directory (Home ▸ Add project, a tab, a session) — and announced as `project.directories.updated` on the
+**global** bus when the row is new. Recording it in `fromDirectory` instead is wrong: browsing the directory
+picker lists directories, and each of those requests resolves a project too, so every browsed folder
+(`/usr`, `/boot`, `/proc`, …) became a "project" — only the live test caught that. Record the directory that was
+**requested**, not `ProjectV2.resolve`'s `data.directory` (for a repository-less directory that field is `/`).
+On the app side the list is a **query** (`[scope, "project-folder"]`) whose result backs the `folder` store slice
 as a getter, and `mergeProjectFolders` (`packages/app/src/pages/home/home-project-folders.ts`) feeds the Home
-list of **every** server, not only the focused one. Two more traps: `ProjectDirectories.create` in
-`packages/core` **cannot** take an `EventV2.node` dependency (module-init cycle, `Cannot access 'node' before
-initialization`) — the engine layer publishes instead; and `POST /project/git/init` on a non-repo directory
-repoints the **global** project's own `worktree`, so nothing calls it for folders any more. Folder rows have no
-project id, hence no "Edit project". Background: `50-projects/p003-opencode-fork/README.md` → `## FE-020`.
+list of **every** server, not only the focused one. Three traps: `ProjectDirectories.create` in `packages/core`
+**cannot** take an `EventV2.node` dependency (module-init cycle, `Cannot access 'node' before initialization`) —
+the engine layer publishes instead; `POST /project/git/init` on a non-repo directory repoints the **global**
+project's own `worktree`, so nothing calls it for folders any more; and `GET /project/{projectID}/directories` is
+**not in the generated v2 client** (it is not part of the default protocol API) while the v1 compat layer answers
+`project.directories` with `worktree.list()` — the current instance's *sandbox worktrees*, a different set — so
+the app calls that route itself via `fetchProjectDirectories` (`packages/app/src/utils/server.ts`, same Basic auth
+as the SDK clients, same precedent as the `/api/rss/url` route). Folder rows have no project id, hence no
+"Edit project". Background: `50-projects/p003-opencode-fork/README.md` → `## FE-020`.
 
-**Last deploy (2026-09-27):** rebuilt + redeployed :4447 via `deploy-web-4447.sh --detach` — version
-`1.1.20260927065342`, server **pid 3613950** on :4447 (`/login` healthy, HTTP 401 before auth). Carries, in one
-binary: **FE-020** (`c1f1b58`) and the **DEV-menu utility items** (DEC-046, `titlebar.tsx` `ChannelIndicator` —
-the DEV dropdown now also holds Log out / Settings / Help, wired to the same handlers and i18n keys as
-`HomeUtilityNav`). Playwright-verified on the live server: 7 items + separator, Settings opens the v2 dialog,
-Log out confirm → `/login`, no console errors. **⚠ This build compiles whatever is in the checkout, so it also
-contains a parallel session's uncommitted WIP** (`turn-activity.ts` + its test, `message-timeline.tsx`, a
-`session.thinking.elapsed` key in all 62 locales) — an in-flight session's edits ship with the next deploy. That
-WIP self-repaired its 2 TS errors by 07:33 (`bun typecheck` clean again) but is still uncommitted; land or revert
-it before the next commit (ide FU-082).
+**Last deploy (2026-09-27 07:28 UTC):** rebuilt + redeployed :4447 via `deploy-web-4447.sh --detach` — version
+`1.1.20260927072837`, server **pid 3654762** on :4447 (`/api/health` `{"healthy":true,...}`, HTTP 401 before auth,
+`/login` 200). Carries **FE-021** (`5d6b47a`, committed + pushed): the "Thinking" row shows
+`· <since last model output> / <since your prompt>` with a tooltip naming both numbers and the absolute clock
+time of the last output (DEC-047). Verified present in the served bundle (`assets/index-BFF1n-Mg.js` contains
+`session.thinking.elapsed` and `since the last model output`) and in the binary; **not yet visually confirmed by
+the user** (ide FU-085). Also in this binary: **FE-020** (`c1f1b58`) and the **DEV-menu utility items**
+(DEC-046, `titlebar.tsx` — still uncommitted, ide FU-081).
+
+**Reminders that outlive a deploy:** the build compiles the whole checkout, so whatever is in the tree ships with
+it — check `git status` before building, because an in-flight session's edits land in the binary too. And a
+deploy kills the listener the running session is using; use `--detach` and expect the tab to reconnect.
 
 **Previous deploy (2026-09-26):** rebuilt + redeployed :4447 with the reviewed Settings v2 responsive nav
 (`71c73a0`, binary via `build-linux.sh`, version `1.1.20260926102413`, server pid 2999326 on :4447, `/login`

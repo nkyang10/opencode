@@ -315,28 +315,50 @@ describe("query keys", () => {
   })
 
   test("loads the directories of the global project as plain folders", async () => {
-    const calls: unknown[] = []
-    const api = {
-      directories: async (input: unknown) => {
-        calls.push(input)
-        return [{ directory: "/home/mark/Desktop" }, { directory: "/scratch" }]
-      },
-    } as unknown as ProjectApi
+    const calls: string[] = []
+    const fetcher = (async (input: RequestInfo | URL) => {
+      calls.push(String(input))
+      return new Response(JSON.stringify([{ directory: "/home/mark/Desktop" }, { directory: "/scratch" }]), {
+        headers: { "content-type": "application/json" },
+      })
+    }) as typeof globalThis.fetch
 
-    const result = await new QueryClient().fetchQuery(loadProjectFoldersQuery(ServerScope.local, api))
+    const result = await new QueryClient().fetchQuery(
+      loadProjectFoldersQuery(ServerScope.local, { url: "http://127.0.0.1:4447", password: "haha" }, fetcher),
+    )
 
-    expect(calls).toEqual([{ projectID: "global" }])
+    // The route is called directly: the generated client does not cover it and the v1
+    // compatibility layer answers it with the instance's sandbox worktrees instead.
+    expect(calls).toEqual(["http://127.0.0.1:4447/project/global/directories"])
     expect(result).toEqual(["/home/mark/Desktop", "/scratch"])
   })
 
-  test("keeps the project list usable when the folder request fails", async () => {
-    const api = {
-      directories: async () => {
-        throw new Error("nope")
-      },
-    } as unknown as ProjectApi
+  test("sends the server credentials with the folder request", async () => {
+    let authorization: string | undefined
+    const fetcher = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      authorization = new Headers(init?.headers).get("authorization") ?? undefined
+      return new Response("[]", { headers: { "content-type": "application/json" } })
+    }) as typeof globalThis.fetch
 
-    expect(await new QueryClient().fetchQuery(loadProjectFoldersQuery(ServerScope.local, api))).toEqual([])
+    await new QueryClient().fetchQuery(
+      loadProjectFoldersQuery(
+        ServerScope.local,
+        { url: "http://127.0.0.1:4447", username: "mark", password: "haha" },
+        fetcher,
+      ),
+    )
+
+    expect(authorization).toBe(`Basic ${btoa("mark:haha")}`)
+  })
+
+  test("keeps the project list usable when the folder request fails", async () => {
+    const fetcher = (async () => new Response("nope", { status: 500 })) as unknown as typeof globalThis.fetch
+
+    expect(
+      await new QueryClient().fetchQuery(
+        loadProjectFoldersQuery(ServerScope.local, { url: "http://127.0.0.1:4447" }, fetcher),
+      ),
+    ).toEqual([])
   })
 
   test("loads references from the current location-scoped endpoint", async () => {

@@ -17,7 +17,13 @@ export const projectHandlers = HttpApiBuilder.group(InstanceHttpApi, "project", 
     })
 
     const current = Effect.fn("ProjectHttpApi.current")(function* () {
-      return (yield* InstanceState.context).project
+      const ctx = yield* InstanceState.context
+      // Asking the server to open a directory is what makes it remember a plain folder
+      // (one without a repository). Merely reaching a directory — listing it in the
+      // directory picker, for instance — resolves a project too, and recording that
+      // would fill the project list with every folder the user browsed past.
+      yield* svc.recordOpenedDirectory({ project: ctx.project, directory: ctx.directory })
+      return ctx.project
     })
 
     const initGit = Effect.fn("ProjectHttpApi.initGit")(function* () {

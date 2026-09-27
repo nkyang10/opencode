@@ -194,6 +194,7 @@ export function seedActiveSessionStatuses(
 function makeQueryOptionsApi(
   scope: ServerScope,
   serverSDK: () => OpencodeClient,
+  server: ServerConnection.HttpBase,
   serverAPI: ServerApi,
   sdkFor: (dir: PathKey) => OpencodeClient,
   protocol: Promise<"v1" | "v2">,
@@ -201,7 +202,7 @@ function makeQueryOptionsApi(
   return {
     globalConfig: () => loadGlobalConfigQuery(scope, serverSDK(), protocol),
     projects: () => loadProjectsQuery(scope, serverAPI.project),
-    projectFolders: () => loadProjectFoldersQuery(scope, serverAPI.project),
+    projectFolders: () => loadProjectFoldersQuery(scope, server),
     providers: (directory: PathKey | null) =>
       loadProvidersQuery(scope, directory, serverAPI, directory ? sdkFor(directory) : serverSDK(), protocol),
     path: (directory: PathKey | null) =>
@@ -246,6 +247,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
   const queryOptionsApi = makeQueryOptionsApi(
     serverSDK.scope,
     () => serverSDK.client,
+    serverSDK.server.http,
     serverSDK.api,
     sdkFor,
     serverSDK.protocol,

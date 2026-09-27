@@ -88,6 +88,8 @@ export interface Interface {
    */
   readonly init: () => Effect.Effect<void>
   readonly fromDirectory: (directory: string) => Effect.Effect<{ project: Info; sandbox: string }>
+  /** Remember a directory that was *opened* and has no repository of its own. */
+  readonly recordOpenedDirectory: (input: { project: Info; directory: string }) => Effect.Effect<void>
   readonly discover: (input: Info) => Effect.Effect<void>
   readonly list: () => Effect.Effect<Info[]>
   readonly get: (id: ProjectV2.ID) => Effect.Effect<Info | undefined>
@@ -211,9 +213,6 @@ const layer = Layer.effect(
       // was deleted would otherwise leave a row the user can never open again. The same
       // check the sandbox list uses.
       if (!(yield* fs.isDir(opened).pipe(Effect.orDie))) return false
-      // Recorded for the global project too: a directory without a repository
-      // resolves to the global project, and this row is then the only place such
-      // a folder is remembered, so clients can list it as a plain working folder.
       return yield* projectDirectories
         .create({
           directory: opened,
@@ -226,6 +225,24 @@ const layer = Layer.effect(
             ),
           ),
         )
+    })
+
+    // A directory without a repository resolves to the shared `global` project, which
+    // means it has no project row of its own — this row is then the only place the
+    // server remembers it, and what clients list as a plain working folder.
+    //
+    // It is recorded when a client *opens* the directory (`project/current`: Home ▸ Add
+    // project, a tab, a session), never when the directory is merely reached: browsing
+    // the directory picker lists directories, and every one of those requests resolves a
+    // project too, which would fill the list with `/usr`, `/boot` and friends.
+    const recordOpenedDirectory = Effect.fn("Project.recordOpenedDirectory")(function* (input: {
+      project: Info
+      directory: string
+    }) {
+      if (input.project.id !== ProjectV2.ID.global) return
+      if (input.project.vcs) return
+      if (yield* saveProjectDirectory({ projectID: input.project.id, directory: input.directory }))
+        yield* emitDirectoriesUpdated(input.project.id)
     })
 
     const fromDirectory = Effect.fn("Project.fromDirectory")(function* (directory: string) {
@@ -315,14 +332,12 @@ const layer = Layer.effect(
           .pipe(Effect.orDie)
       }
 
-      // A repository records its own worktree, but a directory without one
-      // resolves to the global project with `data.directory` collapsed to "/",
-      // so the request is the only place the opened plain folder exists.
-      const created = yield* saveProjectDirectory({
-        projectID,
-        directory: data.vcs ? data.directory : directory,
-      })
-      if (created) yield* emitDirectoriesUpdated(projectID)
+      // The project's own worktree. A directory without a repository is not recorded
+      // here — see `recordOpenedDirectory` for why that waits until it is opened.
+      if (projectID !== ProjectV2.ID.global) {
+        if (yield* saveProjectDirectory({ projectID, directory: data.directory }))
+          yield* emitDirectoriesUpdated(projectID)
+      }
 
       yield* emitUpdated(result)
       if (projectID !== ProjectV2.ID.global && data.vcs?.type === "git") {
@@ -472,6 +487,7 @@ const layer = Layer.effect(
     return Service.of({
       init,
       fromDirectory,
+      recordOpenedDirectory,
       discover,
       list,
       get,
