@@ -83,11 +83,11 @@ describe("active session query", () => {
     expect([...options.queryKey]).toEqual([ServerScope.local, "activeSessions"])
   })
 
-  test("does not overwrite statuses already written by events", () => {
+  test("does not overwrite statuses already written by events", async () => {
     const session = createServerSession({} as OpencodeClient)
     session.set("session_status", "ses_retry", { type: "retry", attempt: 2, message: "retrying", next: 10 })
 
-    seedActiveSessionStatuses(session, {
+    await seedActiveSessionStatuses(session, {
       ses_running: { type: "running" },
       ses_retry: { type: "running" },
     })
@@ -101,12 +101,12 @@ describe("active session query", () => {
     })
   })
 
-  test("clears stale busy statuses the server no longer lists (missed idle event)", () => {
+  test("clears stale busy statuses the server no longer lists (missed idle event)", async () => {
     const session = createServerSession({} as OpencodeClient)
     session.set("session_status", "ses_finished", { type: "busy" })
     session.set("session_status", "ses_still_running", { type: "busy" })
 
-    seedActiveSessionStatuses(session, {
+    await seedActiveSessionStatuses(session, {
       ses_still_running: { type: "running" },
     })
 
@@ -114,7 +114,7 @@ describe("active session query", () => {
     expect(session.data.session_status.ses_still_running).toEqual({ type: "busy" })
   })
 
-  test("keeps a retrying turn and settles the client's pending record only when it demotes", () => {
+  test("keeps a retrying turn and settles the client's pending record only when it demotes", async () => {
     const session = createServerSession({} as OpencodeClient)
     session.set("session_status", "ses_retrying", { type: "retry", attempt: 2, message: "upstream down", next: 10 })
     session.set("session_status", "ses_finished", { type: "busy" })
@@ -122,7 +122,7 @@ describe("active session query", () => {
 
     // A retry backoff keeps the session out of the status map, but the server is still working on
     // the turn: demoting it here would blank the timeline's progress row mid-flight.
-    seedActiveSessionStatuses(session, {}, (sessionID) => settled.push(sessionID))
+    await seedActiveSessionStatuses(session, {}, { settle: (sessionID) => settled.push(sessionID) })
 
     expect(session.data.session_status.ses_retrying).toEqual({
       type: "retry",
@@ -132,6 +132,26 @@ describe("active session query", () => {
     })
     expect(session.data.session_status.ses_finished).toEqual({ type: "idle" })
     expect(settled).toEqual(["ses_finished"])
+  })
+
+  test("asks the server before demoting a session it does not list", async () => {
+    const session = createServerSession({} as OpencodeClient)
+    session.set("session_status", "ses_open_turn", { type: "busy" })
+    session.set("session_status", "ses_done", { type: "busy" })
+    const asked: string[] = []
+
+    // A session waiting out a provider retry is running but missing from the status map, so the map
+    // alone cannot decide; the turn's own message list can.
+    await seedActiveSessionStatuses(session, {}, {
+      turnFinished: async (sessionID) => {
+        asked.push(sessionID)
+        return sessionID === "ses_done"
+      },
+    })
+
+    expect(asked).toEqual(["ses_open_turn", "ses_done"])
+    expect(session.data.session_status.ses_open_turn).toEqual({ type: "busy" })
+    expect(session.data.session_status.ses_done).toEqual({ type: "idle" })
   })
 })
 

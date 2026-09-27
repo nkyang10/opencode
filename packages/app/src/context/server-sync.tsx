@@ -169,10 +169,16 @@ export const loadActiveSessionsQuery = (
     refetchOnWindowFocus: false,
   })
 
-export function seedActiveSessionStatuses(
+export async function seedActiveSessionStatuses(
   session: Pick<ServerSession, "data" | "set">,
   active: SessionActiveOutput | Record<string, SessionStatus>,
-  settle?: (sessionID: string) => void,
+  input?: {
+    settle?: (sessionID: string) => void
+    // Asks the server whether the turn is really over before a demotion. "Absent from the status
+    // map" is not proof: a session waiting out a provider retry is running but unlisted, and
+    // demoting it blanks the timeline's progress row in the middle of a live turn.
+    turnFinished?: (sessionID: string) => Promise<boolean>
+  },
 ) {
   for (const sessionID of Object.keys(active)) {
     if (session.data.session_status[sessionID] !== undefined) continue
@@ -186,13 +192,16 @@ export function seedActiveSessionStatuses(
   // forever even though the response completed. A `retry` is never reconciled:
   // the server is still working on the turn and is absent from the status map
   // for the whole backoff, so demoting it here would blank a live indicator.
+  const demotions: string[] = []
   for (const [sessionID, status] of Object.entries(session.data.session_status)) {
     if (status?.type !== "busy") continue
     const serverStatus = active[sessionID]
-    if (!serverStatus || serverStatus.type === "idle") {
-      session.set("session_status", sessionID, { type: "idle" })
-      settle?.(sessionID)
-    }
+    if (!serverStatus || serverStatus.type === "idle") demotions.push(sessionID)
+  }
+  for (const sessionID of demotions) {
+    if (input?.turnFinished && !(await input.turnFinished(sessionID))) continue
+    session.set("session_status", sessionID, { type: "idle" })
+    input?.settle?.(sessionID)
   }
 }
 
@@ -268,12 +277,23 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     ],
   }))
   const settleTurn = (sessionID: string) => TurnProgressState.settle(serverSDK.scope, sessionID)
+  // The only trustworthy "the turn is over" answer when the event stream is not delivering: the
+  // server's own message list. The last assistant message of the turn is completed or carries an
+  // error once the server stopped working on it; while it is still open the turn is running, even
+  // if the session is missing from the status map (provider retry backoff).
+  const turnFinished = async (sessionID: string) => {
+    await session.sync(sessionID, { force: true }).catch(() => undefined)
+    const last = session.data.message[sessionID]?.at(-1)
+    if (!last) return true
+    if (last.role !== "assistant") return false
+    return !!last.time.completed || !!last.error
+  }
   const activeSessionsQuery = useQuery(() =>
     loadActiveSessionsQuery(serverSDK.scope, {
       active: async () => {
         if ((await serverSDK.protocol) === "v1") {
           const statuses = (await serverSDK.client.session.status()).data ?? {}
-          seedActiveSessionStatuses(session, statuses, settleTurn)
+          await seedActiveSessionStatuses(session, statuses, { settle: settleTurn, turnFinished })
           TurnProgressState.settleUnacknowledged(
             serverSDK.scope,
             (sessionID) => statuses[sessionID]?.type !== undefined && statuses[sessionID]!.type !== "idle",
@@ -288,7 +308,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
           )
         }
         const active = await serverSDK.api.session.active()
-        seedActiveSessionStatuses(session, active, settleTurn)
+        await seedActiveSessionStatuses(session, active, { settle: settleTurn, turnFinished })
         TurnProgressState.settleUnacknowledged(serverSDK.scope, (sessionID) => !!active[sessionID])
         for (const sessionID of Object.keys(active)) {
           void session.resolve(sessionID).catch(() => undefined)
