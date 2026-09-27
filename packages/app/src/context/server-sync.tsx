@@ -60,6 +60,7 @@ import type {
 } from "@opencode-ai/client/promise"
 import { toggleMcp } from "./global-sync/mcp"
 import { createServerSession, type ServerSession } from "./server-session"
+import { TurnProgressState } from "@/utils/turn-progress"
 
 type GlobalStore = {
   ready: boolean
@@ -171,6 +172,7 @@ export const loadActiveSessionsQuery = (
 export function seedActiveSessionStatuses(
   session: Pick<ServerSession, "data" | "set">,
   active: SessionActiveOutput | Record<string, SessionStatus>,
+  settle?: (sessionID: string) => void,
 ) {
   for (const sessionID of Object.keys(active)) {
     if (session.data.session_status[sessionID] !== undefined) continue
@@ -181,12 +183,15 @@ export function seedActiveSessionStatuses(
   // finished while the event stream was suspended (mobile backgrounding kills
   // the SSE without erroring it), so its `session.status idle` event was lost.
   // Reconcile against server truth or the timeline keeps its "Thinking" row
-  // forever even though the response completed.
+  // forever even though the response completed. A `retry` is never reconciled:
+  // the server is still working on the turn and is absent from the status map
+  // for the whole backoff, so demoting it here would blank a live indicator.
   for (const [sessionID, status] of Object.entries(session.data.session_status)) {
     if (status?.type !== "busy") continue
     const serverStatus = active[sessionID]
     if (!serverStatus || serverStatus.type === "idle") {
       session.set("session_status", sessionID, { type: "idle" })
+      settle?.(sessionID)
     }
   }
 }
@@ -243,6 +248,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
 
   const session = createServerSession(serverSDK.client, serverSDK.api.session, serverSDK.api.message, {
     protocol: serverSDK.protocol,
+    scope: serverSDK.scope,
   })
   const queryOptionsApi = makeQueryOptionsApi(
     serverSDK.scope,
@@ -261,12 +267,17 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
       queryOptionsApi.projectFolders(),
     ],
   }))
+  const settleTurn = (sessionID: string) => TurnProgressState.settle(serverSDK.scope, sessionID)
   const activeSessionsQuery = useQuery(() =>
     loadActiveSessionsQuery(serverSDK.scope, {
       active: async () => {
         if ((await serverSDK.protocol) === "v1") {
           const statuses = (await serverSDK.client.session.status()).data ?? {}
-          seedActiveSessionStatuses(session, statuses)
+          seedActiveSessionStatuses(session, statuses, settleTurn)
+          TurnProgressState.settleUnacknowledged(
+            serverSDK.scope,
+            (sessionID) => statuses[sessionID]?.type !== undefined && statuses[sessionID]!.type !== "idle",
+          )
           for (const sessionID of Object.keys(statuses)) {
             void session.resolve(sessionID).catch(() => undefined)
           }
@@ -277,7 +288,8 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
           )
         }
         const active = await serverSDK.api.session.active()
-        seedActiveSessionStatuses(session, active)
+        seedActiveSessionStatuses(session, active, settleTurn)
+        TurnProgressState.settleUnacknowledged(serverSDK.scope, (sessionID) => !!active[sessionID])
         for (const sessionID of Object.keys(active)) {
           void session.resolve(sessionID).catch(() => undefined)
         }
@@ -289,12 +301,13 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
   // Status watchdog: quick Cloudflare tunnels silently buffer SSE bodies and mobile
   // event streams drop events on suspension, so a finished session can stay "busy"
   // (Thinking row forever) with no idle event ever arriving. While any session is
-  // busy, periodically reconcile against the server's status map so stale busy
-  // statuses recover even with a silent or suspended stream. Cheap: no network when
-  // nothing is busy.
+  // busy, or a submitted turn is still unacknowledged, periodically reconcile against
+  // the server's status map so stale busy statuses recover even with a silent or
+  // suspended stream. Cheap: no network when nothing is in flight.
   const statusWatchdog = setInterval(() => {
     const hasBusy = Object.values(session.data.session_status).some((status) => status?.type === "busy")
-    if (hasBusy && !activeSessionsQuery.isFetching) void activeSessionsQuery.refetch()
+    if ((hasBusy || TurnProgressState.hasPending(serverSDK.scope)) && !activeSessionsQuery.isFetching)
+      void activeSessionsQuery.refetch()
   }, 15_000)
   onCleanup(() => clearInterval(statusWatchdog))
 

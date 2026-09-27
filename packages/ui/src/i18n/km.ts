@@ -86,6 +86,8 @@ export const dict = {
   "ui.sessionTurn.status.runningCommands": "កំពុងដំណើរការពាក្យបញ្ជា",
   "ui.sessionTurn.status.thinking": "ការគិត",
   "ui.sessionTurn.status.thinkingWithTopic": "ការគិត - {{topic}}",
+  "ui.sessionTurn.status.sending": "Sending",
+  "ui.sessionTurn.status.waiting": "Waiting for the model",
   "ui.sessionTurn.status.gatheringThoughts": "ការប្រមូលផ្តុំគំនិត",
   "ui.sessionTurn.status.consideringNextSteps": "ពិចារណាជំហានបន្ទាប់",
   "ui.messagePart.diagnostic.error": "កំហុស",

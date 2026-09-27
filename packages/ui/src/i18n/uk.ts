@@ -94,6 +94,8 @@ export const dict: Record<string, string> = {
   "ui.sessionTurn.status.runningCommands": "Виконання команд",
   "ui.sessionTurn.status.thinking": "Міркування",
   "ui.sessionTurn.status.thinkingWithTopic": "Міркування — {{topic}}",
+  "ui.sessionTurn.status.sending": "Sending",
+  "ui.sessionTurn.status.waiting": "Waiting for the model",
   "ui.sessionTurn.status.gatheringThoughts": "Збирання думок",
   "ui.sessionTurn.status.consideringNextSteps": "Розгляд наступних кроків",
 

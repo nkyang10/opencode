@@ -95,6 +95,8 @@ export const dict = {
   "ui.sessionTurn.status.runningCommands": "Befehle werden ausgeführt",
   "ui.sessionTurn.status.thinking": "Denkt nach",
   "ui.sessionTurn.status.thinkingWithTopic": "Denkt nach: {{topic}}",
+  "ui.sessionTurn.status.sending": "Sending",
+  "ui.sessionTurn.status.waiting": "Waiting for the model",
   "ui.sessionTurn.status.gatheringThoughts": "Gedanken werden gesammelt",
   "ui.sessionTurn.status.consideringNextSteps": "Nächste Schritte werden erwogen",
 

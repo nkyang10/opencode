@@ -84,6 +84,8 @@ export const dict: Record<string, string> = {
   "ui.sessionTurn.status.runningCommands": "አሂድ ትዕዛዞች",
   "ui.sessionTurn.status.thinking": "አስተሳሰብ",
   "ui.sessionTurn.status.thinkingWithTopic": "ማሰብ - {{topic}}",
+  "ui.sessionTurn.status.sending": "Sending",
+  "ui.sessionTurn.status.waiting": "Waiting for the model",
   "ui.sessionTurn.status.gatheringThoughts": "ሀሳቦችን መሰብሰብ",
   "ui.sessionTurn.status.consideringNextSteps": "ቀጣዮቹን ደረጃዎች ከግምት ውስጥ በማስገባት",
   "ui.messagePart.diagnostic.error": "ስህተት",

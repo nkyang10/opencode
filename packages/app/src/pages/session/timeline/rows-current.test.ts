@@ -204,4 +204,36 @@ describe("current session timeline rows", () => {
 
     expect(result.rows.map((row) => row._tag)).toEqual(["UserMessage", "AssistantPart"])
   })
+
+  describe("turn in flight", () => {
+    const source = [{ id: "msg_u", type: "user", text: "go", time: { created: 1 } }] satisfies SessionMessageInfo[]
+    const normalized = normalizeSessionMessages("ses_1", source)
+    const rows = (status: "idle" | "busy" | "retry", pending?: string) => {
+      const result = Timeline.constructSessionMessageRows(
+        source,
+        (messageID) => normalized.messages.find((message) => message.id === messageID),
+        () => [],
+        false,
+        status,
+        true,
+        normalized.messages.filter((message) => message.role === "user"),
+        pending,
+      )
+      return result.rows.map((row) => row._tag)
+    }
+
+    // A prompt the client just sent is in flight before the server has published any status, which
+    // is the whole window where the user used to see nothing at all.
+    test("shows the progress row for a submitted turn the server has not acknowledged", () => {
+      expect(rows("idle", "msg_u")).toEqual(["UserMessage", "Thinking"])
+      expect(rows("idle")).toEqual(["UserMessage"])
+    })
+
+    // A retry backoff is still the server working on the turn: the row must not blank out and read
+    // as a dropped connection.
+    test("shows the progress row while the server is retrying", () => {
+      expect(rows("retry")).toEqual(["UserMessage", "Thinking", "Retry"])
+      expect(rows("busy")).toEqual(["UserMessage", "Thinking"])
+    })
+  })
 })

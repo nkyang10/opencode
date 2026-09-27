@@ -87,6 +87,8 @@ export const dict: Record<string, string> = {
   "ui.sessionTurn.status.runningCommands": "চলমান কমান্ড",
   "ui.sessionTurn.status.thinking": "ভাবছেন",
   "ui.sessionTurn.status.thinkingWithTopic": "ভাবনা - {{topic}}",
+  "ui.sessionTurn.status.sending": "Sending",
+  "ui.sessionTurn.status.waiting": "Waiting for the model",
   "ui.sessionTurn.status.gatheringThoughts": "চিন্তা জড়ো করা",
   "ui.sessionTurn.status.consideringNextSteps": "পরবর্তী পদক্ষেপ বিবেচনা করে",
   "ui.messagePart.diagnostic.error": "ত্রুটি",

@@ -82,6 +82,7 @@ import { scheduleConnectedMeasure } from "./measure"
 import { observeElementOffsetReconnectAware } from "./observe-element-offset"
 import { createTimelineProjection } from "./projection"
 import { latestTurnActivity } from "./turn-activity"
+import { TurnProgressState } from "@/utils/turn-progress"
 import { MessageComment, SummaryDiff, TimelineRow, TimelineRowMap } from "./rows"
 import { filterVirtualIndexes } from "./virtual-items"
 
@@ -139,11 +140,18 @@ const markBoundaryGesture = (input: {
   }
 }
 
+// Seconds of complete silence from the model before the row stops claiming it is "thinking" and
+// says it is still waiting instead. A long tool call must not trip this, so the caller only sets
+// `silent` while the turn has produced no output at all.
+const waitThreshold = 10_000
+
 function TimelineThinkingRow(props: {
   reasoningHeading?: string
   showReasoningSummaries: boolean
   activityAt?: number
   promptAt?: number
+  pending?: boolean
+  silent?: boolean
 }) {
   const language = useLanguage()
   const [now, setNow] = createSignal(Date.now())
@@ -164,10 +172,15 @@ function TimelineThinkingRow(props: {
         })
   const lastOutput = () => since(props.activityAt)
   const sincePrompt = () => since(props.promptAt)
+  const label = () => {
+    if (props.pending) return language.t("ui.sessionTurn.status.sending")
+    if (props.silent && lastOutput() * 1000 >= waitThreshold) return language.t("ui.sessionTurn.status.waiting")
+    return language.t("ui.sessionTurn.status.thinking")
+  }
 
   return (
     <div data-slot="session-turn-thinking">
-      <TextShimmer text={language.t("ui.sessionTurn.status.thinking")} />
+      <TextShimmer text={label()} />
       <Show when={sincePrompt() > 0}>
         <span
           data-slot="session-turn-thinking-elapsed"
@@ -331,6 +344,13 @@ export function MessageTimeline(props: {
     if (!id) return idle
     return sync().data.session_status[id] ?? idle
   })
+  // A prompt this client submitted and the server has not acknowledged yet. The timeline shows the
+  // turn as in flight from the submit keystroke, not from the server's first status event.
+  const pendingMessageID = createMemo(() => {
+    const id = sessionID()
+    if (!id) return undefined
+    return TurnProgressState.read(serverSDK().scope, id)?.messageID
+  })
   const sessionMessages = createMemo(() => (sessionID() ? (sync().data.message[sessionID()!] ?? []) : []))
   const projectedMessages = createMemo(() => {
     const id = sessionID()
@@ -387,6 +407,7 @@ export function MessageTimeline(props: {
     sessionMessages: projectedMessages,
     parts: getMsgParts,
     status: sessionStatus,
+    pendingMessageID: pendingMessageID,
     showReasoningSummaries: settings.general.showReasoningSummaries,
     inlineComments: settings.general.newLayoutDesigns,
   })
@@ -1289,10 +1310,11 @@ export function MessageTimeline(props: {
       case "Thinking": {
         const thinkingRow = row as Accessor<TimelineRowByTag<"Thinking">>
         const promptAt = createMemo(() => messageByID().get(thinkingRow().userMessageID)?.time.created)
+        const turnAssistants = createMemo(() => assistantMessagesByParent().get(thinkingRow().userMessageID))
         const [observed, setObserved] = createSignal<number>()
         const activity = createMemo(() =>
           latestTurnActivity({
-            messages: assistantMessagesByParent().get(thinkingRow().userMessageID),
+            messages: turnAssistants(),
             parts: getMsgParts,
             observed: observed(),
           }),
@@ -1314,6 +1336,8 @@ export function MessageTimeline(props: {
                 showReasoningSummaries={settings.general.showReasoningSummaries()}
                 activityAt={activity().at ?? promptAt()}
                 promptAt={promptAt()}
+                pending={pendingMessageID() === thinkingRow().userMessageID}
+                silent={(turnAssistants()?.length ?? 0) === 0}
               />
             </div>
           </TimelineRowFrame>

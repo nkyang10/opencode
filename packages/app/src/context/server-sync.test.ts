@@ -113,6 +113,26 @@ describe("active session query", () => {
     expect(session.data.session_status.ses_finished).toEqual({ type: "idle" })
     expect(session.data.session_status.ses_still_running).toEqual({ type: "busy" })
   })
+
+  test("keeps a retrying turn and settles the client's pending record only when it demotes", () => {
+    const session = createServerSession({} as OpencodeClient)
+    session.set("session_status", "ses_retrying", { type: "retry", attempt: 2, message: "upstream down", next: 10 })
+    session.set("session_status", "ses_finished", { type: "busy" })
+    const settled: string[] = []
+
+    // A retry backoff keeps the session out of the status map, but the server is still working on
+    // the turn: demoting it here would blank the timeline's progress row mid-flight.
+    seedActiveSessionStatuses(session, {}, (sessionID) => settled.push(sessionID))
+
+    expect(session.data.session_status.ses_retrying).toEqual({
+      type: "retry",
+      attempt: 2,
+      message: "upstream down",
+      next: 10,
+    })
+    expect(session.data.session_status.ses_finished).toEqual({ type: "idle" })
+    expect(settled).toEqual(["ses_finished"])
+  })
 })
 
 describe("pickDirectoriesToEvict", () => {

@@ -41,6 +41,7 @@ export namespace Timeline {
     status: SessionStatus["type"],
     inlineComments: boolean,
     projectedUserMessages: UserMessage[],
+    pendingMessageID?: string,
   ) {
     const turns: { user: UserMessage; assistants: AssistantMessage[] }[] = []
     const turnByUserID = new Map<string, (typeof turns)[number]>()
@@ -93,6 +94,7 @@ export namespace Timeline {
           status,
           turn.user.id === activeMessageID,
           inlineComments,
+          pendingMessageID === turn.user.id,
         ),
       ),
     }
@@ -108,6 +110,8 @@ export namespace Timeline {
     isActive: boolean,
     // v2 renders comments inside the user message attachments row instead of a strip row
     inlineComments: boolean,
+    // this client submitted the turn and the server has not finished it yet
+    pending: boolean = false,
   ) {
     const rows: TimelineRow.TimelineRow[] = []
 
@@ -190,7 +194,11 @@ export namespace Timeline {
       assistantGroupIndex += 1
     })
 
-    if (isActive && status === "busy" && !error && (showReasoning ? assistantPartRefs.length === 0 : true)) {
+    // The turn is unfinished while the server reports any non-idle state (`retry` included, so an
+    // upstream backoff never looks like a dead connection) or while this client is still waiting
+    // for the server to acknowledge the prompt it just sent.
+    const inFlight = status !== "idle" || pending
+    if (isActive && inFlight && !error && (showReasoning ? assistantPartRefs.length === 0 : true)) {
       const heading = assistantMessages
         .flatMap((message) => getMessageParts(message.id))
         .map((part) => (part.type === "reasoning" && part.text ? reasoningHeading(part.text) : undefined))

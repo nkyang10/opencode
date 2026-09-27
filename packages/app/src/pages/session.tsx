@@ -37,6 +37,7 @@ import { createAutoScroll } from "@opencode-ai/ui/hooks"
 import { previewSelectedLines } from "@opencode-ai/session-ui/pierre/selection-bridge"
 import { Button } from "@opencode-ai/ui/button"
 import { showToast } from "@/utils/toast"
+import { TurnProgressState } from "@/utils/turn-progress"
 import { base64Encode, checksum } from "@opencode-ai/core/util/encode"
 import { useLocation, useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { NewSessionView, SessionHeader } from "@/components/session"
@@ -1727,9 +1728,11 @@ export default function Page() {
         api: sdk().api.session,
         sync: sync(),
         serverSync: serverSync(),
+        scope: sdk().scope,
         draft: item,
         optimisticBusy: item.sessionDirectory === sdk().directory,
       }).catch((err) => {
+        TurnProgressState.settle(sdk().scope, input.sessionID)
         setFollowup("failed", input.sessionID, input.id)
         fail(err)
         return false

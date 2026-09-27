@@ -22,6 +22,8 @@ import { compareMessages, messageKey, normalizeSessionMessages } from "@/utils/s
 import { dropSessionCaches, pickSessionCacheEvictions, SESSION_CACHE_LIMIT } from "./global-sync/session-cache"
 import { createV2SessionReducer, type V2SessionReduction } from "./server-session-v2-reducer"
 import type { ServerApi } from "@/utils/server"
+import { ServerScope } from "@/utils/server-scope"
+import { TurnProgressState } from "@/utils/turn-progress"
 
 type MessageApi = ServerApi["message"]
 
@@ -183,7 +185,7 @@ function reconcileFetched<T extends { id: string }>(
   return options.compare ? items.sort(options.compare) : items
 }
 
-type ServerSessionOptions = { retry?: typeof retry; protocol?: Promise<"v1" | "v2"> }
+type ServerSessionOptions = { retry?: typeof retry; protocol?: Promise<"v1" | "v2">; scope?: ServerScope }
 
 export function createServerSession(
   client: OpencodeClient,
@@ -193,6 +195,11 @@ export function createServerSession(
 ) {
   const sessionApi = messageApi ? (sessionApiOrOptions as SessionApi) : undefined
   const options = messageApi ? currentOptions : (sessionApiOrOptions as ServerSessionOptions | undefined)
+  const scope = options?.scope ?? ServerScope.local
+  // The server's first status event for a turn is its acknowledgement that the prompt was picked
+  // up; every failure path in the client settles the same record. After that the turn's own
+  // progress lives in `session_status`, which the timeline already reads.
+  const settleTurn = (sessionID: string) => TurnProgressState.settle(scope, sessionID)
   const [data, setData] = createStore({
     info: {} as Record<string, Session | undefined>,
     session_status: {} as Record<string, SessionStatus>,
@@ -960,20 +967,30 @@ export function createServerSession(
     //   if (info) remember({ ...info, time: { ...info.time, archived: event.created, updated: event.created } })
     //   evict([sessionID])
     // }
-    if (event.type === "session.execution.started") setData("session_status", sessionID, { type: "busy" })
-    if (
-      event.type === "session.execution.succeeded" ||
-      event.type === "session.execution.failed" ||
-      event.type === "session.execution.interrupted"
-    )
-      setData("session_status", sessionID, { type: "idle" })
-    if (event.type === "session.retry.scheduled")
+    // The first status event after a submit is the server acknowledging the turn, so the client's
+    // own "still waiting to be picked up" record ends here. Later statuses (retry, idle) are the
+    // turn's own progress and are already reflected in `session_status`.
+    if (event.type === "session.execution.started") {
+      settleTurn(sessionID)
+      setData("session_status", sessionID, { type: "busy" })
+    }
+    if (event.type === "session.retry.scheduled") {
+      settleTurn(sessionID)
       setData("session_status", sessionID, {
         type: "retry",
         attempt: event.data.attempt,
         message: event.data.error.message,
         next: event.data.at,
       })
+    }
+    if (
+      event.type === "session.execution.succeeded" ||
+      event.type === "session.execution.failed" ||
+      event.type === "session.execution.interrupted"
+    ) {
+      settleTurn(sessionID)
+      setData("session_status", sessionID, { type: "idle" })
+    }
     if (event.type === "session.forked") void resolve(sessionID, { force: true }).catch(() => {})
     if (
       event.type === "session.revert.staged" ||
@@ -1024,6 +1041,7 @@ export function createServerSession(
       }
       case "session.status": {
         const props = event.properties as { sessionID: string; status: SessionStatus }
+        settleTurn(props.sessionID)
         setData("session_status", props.sessionID, reconcile(props.status))
         return
       }

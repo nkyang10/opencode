@@ -18,7 +18,8 @@ import { Worktree as WorktreeState } from "@/utils/worktree"
 import { buildRequestParts } from "./build-request-parts"
 import { setCursorPosition } from "./editor-dom"
 import { formatServerError } from "@/utils/server-errors"
-import { ScopedKey } from "@/utils/server-scope"
+import { ScopedKey, type ServerScope } from "@/utils/server-scope"
+import { TurnProgressState } from "@/utils/turn-progress"
 import { createPromptSubmissionState } from "./submission-state"
 import { normalizeSessionInfo } from "@/utils/session"
 import { Event } from "@opencode-ai/schema/event"
@@ -46,6 +47,7 @@ type FollowupSendInput = {
   serverSync: ServerSync
   sync: DirectorySync
   draft: FollowupDraft
+  scope: ServerScope
   messageID?: string
   optimisticBusy?: boolean
   before?: () => Promise<boolean> | boolean
@@ -64,6 +66,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
   }
 
   const setIdle = () => {
+    TurnProgressState.settle(input.scope, input.draft.sessionID)
     if (!input.optimisticBusy) return
     input.serverSync.session.set("session_status", input.draft.sessionID, { type: "idle" })
   }
@@ -85,6 +88,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
       }
 
       const messageID = Identifier.ascending("message")
+      TurnProgressState.begin(input.scope, input.draft.sessionID, messageID)
       await input.api.command({
         sessionID: input.draft.sessionID,
         id: messageID,
@@ -153,6 +157,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
 
   batch(() => {
     setBusy()
+    TurnProgressState.begin(input.scope, input.draft.sessionID, messageID)
     add()
   })
 
@@ -516,6 +521,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       if (customCommand) {
         clearInput()
         const messageID = Identifier.ascending("message")
+        TurnProgressState.begin(sdk().scope, session.id, messageID)
         serverSync().session.set("session_status", session.id, { type: "busy" })
         sdk()
           .api.session.command({
@@ -533,6 +539,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
             ),
           })
           .catch((err) => {
+            TurnProgressState.settle(sdk().scope, session.id)
             serverSync().session.set("session_status", session.id, { type: "idle" })
             showToast({
               title: language.t("prompt.toast.commandSendFailed.title"),
@@ -546,6 +553,9 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
     const commentItems = context.filter((item) => item.type === "file" && !!item.comment?.trim())
     const messageID = Identifier.ascending("message")
+    // From here the turn belongs to the server: the timeline shows progress even before the first
+    // status event arrives, and every failure path below settles it again.
+    TurnProgressState.begin(sdk().scope, session.id, messageID)
 
     const removeOptimisticMessage = () => {
       sync().session.optimistic.remove({
@@ -568,6 +578,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
       const controller = new AbortController()
       const cleanup = () => {
+        TurnProgressState.settle(sdk().scope, session.id)
         if (sessionDirectory === projectDirectory) {
           sync().set("session_status", session.id, { type: "idle" })
         }
@@ -620,12 +631,14 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       api: sdk().api.session,
       sync: sync(),
       serverSync: serverSync(),
+      scope: sdk().scope,
       draft,
       messageID,
       optimisticBusy: sessionDirectory === projectDirectory,
       before: waitForWorktree,
     }).catch((err) => {
       pending.delete(pendingKey(session.id))
+      TurnProgressState.settle(sdk().scope, session.id)
       if (sessionDirectory === projectDirectory) {
         sync().set("session_status", session.id, { type: "idle" })
       }

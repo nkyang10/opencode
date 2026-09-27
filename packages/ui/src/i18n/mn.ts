@@ -85,6 +85,8 @@ export const dict = {
   "ui.sessionTurn.status.runningCommands": "Ажиллаж буй командууд",
   "ui.sessionTurn.status.thinking": "Бодож байна",
   "ui.sessionTurn.status.thinkingWithTopic": "Бодох - {{topic}}",
+  "ui.sessionTurn.status.sending": "Sending",
+  "ui.sessionTurn.status.waiting": "Waiting for the model",
   "ui.sessionTurn.status.gatheringThoughts": "Бодол санаа цуглуулах",
   "ui.sessionTurn.status.consideringNextSteps": "Дараагийн алхмуудыг авч үзэх",
   "ui.messagePart.diagnostic.error": "Алдаа",

@@ -12,6 +12,7 @@ export function createTimelineProjection(input: {
   sessionMessages: Accessor<SessionMessageInfo[]>
   parts: (messageID: string) => Part[]
   status: Accessor<SessionStatus>
+  pendingMessageID: Accessor<string | undefined>
   showReasoningSummaries: Accessor<boolean>
   inlineComments: Accessor<boolean>
 }) {
@@ -38,6 +39,7 @@ export function createTimelineProjection(input: {
       input.status().type,
       input.inlineComments(),
       input.userMessages(),
+      input.pendingMessageID(),
     ),
   )
   const activeMessageID = createMemo(() => projection().activeMessageID)

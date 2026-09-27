@@ -85,6 +85,8 @@ export const dict = {
   "ui.sessionTurn.status.runningCommands": "Фармонҳои иҷрошаванда",
   "ui.sessionTurn.status.thinking": "Фикр кардан",
   "ui.sessionTurn.status.thinkingWithTopic": "Фикр кардан - {{topic}}",
+  "ui.sessionTurn.status.sending": "Sending",
+  "ui.sessionTurn.status.waiting": "Waiting for the model",
   "ui.sessionTurn.status.gatheringThoughts": "Ҷамъоварии фикрҳо",
   "ui.sessionTurn.status.consideringNextSteps": "Бо назардошти қадамҳои оянда",
   "ui.messagePart.diagnostic.error": "Хатогӣ",

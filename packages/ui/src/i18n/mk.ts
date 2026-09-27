@@ -85,6 +85,8 @@ export const dict = {
   "ui.sessionTurn.status.runningCommands": "Извршување на команди",
   "ui.sessionTurn.status.thinking": "Размислување",
   "ui.sessionTurn.status.thinkingWithTopic": "Размислување - {{topic}}",
+  "ui.sessionTurn.status.sending": "Sending",
+  "ui.sessionTurn.status.waiting": "Waiting for the model",
   "ui.sessionTurn.status.gatheringThoughts": "Собирање мисли",
   "ui.sessionTurn.status.consideringNextSteps": "Разгледување на следните чекори",
   "ui.messagePart.diagnostic.error": "Грешка",
