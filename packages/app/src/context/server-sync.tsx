@@ -21,6 +21,7 @@ import {
   loadCommands,
   loadGlobalConfigQuery,
   loadPathQuery,
+  loadProjectFoldersQuery,
   loadProjectsQuery,
   loadProvidersQuery,
   loadReferencesQuery,
@@ -65,6 +66,8 @@ type GlobalStore = {
   error?: InitError
   path: Path
   project: Project[]
+  /** Directories that are not a git project of their own, newest first. */
+  folder: string[]
   provider: NormalizedProviderListResponse
   provider_auth: ProviderAuthResponse
   config: Config
@@ -198,6 +201,7 @@ function makeQueryOptionsApi(
   return {
     globalConfig: () => loadGlobalConfigQuery(scope, serverSDK(), protocol),
     projects: () => loadProjectsQuery(scope, serverAPI.project),
+    projectFolders: () => loadProjectFoldersQuery(scope, serverAPI.project),
     providers: (directory: PathKey | null) =>
       loadProvidersQuery(scope, directory, serverAPI, directory ? sdkFor(directory) : serverSDK(), protocol),
     path: (directory: PathKey | null) =>
@@ -247,8 +251,13 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     serverSDK.protocol,
   )
 
-  const [configQuery, providerQuery, pathQuery] = useQueries(() => ({
-    queries: [queryOptionsApi.globalConfig(), queryOptionsApi.providers(null), queryOptionsApi.path(null)],
+  const [configQuery, providerQuery, pathQuery, projectFoldersQuery] = useQueries(() => ({
+    queries: [
+      queryOptionsApi.globalConfig(),
+      queryOptionsApi.providers(null),
+      queryOptionsApi.path(null),
+      queryOptionsApi.projectFolders(),
+    ],
   }))
   const activeSessionsQuery = useQuery(() =>
     loadActiveSessionsQuery(serverSDK.scope, {
@@ -292,6 +301,13 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
       return !bootstrap.isPending
     },
     project: [],
+    // Directories that are not a git project of their own. Read from the query so
+    // every refetch (reconnect, `project.directories.updated`, invalidation) lands
+    // here without a separate write.
+    get folder() {
+      if (projectFoldersQuery.isLoading) return []
+      return projectFoldersQuery.data ?? []
+    },
     provider_auth: {},
     get path() {
       const EMPTY = { state: "", config: "", worktree: "", directory: "", home: "" }

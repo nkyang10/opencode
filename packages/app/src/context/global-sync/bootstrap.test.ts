@@ -10,6 +10,7 @@ import {
   loadCommands,
   loadGlobalConfigQuery,
   loadPathQuery,
+  loadProjectFoldersQuery,
   loadProjectsQuery,
   loadProvidersQuery,
   loadReferencesQuery,
@@ -311,6 +312,31 @@ describe("query keys", () => {
     const result = await new QueryClient().fetchQuery(loadProjectsQuery(ServerScope.local, api))
 
     expect(result.map((project) => project.id)).toEqual(["a", "b"])
+  })
+
+  test("loads the directories of the global project as plain folders", async () => {
+    const calls: unknown[] = []
+    const api = {
+      directories: async (input: unknown) => {
+        calls.push(input)
+        return [{ directory: "/home/mark/Desktop" }, { directory: "/scratch" }]
+      },
+    } as unknown as ProjectApi
+
+    const result = await new QueryClient().fetchQuery(loadProjectFoldersQuery(ServerScope.local, api))
+
+    expect(calls).toEqual([{ projectID: "global" }])
+    expect(result).toEqual(["/home/mark/Desktop", "/scratch"])
+  })
+
+  test("keeps the project list usable when the folder request fails", async () => {
+    const api = {
+      directories: async () => {
+        throw new Error("nope")
+      },
+    } as unknown as ProjectApi
+
+    expect(await new QueryClient().fetchQuery(loadProjectFoldersQuery(ServerScope.local, api))).toEqual([])
   })
 
   test("loads references from the current location-scoped endpoint", async () => {

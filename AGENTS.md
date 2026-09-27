@@ -99,10 +99,29 @@ and the section titles + app-name/version footer are hidden (they do not fit a s
 `.settings-v2[data-variant="settings"][data-orientation="horizontal"]` in `settings-v2.css`, plus a
 `max-width: 639px` header/body padding reduction (40px → 16px). The old `144px` side-nav media block was deleted.
 
-**Last deploy (2026-09-26):** rebuilt + redeployed :4447 with the Settings v2 responsive nav (binary via
-`build-linux.sh`, version `1.1.20260926074652`, server pid 2922029 on :4447, `/login` healthy — HTTP 401 before auth
-is expected). Playwright-measured: desktop 1280px unchanged (nav 240px left / panel 740px); 390px phone → strip
-358×45 on top, panel 358px full width, key/value row 286px (was ~134px), ArrowRight moves between tabs.
+**Project identity = git, not path (2026-09-26, DEC-045 / FE-020):** a project id is derived from git
+(`ProjectV2.resolve`: remote-url hash → id cached in `<git-common-dir>/opencode` → **first root commit sha**).
+A directory with no repository resolves to the shared `global` project, which is why it used to vanish from the
+server-truth Home project list when picked in the folder selector. `Project.saveProjectDirectory` now records
+**every opened** directory — the global project included, which is the only place a plain folder is
+remembered — and `fromDirectory` emits `project.directories.updated` on the **global** bus (same shape as
+`emitUpdated`) when a row is new. Record the directory that was **requested**, not `ProjectV2.resolve`'s
+`data.directory`: for a repository-less directory that field is `/`, so it would remember the filesystem root
+instead of the folder (`data.vcs ? data.directory : directory`; test: `test/project/project.test.ts` ▸ *"should
+record a directory without a repository"*). On the app side the list is a **query**
+(`[scope, "project-folder"]` → `GET /project/global/directories`) whose result backs the `folder` store slice
+as a getter, and `mergeProjectFolders` (`packages/app/src/pages/home/home-project-folders.ts`) feeds the Home
+list of **every** server, not only the focused one. Two more traps: `ProjectDirectories.create` in
+`packages/core` **cannot** take an `EventV2.node` dependency (module-init cycle, `Cannot access 'node' before
+initialization`) — the engine layer publishes instead; and `POST /project/git/init` on a non-repo directory
+repoints the **global** project's own `worktree`, so nothing calls it for folders any more. Folder rows have no
+project id, hence no "Edit project". Background: `50-projects/p003-opencode-fork/README.md` → `## FE-020`.
+
+**Last deploy (2026-09-26):** rebuilt + redeployed :4447 with the reviewed Settings v2 responsive nav
+(`71c73a0`, binary via `build-linux.sh`, version `1.1.20260926102413`, server pid 2999326 on :4447, `/login`
+healthy — HTTP 401 before auth is expected). Playwright-measured: desktop 1280px unchanged (nav 240px left /
+panel 740px); 390px phone → strip 358×45 on top, panel 358px full width, key/value row 286px (was ~134px),
+ArrowRight moves between tabs. **FE-020 is code-complete in the working tree and is NOT in this build.**
 
 ## Branch Names
 

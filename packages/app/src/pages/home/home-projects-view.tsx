@@ -20,6 +20,7 @@ import { ServerRowMenuView, serverMenuLabels } from "@/components/server/server-
 import { ServerHealthIndicator } from "@/components/server/server-row"
 import { type ServerHealth } from "@/utils/server-health"
 import { fileManagerApp } from "@/utils/file-manager"
+import { isPlainFolder } from "./home-project-folders"
 
 const HOME_PROJECT_NAV_LABEL = "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
 
@@ -560,9 +561,12 @@ function HomeProjectRow(
               <MenuV2.Item onSelect={() => props.onOpenProjectNewSession(props.server, props.project.worktree)}>
                 {props.language.t("command.session.new")}
               </MenuV2.Item>
-              <MenuV2.Item onSelect={() => props.onEditProject(props.server, props.project)}>
-                {props.language.t("dialog.project.edit.title")}
-              </MenuV2.Item>
+              {/* A plain folder has no project row, so it has nothing to edit. */}
+              <Show when={!isPlainFolder(props.project)}>
+                <MenuV2.Item onSelect={() => props.onEditProject(props.server, props.project)}>
+                  {props.language.t("dialog.project.edit.title")}
+                </MenuV2.Item>
+              </Show>
               <Show when={props.canRevealProject(props.server)}>
                 <MenuV2.Item onSelect={() => props.onRevealProject(props.server, props.project)}>
                   {props.language.t(

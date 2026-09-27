@@ -50,6 +50,30 @@ MarkCode's changes over stock opencode (web UI + server layer):
   open session re-fetches once, so messages emitted while backgrounded appear without tab-switching.
 - **Project-selector crash fix** — `/file` + `/find/file` 500 handled with an FS fallback.
 - **Slim live-reply fix** — seeded session summaries get a live assistant reply, not only after a reload.
+- **Deploy toast also on a same-version restart** — the refresh prompt fires when the server drops and recovers,
+  and dev builds carry a globally unique version so every build is distinguishable.
+
+### Projects & folders
+- **Every folder you open is a project** — a directory without a git repository is remembered server-side and
+  listed next to your repositories, so picking one in the folder selector actually takes effect. Adding a
+  folder no longer creates a `.git` in it. *(FE-020 — in the working tree, not yet built into a binary)*
+- **Folder picker returns only what you picked** — confirming with nothing selected is not possible, the path
+  box shows the absolute path, and clicking a row in the tree no longer triggers a filesystem-wide search.
+  *(FE-020 — in the working tree, not yet built into a binary)*
+
+### Home
+- **Sessions list paginates** — both Home lists load 15 rows and fetch more on demand instead of scanning the
+  whole table; the search scan only runs while the search box is focused.
+- **Skills tab** — browse, edit, copy, enable/disable and delete the skills the agent can load.
+
+### Mobile
+- **Compact-and-start-new-session** places the fresh tab next to the original, renames the original
+  `<title> [ended]` and closes its tab.
+- **Enter inserts a newline on touch devices** (send button submits); desktop Enter still submits.
+
+### Notifications
+- **Per-user RSS feed** of finished sessions — the URL is in Settings ▸ Notifications, with a copyable
+  dialog, so another device or a reader can follow along.
 
 ### Dev tooling
 - **DEV title-bar dropdown** — the top-left button now offers **Home page** / **Refresh** / **Debug tools**.

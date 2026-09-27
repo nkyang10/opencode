@@ -23,6 +23,7 @@ import {
   displayPickerPath,
   pickerParent,
   pickerRoot,
+  pickerRootSelection,
   pickerRelativePath,
 } from "./directory-picker-domain"
 import { DirectoryTreeZag, type DirectoryTreeZagApi } from "./directory-tree-zag"
@@ -52,6 +53,10 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
   }
   const [root, setRoot] = createSignal("")
   const [input, setInput] = createSignal("")
+  // The textbox shows the current path; only what the user actually typed drives the
+  // suggestion search. A tree click or a navigation moves the path without searching,
+  // so picking a folder never fires a search for the path it just selected.
+  const [searchInput, setSearchInput] = createSignal("")
   const [selected, setSelected] = createSignal("")
   const [suggestionsOpen, setSuggestionsOpen] = createSignal(false)
   const [activeSuggestion, setActiveSuggestion] = createSignal(-1)
@@ -89,7 +94,7 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
       fallbackPath()?.home,
   )
   const search = createDirectorySearch({ sdk, home, base: () => root() || start() })
-  const [suggestions] = createResource(input, async (value) => {
+  const [suggestions] = createResource(searchInput, async (value) => {
     const cleaned = cleanPickerInput(value)
     const typed = cleaned.replace(/\/+$/, "")
     const current = displayPickerPath(root(), value, home()).replace(/\/+$/, "")
@@ -116,7 +121,7 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
       items: Array.from(new Map(results.map((result) => [result.absolute, result])).values()).slice(0, 8),
     }
   })
-  const currentSuggestions = createMemo(() => currentPickerSuggestions(suggestions(), input()))
+  const currentSuggestions = createMemo(() => currentPickerSuggestions(suggestions(), searchInput()))
 
   async function load(path: string, generation: number, eager = false) {
     const key = path.replace(/\/+$/, "")
@@ -161,6 +166,7 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
     setSelected("")
     setSuggestionsOpen(false)
     setActiveSuggestion(-1)
+    setSearchInput("")
     setRoot(value)
     setInput(displayPickerPath(value, value, home()))
     listings.clear()
@@ -216,6 +222,7 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
     treeApi?.reveal(targets)
     setSelected(policy.selection(root(), targets.at(-1) ?? "") ?? "")
     setInput(displayPickerPath(absolute, absolute, home()))
+    setSearchInput("")
     setSuggestionsOpen(false)
     setActiveSuggestion(-1)
   }
@@ -235,7 +242,10 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
 
   function chooseSuggestion(suggestion: { absolute: string; type: "file" | "directory" }) {
     if (suggestion.type === "directory") {
+      // navigate() clears the selection synchronously before it awaits, so the
+      // suggestion is re-selected here as the folder the tree is now rooted at.
       void navigate(suggestion.absolute)
+      setSelected(pickerRootSelection(root()) ?? "")
       return
     }
     setInput(displayPickerPath(suggestion.absolute, input(), home()))
@@ -274,7 +284,7 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
   }
 
   function resolve() {
-    const path = policy.result(root(), selected(), rootValid())
+    const path = policy.result(selected(), rootValid())
     if (!path) return
     props.onSelect(props.multiple ? [path] : path)
     dialog.close()
@@ -296,8 +306,12 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
   }
 
   function handleTreeSelect(path: string) {
+    // `path` is relative to the tree root, so the textbox needs the absolute path —
+    // otherwise it would show "home/mark" for the row at "/home/mark".
+    const absolute = absoluteTreePath(root(), path)
     setSelected(path ? (policy.selection(root(), path) ?? "") : "")
-    setInput(displayPickerPath(path, path, home()))
+    setInput(displayPickerPath(absolute, absolute, home()))
+    setSearchInput("")
     setSuggestionsOpen(false)
     setActiveSuggestion(-1)
   }
@@ -323,7 +337,9 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
             spellcheck={false}
             class="!w-full"
             onInput={(event) => {
-              setInput(cleanPickerInput(event.currentTarget.value))
+              const value = cleanPickerInput(event.currentTarget.value)
+              setInput(value)
+              setSearchInput(value)
               setSelected("")
               setSuggestionsOpen(true)
               setActiveSuggestion(-1)
@@ -386,13 +402,13 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
             }}
           />
         </div>
-        <div class="directory-picker-v2-selection">{policy.result(root(), selected(), rootValid())}</div>
+        <div class="directory-picker-v2-selection">{policy.result(selected(), rootValid())}</div>
       </DialogBody>
       <DialogFooter>
         <ButtonV2 variant="neutral" onClick={() => dialog.close()}>
           {language.t("common.cancel")}
         </ButtonV2>
-        <ButtonV2 variant="contrast" disabled={!policy.result(root(), selected(), rootValid())} onClick={resolve}>
+        <ButtonV2 variant="contrast" disabled={!policy.result(selected(), rootValid())} onClick={resolve}>
           {action[policy.action]}
         </ButtonV2>
       </DialogFooter>

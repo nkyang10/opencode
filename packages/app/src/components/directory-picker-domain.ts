@@ -11,8 +11,13 @@ export type DirectoryPickerMode = {
   action: "directory" | "file"
   entries: (parent: string, nodes: ReadonlyArray<{ name: string; type: "file" | "directory" }>) => string[]
   navigation: (path: string) => string | undefined
-  result: (root: string, selected: string, valid: boolean) => string | undefined
+  result: (selected: string, valid: boolean) => string | undefined
   selection: (root: string, path: string) => string | undefined
+}
+
+/** Selection for the folder the tree is rooted at, after navigating straight to it. */
+export function pickerRootSelection(root: string) {
+  return root ? nativePickerPath(root) : undefined
 }
 
 export function pickerTreeEntries(
@@ -41,7 +46,7 @@ export function pickerMode(mode: "directory" | "file", base?: string) {
       navigation(path: string) {
         return treePathWithin(base, path) ? path : undefined
       },
-      result(root: string, selected: string) {
+      result(selected: string) {
         return selected || undefined
       },
       selection(root: string, path: string) {
@@ -62,9 +67,13 @@ export function pickerMode(mode: "directory" | "file", base?: string) {
     navigation(path: string) {
       return path
     },
-    result(root: string, selected: string, valid = true) {
-      if (!valid) return
-      return selected || (root ? nativePickerPath(root) : undefined)
+    result(selected: string, valid = true) {
+      if (!valid) return undefined
+      // Only an explicit selection resolves. Falling back to the folder the tree
+      // happens to be rooted at would hand the caller a path the user never
+      // picked (confirming straight after opening would return the filesystem
+      // root), so the action stays disabled until a folder is chosen.
+      return selected || undefined
     },
     selection(root: string, path: string) {
       return selectedTreePath(root, path, "directory")

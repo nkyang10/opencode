@@ -5,7 +5,7 @@ import path from "path"
 import { tmpdirScoped } from "../fixture/fixture"
 import { GlobalBus } from "../../src/bus/global"
 import { Database } from "@opencode-ai/core/database/database"
-import { ProjectTable } from "@opencode-ai/core/project/sql"
+import { ProjectDirectoryTable, ProjectTable } from "@opencode-ai/core/project/sql"
 import { SessionTable } from "@opencode-ai/core/session/sql"
 import { WorkspaceTable } from "@opencode-ai/core/control-plane/workspace.sql"
 import { eq } from "drizzle-orm"
@@ -95,6 +95,16 @@ const iconDiscoveryIt = testEffect(
   AppNodeBuilder.build(projectTestNode, [[RuntimeFlags.node, RuntimeFlags.layer({ experimentalIconDiscovery: true })]]),
 )
 
+const globalDirectoryRows = Effect.fnUntraced(function* () {
+  const db = (yield* Database.Service).db
+  return yield* db
+    .select({ directory: ProjectDirectoryTable.directory })
+    .from(ProjectDirectoryTable)
+    .where(eq(ProjectDirectoryTable.project_id, ProjectV2.ID.global))
+    .all()
+    .pipe(Effect.orDie)
+})
+
 function waitForProjectIcon(id: ProjectV2.ID, attempts = 50): Effect.Effect<Project.Info, never, Project.Service> {
   return Effect.gen(function* () {
     const project = yield* Project.Service
@@ -122,6 +132,34 @@ describe("Project.fromDirectory", () => {
 
       const opencodeFile = path.join(tmp, ".git", "opencode")
       expect(yield* Effect.promise(() => Bun.file(opencodeFile).exists())).toBe(false)
+    }),
+  )
+
+  it.live("should record a directory without a repository for the global project", () =>
+    Effect.gen(function* () {
+      const project = yield* Project.Service
+      const tmp = yield* tmpdirScoped()
+
+      const result = yield* project.fromDirectory(tmp)
+
+      expect(result.project.id).toBe(ProjectV2.ID.global)
+      expect(result.project.worktree).toBe("/")
+
+      // The row has to be the directory that was opened: `ProjectV2.resolve`
+      // collapses a repository-less directory to "/", so recording the resolved
+      // directory would remember the root instead of the folder.
+      expect((yield* globalDirectoryRows()).map((row) => String(row.directory))).toEqual([tmp])
+    }),
+  )
+
+  it.live("should not record a path that is not a directory", () =>
+    Effect.gen(function* () {
+      const project = yield* Project.Service
+      const tmp = yield* tmpdirScoped()
+
+      // A stale tab or a typo must not leave a row the user can never open again.
+      yield* project.fromDirectory(path.join(tmp, "gone"))
+      expect(yield* globalDirectoryRows()).toEqual([])
     }),
   )
 

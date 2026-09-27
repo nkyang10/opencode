@@ -19,6 +19,7 @@ import {
   displayPickerPath,
   pickerParent,
   pickerRoot,
+  pickerRootSelection,
   pickerAbsoluteInput,
 } from "./directory-picker-domain"
 
@@ -61,7 +62,7 @@ test("centralizes file and directory selection policy", () => {
   expect(file.includeFiles).toBeTrue()
   expect(file.selection("/repo/src", "index.ts")).toBe("src/index.ts")
   expect(file.selection("/repo", "src/")).toBeUndefined()
-  expect(file.result("/repo", "src/index.ts")).toBe("src/index.ts")
+  expect(file.result("src/index.ts")).toBe("src/index.ts")
   expect(file.selection("/tmp", "example.txt")).toBeUndefined()
   expect(file.navigation("/repo/src")).toBe("/repo/src")
   expect(file.navigation("/tmp")).toBeUndefined()
@@ -72,10 +73,13 @@ test("centralizes file and directory selection policy", () => {
   expect(directory.selection("C:/Users/luke", "repos/")).toBe("C:\\Users\\luke\\repos")
   expect(directory.selection("//Server/Share", "repo/")).toBe("\\\\Server\\Share\\repo")
   expect(directory.navigation("/tmp")).toBe("/tmp")
-  expect(directory.result("/repo", "")).toBe("/repo")
-  expect(directory.result("C:/Users/luke", "")).toBe("C:\\Users\\luke")
-  expect(directory.result("//Server/Share/repo", "")).toBe("\\\\Server\\Share\\repo")
-  expect(directory.result("/repo", "", false)).toBeUndefined()
+  expect(directory.result("/repo/src")).toBe("/repo/src")
+  expect(directory.result("", false)).toBeUndefined()
+  // No implicit fallback to the folder the tree is rooted at: confirming without
+  // picking anything must not hand the caller a path the user never chose.
+  expect(directory.result("")).toBeUndefined()
+  expect(pickerRootSelection("/repo/src/")).toBe("/repo/src")
+  expect(pickerRootSelection("")).toBeUndefined()
 })
 
 test("accepts mutations only from the active navigation", () => {

@@ -18,6 +18,7 @@ import type {
   CommandListOutput,
   ProjectCurrentInput,
   ProjectCurrentOutput,
+  ProjectDirectories,
   ProjectListOutput,
   ReferenceListInput,
   ReferenceListOutput,
@@ -50,11 +51,16 @@ type GlobalStore = {
   ready: boolean
   path: Path
   project: Project[]
+  /** Directories that are not a git project of their own, newest first. */
+  folder: string[]
   provider: NormalizedProviderListResponse
   provider_auth: ProviderAuthResponse
   config: Config
   reload: undefined | "pending" | "complete"
 }
+
+/** Server-side project id that collects every directory which is not a git project. */
+const GLOBAL_PROJECT_ID = "global"
 
 function waitForPaint() {
   return new Promise<void>((resolve) => {
@@ -117,6 +123,7 @@ export const loadGlobalConfigQuery = (scope: ServerScope, sdk: OpencodeClient, p
 type ProjectApi = {
   readonly list: () => Promise<ProjectListOutput>
   readonly current: (input?: ProjectCurrentInput) => Promise<ProjectCurrentOutput>
+  readonly directories: (input: { projectID: string }) => Promise<ProjectDirectories>
 }
 
 type McpApi = ServerApi["mcp"]
@@ -138,6 +145,24 @@ export const loadProjectsQuery = (scope: ServerScope, api: ProjectApi) =>
             .sort((a, b) => cmp(a.id, b.id))
         }),
       ),
+  })
+
+/**
+ * A project is identified by its git repository, so a directory without one resolves to the
+ * shared `global` project and has no project row of its own. The directories recorded there are
+ * exactly those plain working folders, newest first — they are what the project list shows for
+ * a folder that is not a repository. A server that does not know the endpoint yet must not break
+ * the project list, so the failure resolves to nothing rather than rejecting.
+ */
+export const loadProjectFoldersQuery = (scope: ServerScope, api: ProjectApi) =>
+  queryOptions({
+    queryKey: [scope, "project-folder"],
+    queryFn: () =>
+      retry(() =>
+        api
+          .directories({ projectID: GLOBAL_PROJECT_ID })
+          .then((folders) => folders.map((folder) => folder.directory).filter((directory) => !!directory)),
+      ).catch(() => []),
   })
 
 export async function bootstrapGlobal(input: {

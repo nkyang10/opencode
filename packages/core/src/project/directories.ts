@@ -7,7 +7,11 @@ import { makeGlobalNode } from "../effect/app-node"
 import { AbsolutePath, optional } from "../schema"
 import { ProjectSchema } from "./schema"
 import { ProjectDirectoryTable } from "./sql"
+import { Event } from "@opencode-ai/schema/project-directories"
 import type { EffectDrizzleSqlite } from "@opencode-ai/effect-drizzle-sqlite"
+
+// The event belongs to the table, so it travels with the service on its namespace.
+export { Event }
 
 export interface Directory {
   readonly directory: AbsolutePath

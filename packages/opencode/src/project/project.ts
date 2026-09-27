@@ -139,6 +139,16 @@ const layer = Layer.effect(
         }),
       )
 
+    // A new directory row changes what clients can list, so announce it on the global stream.
+    const emitDirectoriesUpdated = (projectID: ProjectV2.ID) =>
+      Effect.sync(() =>
+        GlobalBus.emit("event", {
+          directory: "global",
+          project: projectID,
+          payload: { type: ProjectDirectories.Event.Updated.type, properties: { projectID } },
+        }),
+      )
+
     const fakeVcs = Schema.decodeUnknownSync(Schema.optional(Project.Vcs))(Flag.OPENCODE_FAKE_VCS)
 
     const scope = yield* Scope.Scope
@@ -196,16 +206,24 @@ const layer = Layer.effect(
       projectID: ProjectV2.ID
       directory: string
     }) {
-      if (input.projectID === ProjectV2.ID.global) return
       const opened = AbsolutePath.make(FSUtil.resolve(input.directory))
-      yield* projectDirectories
+      // Only a real directory is worth remembering: a stale tab, a typo or a path that
+      // was deleted would otherwise leave a row the user can never open again. The same
+      // check the sandbox list uses.
+      if (!(yield* fs.isDir(opened).pipe(Effect.orDie))) return false
+      // Recorded for the global project too: a directory without a repository
+      // resolves to the global project, and this row is then the only place such
+      // a folder is remembered, so clients can list it as a plain working folder.
+      return yield* projectDirectories
         .create({
           directory: opened,
           projectID: input.projectID,
         })
         .pipe(
           Effect.catchCause((cause) =>
-            Effect.logWarning("project directory persistence failed", { projectID: input.projectID, cause }),
+            Effect.logWarning("project directory persistence failed", { projectID: input.projectID, cause }).pipe(
+              Effect.as(false),
+            ),
           ),
         )
     })
@@ -297,10 +315,14 @@ const layer = Layer.effect(
           .pipe(Effect.orDie)
       }
 
-      yield* saveProjectDirectory({
+      // A repository records its own worktree, but a directory without one
+      // resolves to the global project with `data.directory` collapsed to "/",
+      // so the request is the only place the opened plain folder exists.
+      const created = yield* saveProjectDirectory({
         projectID,
-        directory: data.directory,
+        directory: data.vcs ? data.directory : directory,
       })
+      if (created) yield* emitDirectoriesUpdated(projectID)
 
       yield* emitUpdated(result)
       if (projectID !== ProjectV2.ID.global && data.vcs?.type === "git") {

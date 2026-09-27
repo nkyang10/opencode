@@ -129,7 +129,12 @@ function createServerCtx(
 
   const projectsList = createMemo(() => projects.list().map(enrich))
   const recentlyClosedList = createMemo(() => {
-    const known = new Set(sync.data.project.map((project) => pathKey(project.worktree)))
+    // Plain folders have no project row, so a directory is "known" if the server
+    // recorded it as one of the global project's directories too.
+    const known = new Set([
+      ...sync.data.project.map((project) => pathKey(project.worktree)),
+      ...sync.data.folder.map(pathKey),
+    ])
     return projects
       .recentlyClosed()
       .filter((worktree) => known.has(pathKey(worktree)))
