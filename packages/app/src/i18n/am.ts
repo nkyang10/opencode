@@ -743,6 +743,8 @@ export const dict = {
   "session.messages.loadEarlier": "የቀድሞ መልዕክቶችን ጫን",
   "session.messages.loading": "መልእክቶችን በመጫን ላይ...",
   "session.messages.jumpToLatest": "ወደ የቅርብ ጊዜ ዝለል",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "{{selection}}ን ወደ አውድ አክል",
   "session.todo.title": "የሚደረጉ ሥራዎች",
   "session.todo.collapse": "ስብስብ",
@@ -1057,6 +1059,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "ወኪል",
   "settings.general.sounds.agent.description": "ወኪሉ ሲጠናቀቅ ወይም ትኩረት ሲፈልግ ድምጽ ያጫውቱ",
   "settings.general.sounds.permissions.title": "ፍቃዶች",

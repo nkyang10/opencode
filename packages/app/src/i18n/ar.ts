@@ -737,6 +737,8 @@ export const dict = {
   "session.messages.loadEarlier": "تحميل الرسائل السابقة",
   "session.messages.loading": "جارٍ تحميل الرسائل...",
   "session.messages.jumpToLatest": "الانتقال إلى الأحدث",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "إضافة {{selection}} إلى السياق",
   "session.todo.title": "المهام",
   "session.todo.collapse": "طي",
@@ -1002,6 +1004,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "وكيل",
   "settings.general.sounds.agent.description": "تشغيل صوت عندما يكتمل الوكيل أو يحتاج إلى اهتمام",
   "settings.general.sounds.permissions.title": "أذونات",

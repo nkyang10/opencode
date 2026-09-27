@@ -756,6 +756,8 @@ export const dict = {
   "session.messages.loadEarlier": "Innlesa fyrri boð",
   "session.messages.loading": "Heinta boð...",
   "session.messages.jumpToLatest": "Hopp til nýggjasta",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Legg {{selection}} til samanhang",
   "session.todo.title": "Uppgávur",
   "session.todo.collapse": "Kollaps",
@@ -1081,6 +1083,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "Agentur",
   "settings.general.sounds.agent.description": "Spæl ljóð, tá agenturin er liðugur ella hevur brúk fyri uppmerksemi",
   "settings.general.sounds.permissions.title": "Loyvi",

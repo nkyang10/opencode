@@ -740,6 +740,8 @@ export const dict = {
   "session.messages.loadEarlier": "以前のメッセージを読み込む",
   "session.messages.loading": "メッセージを読み込み中...",
   "session.messages.jumpToLatest": "最新へジャンプ",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "{{selection}}をコンテキストに追加",
   "session.todo.title": "ToDo",
   "session.todo.collapse": "折りたたむ",
@@ -992,6 +994,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "エージェント",
   "settings.general.sounds.agent.description": "エージェントが完了したか、注意が必要な場合に音を再生します",
   "settings.general.sounds.permissions.title": "権限",

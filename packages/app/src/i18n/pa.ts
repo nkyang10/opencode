@@ -765,6 +765,8 @@ export const dict = {
   "session.messages.loadEarlier": "پہلے سنیہے لوڈ کرو",
   "session.messages.loading": "سنیہے لوڈ ہو رۓ...",
   "session.messages.jumpToLatest": "تازہ ترین تے جاؤ",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "سیاق و سباق چ {{selection}} شامل کرو",
   "session.todo.title": "ٹوڈوس",
   "session.todo.collapse": "سمیٹو",
@@ -1088,6 +1090,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "جدوں ایجنٹ مکمل ہو جائے یا توجہ دی لوڑ ہووے تے آواز چلاؤ",
   "settings.general.sounds.permissions.title": "اجازتاں",

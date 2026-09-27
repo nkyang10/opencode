@@ -786,6 +786,8 @@ export const dict = {
   "session.messages.loading": "正在載入訊息...",
 
   "session.messages.jumpToLatest": "跳到最新",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "將 {{selection}} 新增到上下文",
   "session.todo.title": "待辦事項",
   "session.todo.collapse": "收合",
@@ -1045,6 +1047,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS 訂閱網址",
   "settings.general.notifications.rss.description":
     "訂閱會話通知的 RSS 來源（完成、錯誤、提問、權限請求）。無需登入即可存取；請勿公開分享此網址",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "代理程式",
   "settings.general.sounds.agent.description": "當代理程式完成或需要注意時播放聲音",
   "settings.general.sounds.permissions.title": "權限",

@@ -754,6 +754,8 @@ export const dict = {
   "session.messages.loadEarlier": "Muat mesej terdahulu",
   "session.messages.loading": "Memuat mesej...",
   "session.messages.jumpToLatest": "Lompat ke terkini",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Tambah {{selection}} ke konteks",
   "session.todo.title": "Senarai Tugasan",
   "session.todo.collapse": "Runtuhkan",
@@ -1084,6 +1086,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "Ejen",
   "settings.general.sounds.agent.description": "Mainkan bunyi apabila ejen selesai atau memerlukan perhatian",
   "settings.general.sounds.permissions.title": "Kebenaran",

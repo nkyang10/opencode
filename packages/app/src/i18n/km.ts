@@ -753,6 +753,8 @@ export const dict = {
   "session.messages.loadEarlier": "ផ្ទុកសារមុន។",
   "session.messages.loading": "កំពុងផ្ទុកសារ...",
   "session.messages.jumpToLatest": "លោតទៅចុងក្រោយបំផុត។",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "បន្ថែម {{selection}} ទៅបរិបទ",
   "session.todo.title": "អ្វីដែលត្រូវធ្វើ",
   "session.todo.collapse": "ដួលរលំ",
@@ -1078,6 +1080,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "ភ្នាក់ងារ",
   "settings.general.sounds.agent.description": "ចាក់សំឡេងនៅពេលដែលភ្នាក់ងារបញ្ចប់ ឬត្រូវការការយកចិត្តទុកដាក់",
   "settings.general.sounds.permissions.title": "ការអនុញ្ញាត",

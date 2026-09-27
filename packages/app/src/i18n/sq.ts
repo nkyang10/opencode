@@ -759,6 +759,8 @@ export const dict = {
   "session.messages.loadEarlier": "Ngarko mesazhet e mëparshme",
   "session.messages.loading": "Po ngarkon mesazhet...",
   "session.messages.jumpToLatest": "Kalo tek e fundit",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Shtoni {{selection}} në kontekst",
   "session.todo.title": "Detyrat",
   "session.todo.collapse": "Kolapsi",
@@ -1090,6 +1092,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "Agjenti",
   "settings.general.sounds.agent.description": "Luaj tingullin kur agjenti është i plotë ose ka nevojë për vëmendje",
   "settings.general.sounds.permissions.title": "Lejet",

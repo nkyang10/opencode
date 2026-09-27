@@ -792,6 +792,8 @@ export const dict = {
   "session.messages.loading": "กำลังโหลดข้อความ...",
   "session.messages.jumpToLatest": "ไปที่ล่าสุด",
 
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
+
   "session.context.addToContext": "เพิ่ม {{selection}} ไปยังบริบท",
   "session.todo.title": "สิ่งที่ต้องทำ",
   "session.todo.collapse": "ย่อ",
@@ -1058,6 +1060,13 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
 
   "settings.general.sounds.agent.title": "เอเจนต์",
   "settings.general.sounds.agent.description": "เล่นเสียงเมื่อเอเจนต์เสร็จสิ้นหรือต้องการความสนใจ",

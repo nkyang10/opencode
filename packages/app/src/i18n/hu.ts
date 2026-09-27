@@ -763,6 +763,8 @@ export const dict = {
   "session.messages.loadEarlier": "Korábbi üzenetek betöltése",
   "session.messages.loading": "Üzenetek betöltése...",
   "session.messages.jumpToLatest": "Ugrás a legújabbra",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Adja hozzá a {{selection}}-t a kontextushoz",
   "session.todo.title": "Feladatok",
   "session.todo.collapse": "Összeomlás",
@@ -1095,6 +1097,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "Ügynök",
   "settings.general.sounds.agent.description": "Hang lejátszása, ha az ügynök befejeződött vagy figyelmet igényel",
   "settings.general.sounds.permissions.title": "Engedélyek",

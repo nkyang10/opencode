@@ -497,6 +497,8 @@ export const dict = {
   "session.messages.loadEarlier": "이전 메시지 로드",
   "session.messages.loading": "메시지 로드 중...",
   "session.messages.jumpToLatest": "최신으로 이동",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "컨텍스트에 {{selection}} 추가",
   "session.todo.title": "할 일",
   "session.todo.collapse": "접기",
@@ -698,6 +700,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "에이전트",
   "settings.general.sounds.agent.description": "에이전트가 완료되거나 주의가 필요할 때 소리 재생",
   "settings.general.sounds.permissions.title": "권한",

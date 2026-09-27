@@ -790,6 +790,8 @@ export const dict = {
   "session.messages.loadEarlier": "加载更早的消息",
   "session.messages.loading": "正在加载消息...",
   "session.messages.jumpToLatest": "跳转到最新",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "将 {{selection}} 添加到上下文",
   "session.todo.title": "待办事项",
   "session.todo.collapse": "折叠",
@@ -1048,6 +1050,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS 订阅地址",
   "settings.general.notifications.rss.description":
     "订阅会话通知的 RSS 源（完成、错误、提问、权限请求）。无需登录即可访问；请勿公开分享此地址",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "智能体",
   "settings.general.sounds.agent.description": "当智能体完成或需要注意时播放声音",
   "settings.general.sounds.permissions.title": "权限",

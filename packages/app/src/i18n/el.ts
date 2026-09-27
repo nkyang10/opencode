@@ -764,6 +764,8 @@ export const dict = {
   "session.messages.loadEarlier": "Φόρτωση προηγούμενων μηνυμάτων",
   "session.messages.loading": "Φόρτωση μηνυμάτων...",
   "session.messages.jumpToLatest": "Μετάβαση στο πιο πρόσφατο",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Προσθήκη {{selection}} στο περιβάλλον",
   "session.todo.title": "Εκκρεμότητες",
   "session.todo.collapse": "Σύμπτυξη",
@@ -1099,6 +1101,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "Πράκτορας",
   "settings.general.sounds.agent.description": "Αναπαραγωγή ήχου όταν ο πράκτορας είναι πλήρης ή χρειάζεται προσοχή",
   "settings.general.sounds.permissions.title": "Δικαιώματα",

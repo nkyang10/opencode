@@ -766,6 +766,8 @@ export const dict = {
   "session.messages.loadEarlier": "Tải tin nhắn trước đó",
   "session.messages.loading": "Đang tải tin nhắn...",
   "session.messages.jumpToLatest": "Chuyển đến mới nhất",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Thêm {{selection}} vào ngữ cảnh",
   "session.todo.title": "việc cần làm",
   "session.todo.collapse": "Thu gọn",
@@ -1096,6 +1098,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "Tác nhân",
   "settings.general.sounds.agent.description": "Phát âm thanh khi tác nhân hoàn thành hoặc cần chú ý",
   "settings.general.sounds.permissions.title": "Quyền",

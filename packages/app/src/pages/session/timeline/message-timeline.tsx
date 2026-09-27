@@ -81,6 +81,7 @@ import { sessionTitle } from "@/utils/session-title"
 import { scheduleConnectedMeasure } from "./measure"
 import { observeElementOffsetReconnectAware } from "./observe-element-offset"
 import { createTimelineProjection } from "./projection"
+import { latestTurnActivity } from "./turn-activity"
 import { MessageComment, SummaryDiff, TimelineRow, TimelineRowMap } from "./rows"
 import { filterVirtualIndexes } from "./virtual-items"
 
@@ -141,27 +142,43 @@ const markBoundaryGesture = (input: {
 function TimelineThinkingRow(props: {
   reasoningHeading?: string
   showReasoningSummaries: boolean
-  baseTime?: number
+  activityAt?: number
+  promptAt?: number
 }) {
   const language = useLanguage()
   const [now, setNow] = createSignal(Date.now())
+  const timefmt = createMemo(() => new Intl.DateTimeFormat(language.intl(), { timeStyle: "short" }))
 
   createEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000)
     onCleanup(() => window.clearInterval(id))
   })
 
-  const elapsedSeconds = createMemo(() => {
-    if (typeof props.baseTime !== "number") return 0
-    return Math.max(0, Math.floor((now() - props.baseTime) / 1000))
-  })
+  const since = (at?: number) => (at === undefined ? 0 : Math.max(0, Math.floor((now() - at) / 1000)))
+  const duration = (seconds: number) =>
+    seconds < 60
+      ? language.t("ui.message.duration.seconds", { count: seconds })
+      : language.t("ui.message.duration.minutesSeconds", {
+          minutes: Math.floor(seconds / 60),
+          seconds: seconds % 60,
+        })
+  const lastOutput = () => since(props.activityAt)
+  const sincePrompt = () => since(props.promptAt)
 
   return (
     <div data-slot="session-turn-thinking">
       <TextShimmer text={language.t("ui.sessionTurn.status.thinking")} />
-      <Show when={elapsedSeconds() > 0}>
-        <span data-slot="session-turn-thinking-elapsed">
-          {language.t("ui.message.duration.seconds", { count: elapsedSeconds() })}
+      <Show when={sincePrompt() > 0}>
+        <span
+          data-slot="session-turn-thinking-elapsed"
+          title={language.t("session.thinking.elapsed", {
+            activity: duration(lastOutput()),
+            time: timefmt().format(props.activityAt ?? props.promptAt ?? now()),
+            total: duration(sincePrompt()),
+          })}
+        >
+          {"\u00B7 "}
+          {duration(lastOutput())} {" / "} {duration(sincePrompt())}
         </span>
       </Show>
       <Show when={!props.showReasoningSummaries}>
@@ -956,7 +973,9 @@ export function MessageTimeline(props: {
     }
     try {
       await sdk().api.session.compact({ sessionID: id, model: { providerID: model.provider.id, modelID: model.id } })
-      await sdk().api.session.wait({ sessionID: id }).catch(() => undefined)
+      await sdk()
+        .api.session.wait({ sessionID: id })
+        .catch(() => undefined)
       dismissProgress()
       showToast({
         variant: "success",
@@ -1269,16 +1288,32 @@ export function MessageTimeline(props: {
       }
       case "Thinking": {
         const thinkingRow = row as Accessor<TimelineRowByTag<"Thinking">>
-        const turnAssistantMessages = assistantMessagesByParent().get(thinkingRow().userMessageID)
-        const baseTime =
-          turnAssistantMessages?.at(-1)?.time.created ?? messageByID().get(thinkingRow().userMessageID)?.time.created
+        const promptAt = createMemo(() => messageByID().get(thinkingRow().userMessageID)?.time.created)
+        const [observed, setObserved] = createSignal<number>()
+        const activity = createMemo(() =>
+          latestTurnActivity({
+            messages: assistantMessagesByParent().get(thinkingRow().userMessageID),
+            parts: getMsgParts,
+            observed: observed(),
+          }),
+        )
+        // Compare against the previous fingerprint instead of `on()`, which re-fires for every
+        // reactive change: stamping writes `observed`, which feeds `activity()`, which would re-fire
+        // this effect forever. The missing first run is what keeps a mount (page reload mid-turn, or
+        // the virtualizer remounting the row) on the server stamps instead of briefly reporting 0s.
+        createEffect((previous) => {
+          const key = activity().key
+          if (previous !== undefined && key !== previous) setObserved(Date.now())
+          return key
+        })
         return (
           <TimelineRowFrame row={thinkingRow}>
             <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
               <TimelineThinkingRow
                 reasoningHeading={thinkingRow().reasoningHeading}
                 showReasoningSummaries={settings.general.showReasoningSummaries()}
-                baseTime={baseTime}
+                activityAt={activity().at ?? promptAt()}
+                promptAt={promptAt()}
               />
             </div>
           </TimelineRowFrame>

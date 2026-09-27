@@ -764,6 +764,8 @@ export const dict = {
   "session.messages.loadEarlier": "Laad eerdere berichten",
   "session.messages.loading": "Berichten laden...",
   "session.messages.jumpToLatest": "Ga naar de laatste",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Voeg {{selection}} toe aan de context",
   "session.todo.title": "Taken",
   "session.todo.collapse": "Samenvouwen",
@@ -1097,6 +1099,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "Agent",
   "settings.general.sounds.agent.description": "Speel geluid af wanneer de agent klaar is of aandacht nodig heeft",
   "settings.general.sounds.permissions.title": "Machtigingen",

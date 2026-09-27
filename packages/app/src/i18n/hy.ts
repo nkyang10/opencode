@@ -761,6 +761,8 @@ export const dict = {
   "session.messages.loadEarlier": "Բեռնել ավելի վաղ հաղորդագրությունները",
   "session.messages.loading": "Բեռնվում է հաղորդագրություններ...",
   "session.messages.jumpToLatest": "Անցնել վերջին",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Ավելացնել {{selection}} համատեքստում",
   "session.todo.title": "Անելիքներ",
   "session.todo.collapse": "Ծալել",
@@ -1091,6 +1093,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "Գործակալ",
   "settings.general.sounds.agent.description": "Նվագարկեք ձայնը, երբ գործակալն ավարտված է կամ ուշադրության կարիք ունի",
   "settings.general.sounds.permissions.title": "Թույլտվություններ",

@@ -753,6 +753,8 @@ export const dict: Record<string, string> = {
   "session.messages.loadEarlier": "කලින් පණිවිඩ පූරණය කරන්න",
   "session.messages.loading": "පණිවිඩ පූරණය කරමින්...",
   "session.messages.jumpToLatest": "නවතම වෙත පනින්න",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "සන්දර්භය වෙත {{selection}} එක් කරන්න",
   "session.todo.title": "ටෝඩෝස්",
   "session.todo.collapse": "හකුළන්න",
@@ -1080,6 +1082,14 @@ export const dict: Record<string, string> = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "නියෝජිතයා",
   "settings.general.sounds.agent.description": "නියෝජිතයා සම්පූර්ණ වූ විට හෝ අවධානය අවශ්‍ය වූ විට ශබ්දය වාදනය කරන්න",
   "settings.general.sounds.permissions.title": "අවසර",

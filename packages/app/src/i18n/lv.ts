@@ -758,6 +758,8 @@ export const dict = {
   "session.messages.loadEarlier": "Ielādēt agrākos ziņojumus",
   "session.messages.loading": "Notiek ziņojumu ielāde...",
   "session.messages.jumpToLatest": "Pāriet uz jaunāko",
+
+  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Pievienot {{selection}} kontekstam",
   "session.todo.title": "Darāmais",
   "session.todo.collapse": "Sakļaut",
@@ -1089,6 +1091,14 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS feed URL",
   "settings.general.notifications.rss.description":
     "Subscribe to an RSS feed of session notifications (finished, errors, questions, permissions). No login needed; keep the URL private",
+  "settings.general.notifications.rss.copied": "Copied!",
+  "settings.general.notifications.rss.copy": "Copy RSS URL",
+  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
+  "settings.general.notifications.rss.dialog.description":
+    "Copied to clipboard. The URL is selectable below for manual copying",
+  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
+  "settings.general.notifications.rss.dialog.done": "Done",
+
   "settings.general.sounds.agent.title": "Aģents",
   "settings.general.sounds.agent.description": "Atskaņot skaņu, kad aģents ir pabeigts vai nepieciešama uzmanība",
   "settings.general.sounds.permissions.title": "Atļaujas",
