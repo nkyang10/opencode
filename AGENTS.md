@@ -117,7 +117,18 @@ initialization`) — the engine layer publishes instead; and `POST /project/git/
 repoints the **global** project's own `worktree`, so nothing calls it for folders any more. Folder rows have no
 project id, hence no "Edit project". Background: `50-projects/p003-opencode-fork/README.md` → `## FE-020`.
 
-**Last deploy (2026-09-26):** rebuilt + redeployed :4447 with the reviewed Settings v2 responsive nav
+**Last deploy (2026-09-27):** rebuilt + redeployed :4447 via `deploy-web-4447.sh --detach` — version
+`1.1.20260927065342`, server **pid 3613950** on :4447 (`/login` healthy, HTTP 401 before auth). Carries, in one
+binary: **FE-020** (`c1f1b58`) and the **DEV-menu utility items** (DEC-046, `titlebar.tsx` `ChannelIndicator` —
+the DEV dropdown now also holds Log out / Settings / Help, wired to the same handlers and i18n keys as
+`HomeUtilityNav`). Playwright-verified on the live server: 7 items + separator, Settings opens the v2 dialog,
+Log out confirm → `/login`, no console errors. **⚠ This build compiles whatever is in the checkout, so it also
+contains a parallel session's uncommitted WIP** (`turn-activity.ts` + its test, `message-timeline.tsx`, a
+`session.thinking.elapsed` key in all 62 locales) — an in-flight session's edits ship with the next deploy. That
+WIP self-repaired its 2 TS errors by 07:33 (`bun typecheck` clean again) but is still uncommitted; land or revert
+it before the next commit (ide FU-082).
+
+**Previous deploy (2026-09-26):** rebuilt + redeployed :4447 with the reviewed Settings v2 responsive nav
 (`71c73a0`, binary via `build-linux.sh`, version `1.1.20260926102413`, server pid 2999326 on :4447, `/login`
 healthy — HTTP 401 before auth is expected). Playwright-measured: desktop 1280px unchanged (nav 240px left /
 panel 740px); 390px phone → strip 358×45 on top, panel 358px full width, key/value row 286px (was ~134px),

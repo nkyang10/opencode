@@ -27,6 +27,7 @@ import { usePlatform } from "@/context/platform"
 import { useCommand } from "@/context/command"
 import { useLanguage } from "@/context/language"
 import { useSettings } from "@/context/settings"
+import { useSettingsDialog } from "@/components/settings-dialog"
 import { WindowsAppMenu } from "./windows-app-menu"
 import { applyPath, backPath, forwardPath } from "./titlebar-history"
 import { TitlebarTabStrip } from "@/components/titlebar-tab-strip"
@@ -648,6 +649,9 @@ function TitlebarUpdateIconButton(props: { state: TitlebarUpdatePillState }) {
 
 function ChannelIndicator(props: { debugTools?: { visible: boolean; toggle: () => void } }) {
   const navigate = useNavigate()
+  const language = useLanguage()
+  const platform = usePlatform()
+  const openSettings = useSettingsDialog()
   const channel = import.meta.env.VITE_OPENCODE_CHANNEL
   if (channel === "dev" && props.debugTools) {
     return (
@@ -694,6 +698,24 @@ function ChannelIndicator(props: { debugTools?: { visible: boolean; toggle: () =
             </DropdownMenu.Item>
             <DropdownMenu.Item onSelect={props.debugTools.toggle}>
               <DropdownMenu.ItemLabel>Debug tools</DropdownMenu.ItemLabel>
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item
+              onSelect={() => {
+                if (window.confirm(language.t("sidebar.logoutConfirm"))) {
+                  window.location.href = "/logout"
+                }
+              }}
+            >
+              <DropdownMenu.ItemLabel>{language.t("sidebar.logout")}</DropdownMenu.ItemLabel>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={openSettings}>
+              <DropdownMenu.ItemLabel>{language.t("sidebar.settings")}</DropdownMenu.ItemLabel>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              onSelect={() => platform.openExternal("https://opencode.ai/desktop-feedback")}
+            >
+              <DropdownMenu.ItemLabel>{language.t("sidebar.help")}</DropdownMenu.ItemLabel>
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>

@@ -76,7 +76,9 @@ MarkCode's changes over stock opencode (web UI + server layer):
   dialog, so another device or a reader can follow along.
 
 ### Dev tooling
-- **DEV title-bar dropdown** — the top-left button now offers **Home page** / **Refresh** / **Debug tools**.
+- **DEV title-bar dropdown** — the top-left button now offers **Home page** / **Refresh** / **Clear cache** /
+  **Debug tools**, plus the project page's own **Log out** / **Settings** / **Help** items (same handlers and
+  localized labels as the project sidebar, DEC-046).
 - **Server-update refresh toast** — `/api/health` reports `{healthy, version}`; on a version change a
   persistent toast with a **Refresh** button appears.
 
