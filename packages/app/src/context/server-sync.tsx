@@ -169,6 +169,20 @@ export const loadActiveSessionsQuery = (
     refetchOnWindowFocus: false,
   })
 
+// A turn is over when the server's own last message for it says so. An assistant message that
+// completed or failed ends the turn; an open one means the server is still working on it even when
+// the session is missing from the status map (a provider retry backoff). No messages at all means the
+// client cannot tell, so it keeps the pre-existing "assume finished" behaviour rather than risk a
+// progress row that never clears.
+export function turnIsFinished(
+  messages: readonly { role: string; time?: { created?: number; completed?: number }; error?: unknown }[] | undefined,
+) {
+  const last = messages?.at(-1)
+  if (!last) return true
+  if (last.role !== "assistant") return false
+  return !!last.time?.completed || !!last.error
+}
+
 export async function seedActiveSessionStatuses(
   session: Pick<ServerSession, "data" | "set">,
   active: SessionActiveOutput | Record<string, SessionStatus>,
@@ -278,15 +292,11 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
   }))
   const settleTurn = (sessionID: string) => TurnProgressState.settle(serverSDK.scope, sessionID)
   // The only trustworthy "the turn is over" answer when the event stream is not delivering: the
-  // server's own message list. The last assistant message of the turn is completed or carries an
-  // error once the server stopped working on it; while it is still open the turn is running, even
-  // if the session is missing from the status map (provider retry backoff).
+  // server's own message list. This is the missed event the watchdog exists to recover from, so ask
+  // for it before revoking a live turn's progress row.
   const turnFinished = async (sessionID: string) => {
     await session.sync(sessionID, { force: true }).catch(() => undefined)
-    const last = session.data.message[sessionID]?.at(-1)
-    if (!last) return true
-    if (last.role !== "assistant") return false
-    return !!last.time.completed || !!last.error
+    return turnIsFinished(session.data.message[sessionID])
   }
   const activeSessionsQuery = useQuery(() =>
     loadActiveSessionsQuery(serverSDK.scope, {

@@ -10,7 +10,13 @@ import type {
 import { QueryClient } from "@tanstack/solid-query"
 import { canDisposeDirectory, pickDirectoriesToEvict } from "./global-sync/eviction"
 import { estimateRootSessionTotal, loadRootSessions } from "./global-sync/session-load"
-import { loadActiveSessionsQuery, loadMcpQuery, loadMcpResourcesQuery, seedActiveSessionStatuses } from "./server-sync"
+import {
+  loadActiveSessionsQuery,
+  loadMcpQuery,
+  loadMcpResourcesQuery,
+  seedActiveSessionStatuses,
+  turnIsFinished,
+} from "./server-sync"
 import { ServerScope } from "@/utils/server-scope"
 import { createServerSession } from "./server-session"
 import type { ServerApi } from "@/utils/server"
@@ -132,6 +138,18 @@ describe("active session query", () => {
     })
     expect(session.data.session_status.ses_finished).toEqual({ type: "idle" })
     expect(settled).toEqual(["ses_finished"])
+  })
+
+  // The rule the watchdog's network check is built on. Both directions matter: a lost idle event
+  // (mobile suspend) must still clear the row, an open turn must keep it.
+  test("turnIsFinished reads the turn off the server's last message", () => {
+    expect(turnIsFinished(undefined)).toBe(true)
+    expect(turnIsFinished([])).toBe(true)
+    expect(turnIsFinished([{ role: "user" }])).toBe(false)
+    expect(turnIsFinished([{ role: "user" }, { role: "assistant" }])).toBe(false)
+    expect(turnIsFinished([{ role: "user" }, { role: "assistant", time: { completed: 5 } }])).toBe(true)
+    expect(turnIsFinished([{ role: "assistant", error: { name: "APIError" } }])).toBe(true)
+    expect(turnIsFinished([{ role: "assistant", time: { completed: 5 } }, { role: "user" }])).toBe(false)
   })
 
   test("asks the server before demoting a session it does not list", async () => {
