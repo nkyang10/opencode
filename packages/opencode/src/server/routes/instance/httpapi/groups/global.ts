@@ -14,6 +14,18 @@ const GlobalHealth = Schema.Struct({
   version: Schema.String,
 })
 
+// FE-023: what the Admin settings section needs to render honest rows — the port
+// stored in the global config, the port the listener actually bound, and whether
+// those two disagree (which only a restart can fix).
+const GlobalWebui = Schema.Struct({
+  configuredPort: Schema.NullOr(Schema.Number),
+  defaultPort: Schema.Number,
+  runningPort: Schema.NullOr(Schema.Number),
+  runningHostname: Schema.NullOr(Schema.String),
+  autoStart: Schema.Boolean,
+  restartRequired: Schema.Boolean,
+})
+
 const SyncEventSchemas = EventManifest.Latest.values()
   .flatMap((definition) => {
     if (!definition.durable) return []
@@ -69,6 +81,7 @@ export const GlobalPaths = {
   health: "/global/health",
   event: "/global/event",
   config: "/global/config",
+  webui: "/global/webui",
   dispose: "/global/dispose",
   upgrade: "/global/upgrade",
 } as const
@@ -112,6 +125,16 @@ export const GlobalApi = HttpApi.make("global").add(
           identifier: "global.config.update",
           summary: "Update global configuration",
           description: "Update global OpenCode configuration settings and preferences.",
+        }),
+      ),
+      HttpApiEndpoint.get("webui", GlobalPaths.webui, {
+        success: described(GlobalWebui, "Web interface server status"),
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.webui",
+          summary: "Get web interface server status",
+          description:
+            "Get the configured web interface port and auto-start setting, the port the server is actually listening on, and whether a restart is needed to apply a port change.",
         }),
       ),
       HttpApiEndpoint.post("dispose", GlobalPaths.dispose, {

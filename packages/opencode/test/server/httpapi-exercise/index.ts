@@ -105,6 +105,23 @@ const scenarios: Scenario[] = [
       "status",
     ),
   http.protected
+    .get("/global/webui", "global.webui")
+    .global()
+    .json(200, (body) => {
+      object(body)
+      check(body.defaultPort === 4446, "webui status should report the fork's default port")
+      check(
+        body.configuredPort === null || typeof body.configuredPort === "number",
+        "configured port should be a number or null when unset",
+      )
+      check(
+        body.runningPort === null || typeof body.runningPort === "number",
+        "running port should be a number or null when no listener is bound",
+      )
+      boolean(body.autoStart)
+      check(body.restartRequired === false, "no configured port means no restart to apply")
+    }),
+  http.protected
     .post("/global/dispose", "global.dispose")
     .global()
     .mutating()

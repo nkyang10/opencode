@@ -4,6 +4,7 @@ import { EffectBridge } from "@/effect/bridge"
 import { EventV2 } from "@opencode-ai/core/event"
 import { Installation } from "@/installation"
 import { disposeAllInstancesAndEmitGlobalDisposed } from "@/server/global-lifecycle"
+import { Webui } from "@/server/webui"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { Effect, Queue } from "effect"
 import * as Stream from "effect/Stream"
@@ -81,6 +82,26 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       return result.info
     })
 
+    // FE-023. The configured values come from the global config only (never the
+    // project config, which would make a per-project file look like a server
+    // setting), and the running values come from the listener this process owns —
+    // `Server.url` is set by `listen()` and cleared on stop, so it is undefined in
+    // the TUI's in-process mode where no socket is bound at all.
+    const webui = Effect.fn("GlobalHttpApi.webui")(function* () {
+      const cfg = yield* config.getGlobal()
+      const { url } = yield* Effect.promise(() => import("@/server/server"))
+      const configuredPort = cfg.server?.port ?? null
+      const runningPort = url ? Number(url.port) : null
+      return {
+        configuredPort,
+        defaultPort: Webui.DefaultPort,
+        runningPort,
+        runningHostname: url?.hostname ?? null,
+        autoStart: cfg.server?.webui?.autoStart ?? false,
+        restartRequired: configuredPort !== null && runningPort !== null && configuredPort !== runningPort,
+      }
+    })
+
     const dispose = Effect.fn("GlobalHttpApi.dispose")(function* () {
       yield* disposeAllInstancesAndEmitGlobalDisposed()
       return true
@@ -120,6 +141,7 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       .handleRaw("event", event)
       .handle("configGet", configGet)
       .handle("configUpdate", configUpdate)
+      .handle("webui", webui)
       .handle("dispose", dispose)
       .handle("upgrade", upgrade)
   }),

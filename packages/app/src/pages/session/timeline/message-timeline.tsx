@@ -65,6 +65,7 @@ import { SessionContextUsage } from "@/components/session-context-usage"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLanguage } from "@/context/language"
 import { useSessionKey } from "@/pages/session/session-layout"
+import { useLayout } from "@/context/layout"
 import { useSessionArchive } from "@/pages/session/session-archive"
 import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
@@ -82,6 +83,7 @@ import { scheduleConnectedMeasure } from "./measure"
 import { observeElementOffsetReconnectAware } from "./observe-element-offset"
 import { createTimelineProjection } from "./projection"
 import { latestTurnActivity } from "./turn-activity"
+import { diffSummaryOverflow, diffSummaryVisible } from "./diff-summary-state"
 import { TurnProgressState } from "@/utils/turn-progress"
 import { MessageComment, SummaryDiff, TimelineRow, TimelineRowMap } from "./rows"
 import { filterVirtualIndexes } from "./virtual-items"
@@ -203,85 +205,121 @@ function TimelineThinkingRow(props: {
 
 function TimelineDiffSummaryRow(props: { diffs: SummaryDiff[] }) {
   const language = useLanguage()
-  const maxFiles = 10
+  const { sessionKey } = useSessionKey()
+  const layout = useLayout()
+  const groupOpen = layout.view(sessionKey).diffSummaryOpen
   const [state, setState] = createStore({
     showAll: false,
     expanded: [] as string[],
   })
   const showAll = () => state.showAll
   const expanded = () => state.expanded
-  const overflow = createMemo(() => Math.max(0, props.diffs.length - maxFiles))
-  const visible = createMemo(() => (showAll() ? props.diffs : props.diffs.slice(0, maxFiles)))
+  const overflow = createMemo(() => diffSummaryOverflow(props.diffs))
+  const visible = createMemo(() => diffSummaryVisible(props.diffs, showAll()))
+  const label = () => language.plural("ui.sessionTurn.diffs.changed", props.diffs.length)
+  const toggle = () => groupOpen.set(!groupOpen.get())
 
   return (
     <div
       data-slot="session-turn-diffs"
       data-component="session-turn-diffs-group"
       data-show-all={showAll() || undefined}
+      data-expanded={groupOpen.get() || undefined}
     >
-      <div data-slot="session-turn-diffs-header">
-        <span data-slot="session-turn-diffs-label">
-          {language.plural("ui.sessionTurn.diffs.changed", props.diffs.length)}
-        </span>
+      <div
+        data-slot="session-turn-diffs-header"
+        role="button"
+        tabIndex={0}
+        aria-expanded={groupOpen.get()}
+        aria-label={label()}
+        onClick={toggle}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") return
+          event.preventDefault()
+          toggle()
+        }}
+      >
+        <span data-slot="session-turn-diffs-label">{label()}</span>
         <DiffChanges changes={props.diffs} />
         <Show when={overflow() > 0}>
-          <span data-slot="session-turn-diffs-toggle" onClick={() => setState("showAll", !showAll())}>
-            {showAll() ? language.t("ui.sessionTurn.diffs.showLess") : language.t("ui.sessionTurn.diffs.showAll")}
-          </span>
-        </Show>
-      </div>
-      <div data-component="session-turn-diffs-content">
-        <Accordion
-          multiple
-          style={{ "--sticky-accordion-offset": "44px" }}
-          value={expanded()}
-          onChange={(value) => setState("expanded", Array.isArray(value) ? value : value ? [value] : [])}
-        >
-          <For each={visible()}>
-            {(diff) => {
-              const opened = createMemo(() => expanded().includes(diff.file))
-
-              return (
-                <Accordion.Item value={diff.file}>
-                  <StickyAccordionHeader>
-                    <Accordion.Trigger>
-                      <div data-slot="session-turn-diff-trigger">
-                        <span data-slot="session-turn-diff-path">
-                          <Show when={diff.file.includes("/")}>
-                            <span data-slot="session-turn-diff-directory">{`\u202A${getDirectory(diff.file)}\u202C`}</span>
-                          </Show>
-                          <span data-slot="session-turn-diff-filename">{getFilename(diff.file)}</span>
-                        </span>
-                        <div data-slot="session-turn-diff-meta">
-                          <span data-slot="session-turn-diff-changes">
-                            <DiffChanges changes={diff} />
-                          </span>
-                          <span data-slot="session-turn-diff-chevron">
-                            <Icon name="chevron-down" size="small" />
-                          </span>
-                        </div>
-                      </div>
-                    </Accordion.Trigger>
-                  </StickyAccordionHeader>
-                  <Accordion.Content>
-                    <Show when={opened()}>
-                      <TimelineDiffView diff={diff} />
-                    </Show>
-                  </Accordion.Content>
-                </Accordion.Item>
-              )
+          <button
+            type="button"
+            data-slot="session-turn-diffs-toggle"
+            onClick={(event) => {
+              // The whole header toggles the group, so lifting the 10 file cap must not also collapse it.
+              event.stopPropagation()
+              setState("showAll", !showAll())
             }}
-          </For>
-        </Accordion>
-        <Show when={!showAll() && overflow() > 0}>
-          <div data-slot="session-turn-diffs-more" onClick={() => setState("showAll", true)}>
-            {language.t("ui.sessionTurn.diffs.more", { count: String(overflow()) })}
-          </div>
+          >
+            {showAll() ? language.t("ui.sessionTurn.diffs.showLess") : language.t("ui.sessionTurn.diffs.showAll")}
+          </button>
         </Show>
+        <span data-slot="session-turn-diffs-chevron" aria-hidden="true">
+          <Icon name="chevron-down" size="small" />
+        </span>
       </div>
+      <Show when={groupOpen.get()}>
+        <div data-component="session-turn-diffs-content">
+          <Accordion
+            multiple
+            style={{ "--sticky-accordion-offset": "44px" }}
+            value={expanded()}
+            onChange={(value) => setState("expanded", Array.isArray(value) ? value : value ? [value] : [])}
+          >
+            <For each={visible()}>
+              {(diff) => {
+                const opened = createMemo(() => expanded().includes(diff.file))
+
+                return (
+                  <Accordion.Item value={diff.file}>
+                    <StickyAccordionHeader>
+                      <Accordion.Trigger>
+                        <div data-slot="session-turn-diff-trigger">
+                          <span data-slot="session-turn-diff-path">
+                            <Show when={diff.file.includes("/")}>
+                              <span data-slot="session-turn-diff-directory">{`\u202A${getDirectory(diff.file)}\u202C`}</span>
+                            </Show>
+                            <span data-slot="session-turn-diff-filename">{getFilename(diff.file)}</span>
+                          </span>
+                          <div data-slot="session-turn-diff-meta">
+                            <span data-slot="session-turn-diff-changes">
+                              <DiffChanges changes={diff} />
+                            </span>
+                            <span data-slot="session-turn-diff-chevron">
+                              <Icon name="chevron-down" size="small" />
+                            </span>
+                          </div>
+                        </div>
+                      </Accordion.Trigger>
+                    </StickyAccordionHeader>
+                    <Accordion.Content>
+                      <Show when={opened()}>
+                        <TimelineDiffView diff={diff} />
+                      </Show>
+                    </Accordion.Content>
+                  </Accordion.Item>
+                )
+              }}
+            </For>
+          </Accordion>
+          <Show when={!showAll() && overflow() > 0}>
+            <button
+              type="button"
+              data-slot="session-turn-diffs-more"
+              onClick={(event) => {
+                event.stopPropagation()
+                setState("showAll", true)
+              }}
+            >
+              {language.t("ui.sessionTurn.diffs.more", { count: String(overflow()) })}
+            </button>
+          </Show>
+        </div>
+      </Show>
     </div>
   )
 }
+
 
 function TimelineDiffView(props: { diff: SummaryDiff }) {
   const fileComponent = useFileComponent()

@@ -262,6 +262,28 @@ export const TuiThreadCommand = cmd({
         return
       }
 
+      // FE-024: the Admin setting `server.webui.autoStart` asks for the web
+      // interface to come up with the app. It runs in the worker (which owns the
+      // listener) and only when nothing is listening yet, so the `--port` path above
+      // keeps priority. Printed before the TUI takes over the screen.
+      const autoStart = await client
+        .call("webuiAutoStart", { port: network.port, hostname: network.hostname })
+        .catch(() => undefined)
+      if (autoStart?.started) {
+        UI.empty()
+        UI.println(UI.Style.TEXT_INFO_BOLD + "  Web UI:            ", UI.Style.TEXT_NORMAL, autoStart.url)
+        for (const url of autoStart.networkURLs) {
+          UI.println(UI.Style.TEXT_INFO_BOLD + "  Network access:    ", UI.Style.TEXT_NORMAL, url)
+        }
+        if (autoStart.downgraded) {
+          UI.println(
+            UI.Style.TEXT_WARNING_BOLD + "  !  ",
+            UI.Style.TEXT_NORMAL,
+            "server is unsecured (no OPENCODE_SERVER_PASSWORD), so the web UI is only reachable on localhost.",
+          )
+        }
+      }
+
       setTimeout(() => {
         client.call("checkUpgrade", { directory: cwd }).catch(() => {})
       }, 1000).unref?.()

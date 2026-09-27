@@ -99,6 +99,34 @@ and the section titles + app-name/version footer are hidden (they do not fit a s
 `.settings-v2[data-variant="settings"][data-orientation="horizontal"]` in `settings-v2.css`, plus a
 `max-width: 639px` header/body padding reduction (40px → 16px). The old `144px` side-nav media block was deleted.
 
+**Admin settings are server-global and live in the config file (2026-09-27, FE-023 / FE-024):** the
+settings-v2 dialog has an **Admin** tab (`settings-v2/admin.tsx`, registered in
+`dialog-settings-v2.tsx` next to Models) whose rows write the **global** config file
+(`~/.config/opencode/opencode.json(c)`), not per-browser state like every other settings row. There is no new
+write path: it uses `PATCH /global/config` → `Config.updateGlobal` (`src/config/config.ts:656-680`), which
+deep-merges into the first existing of `opencode.jsonc` / `opencode.json` / `config.json` and preserves
+comments when the file is `.jsonc`. Three rules keep this honest:
+
+- **Patch only the changed leaf.** A patch deep-merges, but arrays are **replaced** — sending the whole
+  `server` object would overwrite `server.cors`.
+- **A config write disposes every open instance** (`handlers/global.ts:78-82`), so the rows save on an explicit
+  Save, never on blur.
+- **The port is read once at start** (`cli/network.ts` → `server.ts:startWithPortFallback`), so a saved port
+  cannot apply live. `GET /global/webui` (`Webui.DefaultPort` = 4446, the Admin default) reports the configured
+  port next to the one the listener bound, and the tab turns the difference into a "restart to apply" line. A
+  live re-listen is the natural follow-up — the only existing precedent is the TUI worker RPC
+  (`cli/tui/worker.ts` `server()`, which stops the old listener and listens again).
+- `server.webui.autoStart` (FE-024) makes the **TUI process** bind the web server at startup
+  (`cli/web-autostart.ts`, called from the TUI via the worker's `webuiAutoStart` RPC — no second process).
+  It is **opt-in**, and the wildcard address is only used when `OPENCODE_SERVER_PASSWORD` is set; without a
+  password it falls back to `127.0.0.1` and says so, because `web --hostname 0.0.0.0` unsecured exposes the
+  agent to the whole LAN.
+- There is **no user or role model** in this server (one shared Basic credential), so "admin" means "any
+  authenticated browser" — it can already `PATCH /global/config`, dispose instances and trigger an upgrade.
+- The v1 settings page is **dead code** (its "new interface designs" toggle is past its sunset date and
+  `useSettingsDialog()` hard-codes v2). The Admin tab is v2-only on purpose; do not "fix" that by editing
+  `settings-general.tsx`.
+
 **Project identity = git, not path (2026-09-26, DEC-045 / FE-020):** a project id is derived from git
 (`ProjectV2.resolve`: remote-url hash → id cached in `<git-common-dir>/opencode` → **first root commit sha**).
 A directory with no repository resolves to the shared `global` project, which is why it used to vanish from the
@@ -295,3 +323,38 @@ const table = sqliteTable("session", {
 - Keep delivery vocabulary explicit. Prompts steer by default and promote at the next safe provider-turn boundary while the current drain requires continuation. An explicit `queue` input remains pending until the Session would otherwise become idle; promote one queued input at that boundary, then reevaluate continuation before promoting another. Promoting any new user input resets the selected agent's provider-turn allowance; a batch of steers resets it once.
 - Keep EventV2 replay owner claims separate from clustered Session execution ownership.
 - Keep the System Context algebra, registry, and built-ins in `src/system-context`; keep Context Source producers with their observed domains, and keep Session History selection plus Context Epoch persistence Session-owned.
+
+**The "Changed files" group is collapsed by default (2026-09-27, FE-025 / DEC-052):** the timeline's
+`DiffSummary` row (`packages/app/src/pages/session/timeline/message-timeline.tsx`) renders **one 44px line** —
+`N Changed files` + the turn's `+added −deleted` split + a chevron — and the file list is inside a
+`<Show when={open()}>`, so a turn with 10 changed files occupies **44px instead of ~440px** (measured
+44px collapsed vs 393px expanded for 12 files). Three things to know before touching it:
+
+- **The header is the toggle** (`role="button" tabIndex="0" aria-expanded` + Enter/Space, mirroring the composer
+  todo dock at `composer/session-todo-dock.tsx:110-215`). Its chevron rotates on
+  `[data-component="session-turn-diffs-group"][data-expanded]` — a *different* `data-slot`
+  (`session-turn-diffs-chevron`, plural) from the per-file one (`session-turn-diff-chevron`, singular), which
+  still keys off `[data-slot="accordion-item"][data-expanded]`. Do not merge them.
+- **The open flag is persisted, per session, as ONE boolean** (`SessionView.diffSummaryOpen` in
+  `context/layout.tsx`, beside `todoCollapsed`). **Absent means collapsed**, so no `migrate` branch and no
+  `layout.v6` bump. Accepted consequence: opening one turn's list leaves every other turn's list in the same
+  session open too, because they all read the same flag. Per-row independence (a `string[]` of open
+  `userMessageID`s, like the Review panel's `reviewOpen`) is the documented alternative if that is ever
+  complained about. `MessageTimeline` already has `useSessionKey()` so no prop is threaded.
+- **The header must stay 44px tall in both states.** `--sticky-accordion-offset: 44px` on the inner `Accordion`
+  exists because of it, and the first file row sits 50px below the header's top (measured) — a shorter header
+  would let the per-file sticky headers overlap, a taller one would leave a gap.
+- `Show all` and `+N more files` became real `<button type="button">`s (they were a bare `<span onClick>` and
+  `<div onClick>`), and `Show all`'s `opacity: 0` is now also lifted by `:focus-visible` — it used to be
+  invisible to keyboard **and** touch users. **`Show all` lives in the header, so its handler must
+  `stopPropagation()`** or clicking it also collapses the group. Note `Show all` stays rendered while the group
+  is collapsed (it is a header control); only `+N more files` and the file list are behind the toggle.
+- The row's **content is unchanged and adds no i18n key**: the count is `ui.sessionTurn.diffs.changed`
+  (plural) and the totals come from `<DiffChanges changes={props.diffs}>` (the whole array), which **sums**
+  across every file, so the tally is the *turn* total. `additions`/`deletions` are required
+  `Schema.Finite` (`packages/schema/src/file-diff.ts`), and `DiffChanges` renders nothing when the sum is 0, so
+  a rename-only or binary turn legitimately shows no tally. The `+12 −4` split is deliberate — a single
+  "N lines changed" would need a new plural key in **`packages/ui/src/i18n/` (66 locales)**.
+  `diffSummaryOverflow` / `diffSummaryVisible` were extracted to
+  `timeline/diff-summary-state.ts` because `packages/app` has **no** `*.test.tsx`, so only pure logic is
+  unit-testable.

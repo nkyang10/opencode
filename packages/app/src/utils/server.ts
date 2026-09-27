@@ -94,3 +94,41 @@ export async function fetchProjectDirectories(input: {
   const rows = (await response.json()) as { directory?: string }[]
   return rows.map((row) => row.directory).filter((directory): directory is string => !!directory)
 }
+
+/** FE-023: what the Admin settings rows need to stay honest about the web UI server. */
+export type WebuiStatus = {
+  /** `server.port` in the global config, or null when it was never set. */
+  configuredPort: number | null
+  /** The port the Admin tab offers as the default (the fork's 4446). */
+  defaultPort: number
+  /** The port the listener actually bound, or null when no socket is bound. */
+  runningPort: number | null
+  runningHostname: string | null
+  autoStart: boolean
+  /** A configured port that only differs from the running one — a restart applies it. */
+  restartRequired: boolean
+}
+
+/**
+ * `GET /global/webui` is a declared route on the global API, so it is in the OpenAPI
+ * document, but the generated clients the app uses are not regenerated for every server
+ * change, so this one is called directly (same precedent as `fetchProjectDirectories`
+ * above). Same Basic auth as the SDK clients.
+ */
+export async function fetchWebuiStatus(input: {
+  server: ServerConnection.HttpBase
+  fetch?: typeof globalThis.fetch
+}): Promise<WebuiStatus | undefined> {
+  const response = await (input.fetch ?? globalThis.fetch)(`${input.server.url}/global/webui`, {
+    headers: input.server.password
+      ? {
+          Authorization: `Basic ${authTokenFromCredentials({
+            username: input.server.username,
+            password: input.server.password,
+          })}`,
+        }
+      : undefined,
+  })
+  if (!response.ok) return undefined
+  return (await response.json()) as WebuiStatus
+}

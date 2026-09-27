@@ -203,12 +203,16 @@ test("shows all and expands historical diff summary without overlap", async ({ p
   const diff = page.locator('[data-timeline-row="DiffSummary"]')
   const following = page.locator(`[data-message-id="${nextUserID}"]`).first()
   await expect(diff).toBeVisible()
+  // The group ships collapsed, so the file list only exists after the header is clicked open.
+  await diff.locator('[data-slot="session-turn-diffs-header"]').click()
+  await expect(diff.locator('[data-component="session-turn-diffs-content"]')).toBeVisible()
   const regions = defineVisualRegions({
     diff: { selector: '[data-timeline-row="DiffSummary"]' },
     following: { selector: `[data-message-id="${nextUserID}"]` },
   })
   await startVisualProbe(page, regions)
-  await page.getByText(/show all/i).click()
+  // Scoped to the group: the review panel's own "Show all lines" also matches /show all/i.
+  await diff.locator('[data-slot="session-turn-diffs-toggle"]').click()
   await page.waitForTimeout(500)
   await diff.locator('[data-slot="session-turn-diff-trigger"]').first().click()
   await page.waitForTimeout(900)

@@ -818,3 +818,13 @@
   line-height: 1.45;
   color: var(--v2-text-text-secondary);
 }
+
+/* FE-023: status line under the Admin rows (which port is running, whether a
+   restart is needed to apply a saved one). */
+.settings-v2-note {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 440;
+  line-height: 1.45;
+  color: var(--v2-text-text-secondary);
+}

@@ -11,6 +11,7 @@ import { SettingsProvidersV2 } from "./providers"
 import { SettingsModelsV2 } from "./models"
 import "./settings-v2.css"
 import { SettingsServersV2 } from "./servers"
+import { SettingsAdminV2 } from "./admin"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLayout } from "@/context/layout"
 import { useTabs } from "@/context/tabs"
@@ -80,6 +81,10 @@ export const DialogSettings: Component<{
                 <Icon name="models" />
                 {language.t("settings.models.title")}
               </TabsV2.Trigger>
+              <TabsV2.Trigger value="admin">
+                <Icon name="shield" />
+                {language.t("settings.tab.admin")}
+              </TabsV2.Trigger>
             </div>
             <div class="settings-v2-nav-footer">
               <span>{language.t("app.name.desktop")}</span>
@@ -101,6 +106,9 @@ export const DialogSettings: Component<{
         </TabsV2.Content>
         <TabsV2.Content value="models" class="settings-v2-panel">
           <SettingsModelsV2 />
+        </TabsV2.Content>
+        <TabsV2.Content value="admin" class="settings-v2-panel">
+          <SettingsAdminV2 />
         </TabsV2.Content>
       </TabsV2>
     </Dialog>

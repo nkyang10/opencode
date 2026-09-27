@@ -73,6 +73,7 @@ type SessionView = {
   pendingMessage?: string
   pendingMessageAt?: number
   todoCollapsed?: boolean
+  diffSummaryOpen?: boolean
 }
 
 type TabHandoff = {
@@ -872,6 +873,21 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
               } else {
                 setStore("sessionView", session, "todoCollapsed", collapsed)
               }
+            },
+          },
+          // The timeline "N Changed files" group. One flag for the whole session, so opening one turn's
+          // list leaves the other turns' lists open too. Absent means collapsed, so no migration is needed.
+          diffSummaryOpen: {
+            get: () => s().diffSummaryOpen ?? false,
+            set(open: boolean) {
+              const session = key()
+              const current = store.sessionView[session]
+              if (!current) {
+                setStore("sessionView", session, { scroll: {}, diffSummaryOpen: open })
+                return
+              }
+              if (current.diffSummaryOpen === open) return
+              setStore("sessionView", session, "diffSummaryOpen", open)
             },
           },
           terminal: {

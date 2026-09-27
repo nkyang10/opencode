@@ -1146,6 +1146,23 @@ export const dict = {
   "settings.providers.tag.custom": "ސަޤާފަތް",
   "settings.providers.tag.other": "އެހެން",
   "settings.models.title": "މޮޑެލްތަކެވެ",
+  "settings.tab.admin": "Admin",
+  "settings.admin.section.webui": "Web UI server",
+  "settings.admin.row.autoStart.title": "Start the web UI automatically",
+  "settings.admin.row.autoStart.description":
+    "Serve the web interface on this port whenever opencode starts, so other devices on your network can reach it.",
+  "settings.admin.row.autoStart.on.title": "Web UI auto-start enabled",
+  "settings.admin.row.autoStart.off.title": "Web UI auto-start disabled",
+  "settings.admin.row.port.title": "Web UI port",
+  "settings.admin.row.port.description":
+    "TCP port for the web interface. Saved in the global config file, and applied the next time opencode starts.",
+  "settings.admin.row.port.invalid": "Enter a port between 1 and 65535.",
+  "settings.admin.row.port.saved.title": "Web UI port saved: {{port}}",
+  "settings.admin.note.running": "Running on port {{running}}.",
+  "settings.admin.note.restartRequired":
+    "Running on port {{running}}. Restart opencode to serve on port {{configured}}.",
+  "settings.admin.note.unconfigured": "Not set in the config file. Running on port {{running}}.",
+  "settings.admin.note.noListener": "This process is not serving the web interface, so there is no port to change.",
   "settings.models.description": "މޮޑެލް ސެޓިންގސް މިތަނުގައި ކޮންފިގްރޭޓް ކުރެވޭނެއެވެ.",
   "settings.agents.title": "އޭޖެންޓުންނެވެ",
   "settings.agents.description": "އޭޖެންޓް ސެޓިންގސް މިތަނުގައި ކޮންފިގްރޭޓް ކުރެވޭނެއެވެ.",

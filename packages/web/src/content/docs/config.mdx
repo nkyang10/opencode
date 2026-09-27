@@ -305,11 +305,14 @@ You can configure server settings for the `opencode serve` and `opencode web` co
 {
   "$schema": "https://opencode.ai/config.json",
   "server": {
-    "port": 4096,
+    "port": 4446,
     "hostname": "0.0.0.0",
     "mdns": true,
     "mdnsDomain": "myproject.local",
-    "cors": ["http://localhost:5173"]
+    "cors": ["http://localhost:5173"],
+    "webui": {
+      "autoStart": true
+    }
   }
 }
 ```
@@ -321,6 +324,7 @@ Available options:
 - `mdns` - Enable mDNS service discovery. This allows other devices on the network to discover your OpenCode server.
 - `mdnsDomain` - Custom domain name for mDNS service. Defaults to `opencode.local`. Useful for running multiple instances on the same network.
 - `cors` - Additional origins to allow for CORS when using the HTTP server from a browser-based client. Values must be full origins (scheme + host + optional port), eg `https://app.example.com`.
+- `webui.autoStart` - Start the web interface server when OpenCode starts, using `port` and `hostname`. Reachable from other devices only when a server password is set (`OPENCODE_SERVER_PASSWORD`); without one it binds `127.0.0.1`. This setting is also editable in the web interface under **Settings > Admin**, which writes the global config file.
 
 [Learn more about the server here](/docs/server).
 

@@ -157,8 +157,17 @@ test.describe("session timeline projection", () => {
     await scroller.evaluate((element) => (element.scrollTop = 0))
 
     await expect(page.getByText("Keep this stable", { exact: true })).toBeVisible()
-    await expect(page.locator('[data-timeline-row="DiffSummary"]')).toBeVisible()
-    await expect(page.getByText(/show all/i)).toBeVisible()
+    const diff = page.locator('[data-timeline-row="DiffSummary"]')
+    await expect(diff).toBeVisible()
+
+    // The group ships collapsed, so the file list and the "+N more files" control only exist after the header
+    // opens it. "Show all" is a header control, so it stays rendered either way.
+    await expect(diff.locator('[data-component="session-turn-diffs-content"]')).toHaveCount(0)
+    await expect(diff.locator('[data-slot="session-turn-diffs-more"]')).toHaveCount(0)
+    await diff.locator('[data-slot="session-turn-diffs-header"]').click()
+    await expect(diff.locator('[data-component="session-turn-diffs-content"]')).toBeVisible()
+    await expect(diff.locator('[data-slot="session-turn-diffs-more"]')).toBeVisible()
+    await expect(diff.locator('[data-slot="session-turn-diffs-toggle"]')).toBeVisible()
   })
 
   test("renders interruption independently when the turn is not compacted", async ({ page }) => {
