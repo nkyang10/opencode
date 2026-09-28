@@ -174,6 +174,20 @@ The fork's user-facing version is `1.<MAJOR>.<YYYYMMDDHHMMSS>` (DEC-042), and **
 carries it into every surface**: the binary's reported version, the desktop About box, the desktop updater,
 and the `VITE_APP_VERSION` the embedded web UI shows in Settings.
 
+**…and `OPENCODE_UPSTREAM_VERSION` is a second, narrower one (DEC-054, 2026-09-28).** A user-facing version is
+also a *wire* value: `session/llm/request.ts` sends `User-Agent: opencode/<version>` on every provider request,
+and OpenCode's Zen free tier gates on it — HTTP **426** `OpenCode 1.18.0 or newer is required to use the free
+tier` (`anomalyco/opencode#50451`). `1.<MAJOR>.<ts>` reads as `1.1.x`, i.e. **older than 1.18.0**, so the fork
+was locked out of every free model. The wire therefore carries a separate constant,
+`UPSTREAM_VERSION = "1.18.31"` in `packages/script/src/index.ts`, exposed as `Script.upstream`, stamped as
+`OPENCODE_UPSTREAM_VERSION` by `script/build.ts`, `script/build-node.ts` and `packages/cli/script/build.ts`, and
+read at runtime as `UpstreamVersion` (`packages/core/src/installation/version.ts`; it falls back to
+`InstallationVersion` in an unstamped source run). **Bump `UPSTREAM_VERSION` when merging upstream**, or the
+fork under-claims its base — a stale value still passes the gate, so it fails safe. `OPENCODE_UPSTREAM_VERSION` in
+the environment overrides the constant for a one-off build; `build-linux.sh` only overrides `OPENCODE_VERSION` and
+`OPENCODE_CHANNEL`, so it reaches the build through the inherited environment. `packages/core/src/models-dev.ts`
+still sends the *fork* version to `models.opencode.ai` on purpose — no gate in evidence on that service.
+
 - **The Linux web deploy does it today.** `build-linux.sh` derives the version from
   `packages/script/release.ts --channel dev --json` and passes it as
   `OPENCODE_VERSION=$VERSION OPENCODE_CHANNEL=mark-dev` to `script/build.ts --single`. Note

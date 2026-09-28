@@ -9,13 +9,16 @@ import type { MessageV2 } from "../message-v2"
 import type { Provider } from "@/provider/provider"
 import { ProviderTransform } from "@/provider/transform"
 import { SystemPrompt } from "../system"
-import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import { UpstreamVersion } from "@opencode-ai/core/installation/version"
 import { Effect, Record } from "effect"
 import { jsonSchema, tool as aiTool, type ModelMessage, type Tool } from "ai"
 import type { Plugin } from "@/plugin"
 import { mergeDeep } from "remeda"
 
-const USER_AGENT = `opencode/${InstallationVersion}`
+// The wire version must be one OpenCode's services can place: the Zen free tier answers
+// HTTP 426 "OpenCode 1.18.0 or newer is required to use the free tier" for anything older
+// (anomalyco/opencode#50451), and this fork's own version reads as 1.1.x (DEC-042).
+const USER_AGENT = `opencode/${UpstreamVersion}`
 
 type PrepareInput = {
   readonly user: SessionV1.User

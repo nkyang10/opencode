@@ -22,6 +22,7 @@ const env = {
   OPENCODE_BUMP: process.env["OPENCODE_BUMP"],
   OPENCODE_VERSION: process.env["OPENCODE_VERSION"],
   OPENCODE_RELEASE: process.env["OPENCODE_RELEASE"],
+  OPENCODE_UPSTREAM_VERSION: process.env["OPENCODE_UPSTREAM_VERSION"],
 }
 const CHANNEL = await (async () => {
   if (env.OPENCODE_CHANNEL) return env.OPENCODE_CHANNEL
@@ -47,6 +48,13 @@ const VERSION = await (async () => {
   return `${major}.${minor}.${patch + 1}`
 })()
 
+// Upstream release this fork is based on, i.e. the version that goes on the wire in the
+// provider User-Agent. OpenCode's Zen free tier gates on it (HTTP 426 below 1.18.0,
+// anomalyco/opencode#50451) and the fork's own DEC-042 version reads as 1.1.x, so this is
+// the value the gate has to see. Bump it when merging upstream; OPENCODE_UPSTREAM_VERSION
+// overrides it for a one-off build.
+const UPSTREAM_VERSION = "1.18.31"
+
 const bot = ["actions-user", "opencode", "opencode-agent[bot]"]
 const teamPath = path.resolve(import.meta.dir, "../../../.github/TEAM_MEMBERS")
 const team = [
@@ -63,6 +71,9 @@ export const Script = {
   },
   get version() {
     return VERSION
+  },
+  get upstream() {
+    return env.OPENCODE_UPSTREAM_VERSION ?? UPSTREAM_VERSION
   },
   get preview() {
     return IS_PREVIEW
