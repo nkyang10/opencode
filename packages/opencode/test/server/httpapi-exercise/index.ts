@@ -746,6 +746,59 @@ const scenarios: Scenario[] = [
     .status(204, undefined, "status"),
   http.protected.get("/api/command", "v2.command.list").json(200, locationData(array)),
   http.protected.get("/api/skill", "v2.skill.list").json(200, locationData(array)),
+  // The three skill-mutating routes (FE-049). They resolve a skill by name inside the instance's
+  // skills directory, and the runner loads the instance *before* a scenario seeds files, so a skill
+  // written by `.seeded(...)` is not in the discovery set the request sees. These therefore cover the
+  // route contract that is reachable deterministically — decode, instance context, declared error —
+  // and the happy paths stay behind the FE-049 unit tests that call the same handlers directly.
+  http.protected
+    .post("/api/skill/{name}", "v2.skill.update.missing")
+    .at((ctx) => ({
+      path: route("/api/skill/{name}", { name: "httpapi-missing-skill" }),
+      headers: ctx.headers(),
+      body: { content: "# never written\n" },
+    }))
+    .json(
+      400,
+      (body) => {
+        object(body)
+        check(body._tag === "InvalidRequestError", "updating a missing skill should be an InvalidRequestError")
+        check(
+          String(body.message).includes("httpapi-missing-skill"),
+          "the error should name the skill it could not find",
+        )
+      },
+      "status",
+    ),
+  http.protected
+    .post("/api/skill/{name}/enabled", "v2.skill.setEnabled.missing")
+    .at((ctx) => ({
+      path: route("/api/skill/{name}/enabled", { name: "httpapi-missing-skill" }),
+      headers: ctx.headers(),
+      body: { enabled: false },
+    }))
+    .json(
+      400,
+      (body) => {
+        object(body)
+        check(body._tag === "InvalidRequestError", "disabling a missing skill should be an InvalidRequestError")
+      },
+      "status",
+    ),
+  http.protected
+    .delete("/api/skill/{name}", "v2.skill.remove.missing")
+    .at((ctx) => ({
+      path: route("/api/skill/{name}", { name: "httpapi-missing-skill" }),
+      headers: ctx.headers(),
+    }))
+    .json(
+      400,
+      (body) => {
+        object(body)
+        check(body._tag === "InvalidRequestError", "removing a missing skill should be an InvalidRequestError")
+      },
+      "status",
+    ),
   http.protected
     .get("/api/event", "v2.event.subscribe")
     .stream()

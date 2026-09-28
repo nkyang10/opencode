@@ -169,9 +169,11 @@ export function createHomeSessionIndexCache(queryClient: QueryClient, server: st
   }
 }
 
-// TODO(v2): This deliberately dumb full-table scan is necessary because the
-// current V2 API orders by creation time and cannot filter roots, archives, or
-// multiple directories. A bounded page could omit an old session updated today.
+// TODO(v2): This deliberately dumb full-table scan is necessary because the current V2 API cannot
+// filter roots, archived sessions, or multiple directories server-side, and it only exposes summary
+// rows (a full fetch is needed to build one). The ordering half of the old reason is gone: the list is
+// ordered by last activity, so a bounded page no longer omits an old session used today — only the
+// page under-fills, because children and archived rows are dropped here rather than in the query.
 // Once released, use client.v2.project.list() and client.v2.session.list({
 // parentID: null, order: "desc" }), then remove this adapter and its V1 fields.
 export function parseHomeSessionIndex(sessions: SessionV2Info[]): Session[] {
