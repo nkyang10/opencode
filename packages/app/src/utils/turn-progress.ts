@@ -4,7 +4,6 @@ import { ScopedKey, type ServerScope } from "@/utils/server-scope"
 export type TurnProgress = {
   sessionID: string
   messageID: string
-  at: number
 }
 
 // A turn this client submitted and the server has not acknowledged yet. The optimistic `busy`
@@ -30,7 +29,7 @@ export const TurnProgressState = {
   begin(scope: ServerScope, sessionID: string, messageID: string) {
     const id = ScopedKey.from(scope, sessionID)
     accessor(id)
-    setters.get(id)?.({ sessionID, messageID, at: Date.now() })
+    setters.get(id)?.({ sessionID, messageID })
   },
   settle(scope: ServerScope, sessionID: string) {
     setters.get(ScopedKey.from(scope, sessionID))?.(undefined)
@@ -45,7 +44,10 @@ export const TurnProgressState = {
   // list as running cannot still be waiting to acknowledge, so the record has to go or the row would
   // sit on "Sending" forever.
   settleUnacknowledged(scope: ServerScope, isRunning: (sessionID: string) => boolean) {
-    for (const id of pending(scope)) if (!isRunning(id.sessionID)) setters.get(ScopedKey.from(scope, id.sessionID))?.(undefined)
+    for (const id of pending(scope)) {
+      if (isRunning(id.sessionID)) continue
+      setters.get(ScopedKey.from(scope, id.sessionID))?.(undefined)
+    }
   },
 }
 

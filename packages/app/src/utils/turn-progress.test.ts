@@ -12,7 +12,6 @@ describe("turn progress", () => {
       expect(TurnProgressState.read(ServerScope.local, "ses_1")).toEqual({
         sessionID: "ses_1",
         messageID: "msg_1",
-        at: expect.any(Number),
       })
       TurnProgressState.settle(ServerScope.local, "ses_1")
       expect(TurnProgressState.read(ServerScope.local, "ses_1")).toBeUndefined()
