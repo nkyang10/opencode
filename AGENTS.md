@@ -168,6 +168,35 @@ healthy — HTTP 401 before auth is expected). Playwright-measured: desktop 1280
 panel 740px); 390px phone → strip 358×45 on top, panel 358px full width, key/value row 286px (was ~134px),
 ArrowRight moves between tabs. **FE-020 is code-complete in the working tree and is NOT in this build.**
 
+### Version stamping: `OPENCODE_VERSION` is the one input every surface reads
+
+The fork's user-facing version is `1.<MAJOR>.<YYYYMMDDHHMMSS>` (DEC-042), and **one environment variable
+carries it into every surface**: the binary's reported version, the desktop About box, the desktop updater,
+and the `VITE_APP_VERSION` the embedded web UI shows in Settings.
+
+- **The Linux web deploy does it today.** `build-linux.sh` derives the version from
+  `packages/script/release.ts --channel dev --json` and passes it as
+  `OPENCODE_VERSION=$VERSION OPENCODE_CHANNEL=mark-dev` to `script/build.ts --single`. Note
+  `OPENCODE_CHANNEL` must stay `mark-dev`: it is the SQLite filename suffix (DEC-037/FU-058's warning).
+- **Desktop packaging is the gap.** `packages/desktop/electron.vite.config.ts:98` already reads
+  `process.env.OPENCODE_VERSION` and `packages/desktop/scripts/prepare.ts` drives `app.getVersion()` from the
+  same value, but **nothing in this fork sets it** — only upstream has an installer pipeline, and it is not
+  reachable from here. So a desktop build made without the variable silently reports an empty version in About
+  and the embedded web UI, and the updater cannot compare versions.
+- **Therefore, when packaging the desktop by hand, set it the same way the web build does:**
+
+  ```sh
+  # from packages/opencode, with bun 1.3.14 pinned
+  VERSION=$(cd packages/script && bun release.ts --channel dev --json | sed -n 's/^  "version": "\([^"]*\)",$/\1/p')
+  OPENCODE_VERSION="$VERSION" OPENCODE_CHANNEL=mark-dev <your packaging command>
+  ```
+
+  A packaged build is verifiable: `./<binary> --version` must print exactly the string you passed, and
+  Settings in the packaged app must show `v$VERSION`.
+- **Why it is only a document and not a script (FU-074, decided 2026-09-28):** a packaging script for a
+  platform this box does not build would be untested, and an untested release script is worse than a
+  documented requirement. Revisit when a desktop build actually has to be produced here.
+
 ## Branch Names
 
 Use a short branch name of at most three words, separated by hyphens. Do not use slashes or type prefixes such as `feat/` or `fix/`.
