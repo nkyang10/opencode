@@ -766,6 +766,10 @@ export const dict = {
   "session.messages.loading": "سنیہے لوڈ ہو رۓ...",
   "session.messages.jumpToLatest": "تازہ ترین تے جاؤ",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "سیاق و سباق چ {{selection}} شامل کرو",
   "session.todo.title": "ٹوڈوس",

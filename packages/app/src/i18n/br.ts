@@ -746,6 +746,10 @@ export const dict = {
   "session.messages.loading": "Carregando mensagens...",
   "session.messages.jumpToLatest": "Ir para a mais recente",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Adicionar {{selection}} ao contexto",
   "session.todo.title": "Tarefas",

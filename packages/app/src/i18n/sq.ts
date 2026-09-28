@@ -760,6 +760,10 @@ export const dict = {
   "session.messages.loading": "Po ngarkon mesazhet...",
   "session.messages.jumpToLatest": "Kalo tek e fundit",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Shtoni {{selection}} në kontekst",
   "session.todo.title": "Detyrat",

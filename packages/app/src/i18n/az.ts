@@ -767,6 +767,10 @@ export const dict = {
   "session.messages.loading": "Mesajlar yüklənir...",
   "session.messages.jumpToLatest": "Ən sonuncuya keç",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "{{selection}} kontekstə əlavə et",
   "session.todo.title": "Tapşırıqlar",

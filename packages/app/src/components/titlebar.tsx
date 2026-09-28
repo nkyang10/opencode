@@ -666,10 +666,10 @@ function ChannelIndicator(props: { debugTools?: { visible: boolean; toggle: () =
         <DropdownMenu.Portal>
           <DropdownMenu.Content>
             <DropdownMenu.Item onSelect={() => navigate("/")}>
-              <DropdownMenu.ItemLabel>Home page</DropdownMenu.ItemLabel>
+              <DropdownMenu.ItemLabel>{language.t("devMenu.home")}</DropdownMenu.ItemLabel>
             </DropdownMenu.Item>
             <DropdownMenu.Item onSelect={() => window.location.reload()}>
-              <DropdownMenu.ItemLabel>Refresh</DropdownMenu.ItemLabel>
+              <DropdownMenu.ItemLabel>{language.t("devMenu.refresh")}</DropdownMenu.ItemLabel>
             </DropdownMenu.Item>
             <DropdownMenu.Item
               onSelect={() => {
@@ -694,10 +694,10 @@ function ChannelIndicator(props: { debugTools?: { visible: boolean; toggle: () =
                 })
               }}
             >
-              <DropdownMenu.ItemLabel>Clear cache</DropdownMenu.ItemLabel>
+              <DropdownMenu.ItemLabel>{language.t("devMenu.clearCache")}</DropdownMenu.ItemLabel>
             </DropdownMenu.Item>
             <DropdownMenu.Item onSelect={props.debugTools.toggle}>
-              <DropdownMenu.ItemLabel>Debug tools</DropdownMenu.ItemLabel>
+              <DropdownMenu.ItemLabel>{language.t("devMenu.debug")}</DropdownMenu.ItemLabel>
             </DropdownMenu.Item>
             <DropdownMenu.Separator />
             <DropdownMenu.Item

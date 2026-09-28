@@ -64,6 +64,17 @@ describe("web auto start", () => {
     expect(result).toEqual({ started: false, reason: "disabled" })
   })
 
+  test("reports a failed bind as failed, not as disabled", async () => {
+    // The reason is the whole point: "disabled" would make a port clash look like the admin
+    // setting being off, and the TUI would print nothing at all.
+    const result = await WebuiAutostart.autoStartWebServer({
+      ...base,
+      autoStart: true,
+      listen: () => Promise.reject(new Error("EADDRINUSE")),
+    })
+    expect(result).toEqual({ started: false, reason: "failed", port: base.port, hostname: base.hostname })
+  })
+
   test("passes the resolved address to the listener and reports network URLs", async () => {
     let seen: { port: number; hostname: string } | undefined
     const result = await WebuiAutostart.autoStartWebServer({

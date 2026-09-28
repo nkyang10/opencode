@@ -765,6 +765,10 @@ export const dict = {
   "session.messages.loading": "မက်ဆေ့ချ်များကို ဖွင့်နေသည်...",
   "session.messages.jumpToLatest": "နောက်ဆုံးသို့ ခုန်ပါ။",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "{{selection}} ကို ဆက်စပ်အကြောင်းအရာထဲ ထည့်ပါ။",
   "session.todo.title": "လုပ်စရာများ",

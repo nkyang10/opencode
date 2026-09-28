@@ -767,6 +767,10 @@ export const dict = {
   "session.messages.loading": "Đang tải tin nhắn...",
   "session.messages.jumpToLatest": "Chuyển đến mới nhất",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Thêm {{selection}} vào ngữ cảnh",
   "session.todo.title": "việc cần làm",

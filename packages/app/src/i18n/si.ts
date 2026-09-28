@@ -754,6 +754,10 @@ export const dict: Record<string, string> = {
   "session.messages.loading": "පණිවිඩ පූරණය කරමින්...",
   "session.messages.jumpToLatest": "නවතම වෙත පනින්න",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "සන්දර්භය වෙත {{selection}} එක් කරන්න",
   "session.todo.title": "ටෝඩෝස්",

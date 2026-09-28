@@ -415,7 +415,7 @@ export const dict = {
   "prompt.toast.promptSendFailed.title": "傳送提示失敗",
   "prompt.toast.promptSendFailed.description": "無法取得工作階段",
 
-  "dialog.mcp.title": "MCP",
+  "dialog.mcp.title": "MCP 伺服器",
   "dialog.mcp.description": "已啟用 {{enabled}} / {{total}}",
   "dialog.mcp.empty": "未設定 MCP",
 
@@ -737,20 +737,33 @@ export const dict = {
   "home.sessions.group.yesterday": "昨天",
   "home.sessions.group.older": "更早",
   "home.providerTip": "連線 75 個以上的提供者，使用 Claude、GPT、Gemini 等其他模型",
-  "home.skills": "Skills",
-  "home.skills.empty": "No skills yet",
-  "home.skills.empty.description": "Skills live in .opencode/skills or a configured skills directory",
-  "home.skills.enabled": "Enabled",
-  "home.skills.disabled": "Disabled",
-  "home.skills.edit": "Edit skill",
-  "home.skills.copy": "Copy content",
-  "home.skills.delete": "Delete skill",
-  "home.skills.delete.confirm": "Delete skill {{name}}? This will remove its SKILL.md file from disk.",
-  "home.skills.save": "Save",
-  "home.skills.cancel": "Cancel",
-  "home.skills.updated": "Skill saved",
-  "home.skills.deleted": "Skill deleted",
-  "home.skills.toggled": "Skill {{name}} {{state}}",
+  "home.skills": "技能",
+
+  "home.skills.empty": "尚無技能",
+
+  "home.skills.empty.description": "技能存放在 .opencode/skills 或已設定的技能目錄中",
+
+  "home.skills.enabled": "已啟用",
+
+  "home.skills.disabled": "已停用",
+
+  "home.skills.edit": "編輯技能",
+
+  "home.skills.copy": "複製內容",
+
+  "home.skills.delete": "刪除技能",
+
+  "home.skills.delete.confirm": "確定刪除技能 {{name}}？這會從磁碟移除它的 SKILL.md 檔案。",
+
+  "home.skills.save": "儲存",
+
+  "home.skills.cancel": "取消",
+
+  "home.skills.updated": "技能已儲存",
+
+  "home.skills.deleted": "技能已刪除",
+
+  "home.skills.toggled": "技能 {{name}} {{state}}",
 
   "session.tab.session": "工作階段",
   "session.tab.review": "檢閱",
@@ -761,11 +774,16 @@ export const dict = {
   "session.error.notFound.description": "此分頁指向的工作階段已不存在於此伺服器。",
   "session.error.notFound.closeTab": "關閉分頁",
   "session.error.serverConnection": "無法連線至此伺服器",
-  "session.slim.title": "Compact session into a new session with this summary",
-  "session.slim.progress.title": "Compacting session",
-  "session.slim.progress.description": "Summarizing this conversation into a new session...",
-  "session.slim.success.title": "Compact complete",
-  "session.slim.success.description": "New session started with the summary",
+  "session.slim.title": "精簡此對話",
+
+  "session.slim.progress.title": "正在精簡工作階段",
+
+  "session.slim.progress.description": "正在將此對話精簡為新的工作階段…",
+
+  "session.slim.success.title": "精簡完成",
+
+  "session.slim.success.description": "工作階段已精簡，可以繼續",
+
   "session.review.filesChanged": "{{count}} 個檔案變更",
   "session.review.change.one": "變更",
   "session.review.change.other": "變更",
@@ -787,7 +805,12 @@ export const dict = {
 
   "session.messages.jumpToLatest": "跳到最新",
 
-  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
+  "devMenu.home": "首頁",
+  "devMenu.refresh": "重新整理",
+  "devMenu.clearCache": "清除快取",
+  "devMenu.debug": "偵錯工具",
+  "session.thinking.elapsed": "距上次模型輸出 {{activity}}（{{time}}）· 距你的提示 {{total}}",
+
   "session.context.addToContext": "將 {{selection}} 新增到上下文",
   "session.todo.title": "待辦事項",
   "session.todo.collapse": "收合",
@@ -884,8 +907,9 @@ export const dict = {
   "sidebar.menu.toggle": "切換選單",
   "sidebar.nav.projectsAndSessions": "專案與工作階段",
   "sidebar.settings": "設定",
-  "sidebar.logout": "Log out",
-  "sidebar.logoutConfirm": "Are you sure you want to log out?",
+  "sidebar.logout": "登出",
+
+  "sidebar.logoutConfirm": "確定要登出嗎？",
 
   "sidebar.help": "說明",
   "sidebar.workspaces.enable": "啟用工作區",
@@ -915,10 +939,13 @@ export const dict = {
   "settings.general.section.sounds": "音效",
   "settings.general.section.feed": "資訊流",
   "settings.general.section.display": "顯示",
-  "settings.general.section.debug": "Debug",
-  "settings.general.row.testNotification.title": "Test notification",
-  "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
-  "settings.general.row.testNotification.sendLabel": "Send test",
+  "settings.general.section.debug": "偵錯",
+
+  "settings.general.row.testNotification.title": "測試通知",
+
+  "settings.general.row.testNotification.description": "點擊後 5 秒傳送一則系統通知",
+
+  "settings.general.row.testNotification.sendLabel": "傳送測試",
 
   "settings.general.row.language.title": "語言",
   "settings.general.row.language.description": "變更 OpenCode 的顯示語言",
@@ -1041,19 +1068,23 @@ export const dict = {
   "settings.general.notifications.permissions.description": "當需要權限時顯示系統通知",
   "settings.general.notifications.errors.title": "錯誤",
   "settings.general.notifications.errors.description": "發生錯誤時顯示系統通知",
-  "settings.general.notifications.webPush.title": "Background notifications",
+  "settings.general.notifications.webPush.title": "背景通知",
   "settings.general.notifications.webPush.description":
-    "Get a notification when a session finishes even when the tab is closed",
+    "即使分頁已關閉，工作階段完成時仍會收到通知",
   "settings.general.notifications.rss.title": "RSS 訂閱網址",
   "settings.general.notifications.rss.description":
     "訂閱會話通知的 RSS 來源（完成、錯誤、提問、權限請求）。無需登入即可存取；請勿公開分享此網址",
-  "settings.general.notifications.rss.copied": "Copied!",
-  "settings.general.notifications.rss.copy": "Copy RSS URL",
-  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
-  "settings.general.notifications.rss.dialog.description":
-    "Copied to clipboard. The URL is selectable below for manual copying",
-  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
-  "settings.general.notifications.rss.dialog.done": "Done",
+  "settings.general.notifications.rss.copied": "已複製！",
+
+  "settings.general.notifications.rss.copy": "複製 RSS 網址",
+
+  "settings.general.notifications.rss.dialog.title": "RSS 訂閱網址",
+
+  "settings.general.notifications.rss.dialog.description": "已複製到剪貼簿。你可以在下方選取該網址手動複製",
+
+  "settings.general.notifications.rss.dialog.copyAll": "複製網址",
+
+  "settings.general.notifications.rss.dialog.done": "完成",
 
   "settings.general.sounds.agent.title": "代理程式",
   "settings.general.sounds.agent.description": "當代理程式完成或需要注意時播放聲音",
@@ -1090,23 +1121,34 @@ export const dict = {
   "settings.providers.tag.custom": "自訂",
   "settings.providers.tag.other": "其他",
   "settings.models.title": "模型",
-  "settings.tab.admin": "Admin",
-  "settings.admin.section.webui": "Web UI server",
-  "settings.admin.row.autoStart.title": "Start the web UI automatically",
-  "settings.admin.row.autoStart.description":
-    "Serve the web interface on this port whenever opencode starts, so other devices on your network can reach it.",
-  "settings.admin.row.autoStart.on.title": "Web UI auto-start enabled",
-  "settings.admin.row.autoStart.off.title": "Web UI auto-start disabled",
-  "settings.admin.row.port.title": "Web UI port",
-  "settings.admin.row.port.description":
-    "TCP port for the web interface. Saved in the global config file, and applied the next time opencode starts.",
-  "settings.admin.row.port.invalid": "Enter a port between 1 and 65535.",
-  "settings.admin.row.port.saved.title": "Web UI port saved: {{port}}",
-  "settings.admin.note.running": "Running on port {{running}}.",
-  "settings.admin.note.restartRequired":
-    "Running on port {{running}}. Restart opencode to serve on port {{configured}}.",
-  "settings.admin.note.unconfigured": "Not set in the config file. Running on port {{running}}.",
-  "settings.admin.note.noListener": "This process is not serving the web interface, so there is no port to change.",
+  "settings.tab.admin": "管理",
+
+  "settings.admin.section.webui": "Web UI 伺服器",
+
+  "settings.admin.row.autoStart.title": "自動啟動 Web UI",
+
+  "settings.admin.row.autoStart.description": "每次啟動 opencode 時都在此連接埠上提供網頁介面，讓區域網路內的其他裝置也能存取。",
+
+  "settings.admin.row.autoStart.on.title": "已啟用 Web UI 自動啟動",
+
+  "settings.admin.row.autoStart.off.title": "已停用 Web UI 自動啟動",
+
+  "settings.admin.row.port.title": "Web UI 連接埠",
+
+  "settings.admin.row.port.description": "網頁介面使用的 TCP 連接埠。儲存在全域設定檔中，並於下次啟動 opencode 時生效。",
+
+  "settings.admin.row.port.invalid": "請輸入 1 到 65535 之間的連接埠。",
+
+  "settings.admin.row.port.saved.title": "已儲存 Web UI 連接埠：{{port}}",
+
+  "settings.admin.note.running": "正在連接埠 {{running}} 上執行。",
+
+  "settings.admin.note.restartRequired": "正在連接埠 {{running}} 上執行。重新啟動 opencode 後將改用連接埠 {{configured}}。",
+
+  "settings.admin.note.unconfigured": "設定檔中未設定。正在連接埠 {{running}} 上執行。",
+
+  "settings.admin.note.noListener": "此處理程序未提供網頁介面，因此沒有可更改的連接埠。",
+
   "settings.models.description": "模型設定將在此處可設定。",
   "settings.agents.title": "代理程式",
   "settings.agents.description": "代理程式設定將在此處可設定。",
@@ -1184,7 +1226,8 @@ export const dict = {
   "workspace.reset.archived.many": "將封存 {{count}} 個工作階段。",
   "workspace.reset.note": "這將把工作區重設為與預設分支一致。",
   "common.open": "開啟",
-  "common.reload": "Reload",
+  "common.reload": "重新載入",
+
   "dialog.releaseNotes.action.getStarted": "開始",
   "dialog.releaseNotes.action.next": "下一步",
   "dialog.releaseNotes.action.hideFuture": "不再顯示",

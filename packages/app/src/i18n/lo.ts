@@ -752,6 +752,10 @@ export const dict = {
   "session.messages.loading": "ກຳລັງໂຫຼດຂໍ້ຄວາມ...",
   "session.messages.jumpToLatest": "ຂ້າມໄປຫາຫຼ້າສຸດ",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "ເພີ່ມ {{selection}} ໃສ່ບໍລິບົດ",
   "session.todo.title": "ສິ່ງທີ່ຕ້ອງເຮັດ",

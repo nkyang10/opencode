@@ -282,6 +282,13 @@ export const TuiThreadCommand = cmd({
             "server is unsecured (no OPENCODE_SERVER_PASSWORD), so the web UI is only reachable on localhost.",
           )
         }
+      } else if (autoStart?.reason === "failed") {
+        // A bind that did not happen must not look like the setting being off.
+        UI.println(
+          UI.Style.TEXT_DANGER_BOLD + "  !  ",
+          UI.Style.TEXT_NORMAL,
+          `could not start the web UI on port ${autoStart.port} — see the log for the reason.`,
+        )
       }
 
       setTimeout(() => {

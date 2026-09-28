@@ -21,6 +21,7 @@ const WILDCARD = new Set(["0.0.0.0", "::", "[::]", "*"])
 
 export type AutoStartResult =
   | { started: false; reason: "disabled" | "already-listening" }
+  | { started: false; reason: "failed"; port: number; hostname: string }
   | {
       started: true
       url: string
@@ -79,7 +80,10 @@ export async function autoStartWebServer(input: {
   if (!target.listen) {
     return { started: false, reason: input.alreadyListening ? "already-listening" : "disabled" }
   }
-  const listener = await input.listen({ port: target.port, hostname: target.hostname })
+  // A bind that throws is not "disabled": the caller has to be able to tell the user the web UI did
+  // not come up, or a port clash is indistinguishable from the setting being off.
+  const listener = await input.listen({ port: target.port, hostname: target.hostname }).catch(() => undefined)
+  if (!listener) return { started: false, reason: "failed", port: target.port, hostname: target.hostname }
   return {
     started: true,
     url: listener.url.toString(),

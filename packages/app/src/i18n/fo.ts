@@ -757,6 +757,10 @@ export const dict = {
   "session.messages.loading": "Heinta boð...",
   "session.messages.jumpToLatest": "Hopp til nýggjasta",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Legg {{selection}} til samanhang",
   "session.todo.title": "Uppgávur",

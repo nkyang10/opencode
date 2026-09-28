@@ -756,6 +756,10 @@ export const dict = {
   "session.messages.loading": "در حال بارگیری پیام ها...",
   "session.messages.jumpToLatest": "پرش به آخرین",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "{{selection}} را به متن اضافه کنید",
   "session.todo.title": "کارهای انجام‌دادنی",

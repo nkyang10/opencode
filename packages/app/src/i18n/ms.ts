@@ -755,6 +755,10 @@ export const dict = {
   "session.messages.loading": "Memuat mesej...",
   "session.messages.jumpToLatest": "Lompat ke terkini",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Tambah {{selection}} ke konteks",
   "session.todo.title": "Senarai Tugasan",

@@ -770,6 +770,10 @@ export const dict: Record<string, string> = {
   "session.messages.loading": "འཕྲིན་དོན་ཚུ་མངོན་གསལ་འབད་དོ།...",
   "session.messages.jumpToLatest": "གསར་ཤོས་ལུ་མཆོངས།",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "{{selection}} སྐབས་དོན་ལུ་ཁ་སྐོང་བརྐྱབ།",
   "session.todo.title": "ཊོ་ཌོས།",

@@ -762,6 +762,10 @@ export const dict = {
   "session.messages.loading": "Läser in meddelanden...",
   "session.messages.jumpToLatest": "Hoppa till senaste",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Lägg till {{selection}} i kontexten",
   "session.todo.title": "Att göra",

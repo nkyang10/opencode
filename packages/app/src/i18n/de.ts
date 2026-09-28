@@ -639,6 +639,10 @@ export const dict = {
   "session.messages.loading": "Nachrichten werden geladen…",
   "session.messages.jumpToLatest": "Zur neuesten Nachricht springen",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "{{selection}} zum Kontext hinzufügen",
   "session.todo.title": "Aufgaben",

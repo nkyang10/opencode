@@ -757,6 +757,10 @@ export const dict = {
   "session.messages.loading": "Nalaganje sporočil ...",
   "session.messages.jumpToLatest": "Skoči na najnovejšo",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Dodajte {{selection}} v kontekst",
   "session.todo.title": "Opravila",

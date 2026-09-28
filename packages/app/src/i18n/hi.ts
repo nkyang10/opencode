@@ -767,6 +767,10 @@ export const dict = {
   "session.messages.loading": "संदेश लोड हो रहे हैं...",
   "session.messages.jumpToLatest": "नवीनतम पर जाएं",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "{{selection}} को कॉन्टेक्स्ट में जोड़ें",
   "session.todo.title": "कार्य सूची",

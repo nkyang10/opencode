@@ -86,11 +86,12 @@ export const rpc = {
           }),
         ).pipe(
           // A failed bind must not take the TUI down with it: the admin setting is a
-          // convenience, so report it and carry on without a listener.
+          // convenience, so report it and carry on without a listener. The reason stays
+          // "failed" rather than "disabled" so the TUI can tell the user it did not come up.
           Effect.catchCause((cause) =>
             Effect.gen(function* () {
               yield* Effect.logError("[webui] auto-start failed", Cause.pretty(cause))
-              return { started: false as const, reason: "disabled" as const }
+              return { started: false as const, reason: "failed" as const, port, hostname: input.hostname }
             }),
           ),
         )

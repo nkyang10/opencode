@@ -757,6 +757,10 @@ export const dict: Record<string, string> = {
   "session.messages.loading": "বার্তা লোড হচ্ছে...",
   "session.messages.jumpToLatest": "সর্বশেষে ঝাঁপ দাও",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "প্রসঙ্গে {{selection}} যোগ করুন",
   "session.todo.title": "টোডোস",

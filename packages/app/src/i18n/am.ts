@@ -744,6 +744,10 @@ export const dict = {
   "session.messages.loading": "መልእክቶችን በመጫን ላይ...",
   "session.messages.jumpToLatest": "ወደ የቅርብ ጊዜ ዝለል",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "{{selection}}ን ወደ አውድ አክል",
   "session.todo.title": "የሚደረጉ ሥራዎች",

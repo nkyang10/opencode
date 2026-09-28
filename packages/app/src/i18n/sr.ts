@@ -758,6 +758,10 @@ export const dict = {
   "session.messages.loading": "Учитавање порука...",
   "session.messages.jumpToLatest": "Скочи на најновије",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Додајте {{selection}} у контекст",
   "session.todo.title": "Тодос",

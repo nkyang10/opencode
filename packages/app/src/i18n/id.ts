@@ -824,6 +824,10 @@ export const dict = {
   "session.messages.loading": "Memuat pesan...",
   "session.messages.jumpToLatest": "Lompat ke pesan terbaru",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
 
   "session.context.addToContext": "Tambahkan {{selection}} ke konteks",

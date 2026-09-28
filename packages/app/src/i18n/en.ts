@@ -723,6 +723,10 @@ export const dict = {
   "session.messages.loading": "Loading messages...",
   "session.messages.jumpToLatest": "Jump to latest",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
 
   "session.context.addToContext": "Add {{selection}} to context",

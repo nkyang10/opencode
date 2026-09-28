@@ -759,6 +759,10 @@ export const dict: Record<string, string> = {
   "session.messages.loading": "सन्देशहरू लोड गर्दै...",
   "session.messages.jumpToLatest": "नवीनतममा जानुहोस्",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "सन्दर्भमा {{selection}} थप्नुहोस्",
   "session.todo.title": "गर्नुपर्ने कामहरू",

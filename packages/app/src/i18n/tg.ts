@@ -760,6 +760,10 @@ export const dict = {
   "session.messages.loading": "Паёмҳо бор карда мешаванд...",
   "session.messages.jumpToLatest": "Ба охирин гузаред",
 
+  "devMenu.home": "Home page",
+  "devMenu.refresh": "Refresh",
+  "devMenu.clearCache": "Clear cache",
+  "devMenu.debug": "Debug tools",
   "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
   "session.context.addToContext": "Ба контекст {{selection}} илова кунед",
   "session.todo.title": "Тодос",

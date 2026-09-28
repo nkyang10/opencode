@@ -742,20 +742,33 @@ export const dict = {
   "home.sessions.group.yesterday": "昨天",
   "home.sessions.group.older": "更早",
   "home.providerTip": "连接 75 个以上的提供商，使用包括 Claude、GPT、Gemini 在内的更多模型",
-  "home.skills": "Skills",
-  "home.skills.empty": "No skills yet",
-  "home.skills.empty.description": "Skills live in .opencode/skills or a configured skills directory",
-  "home.skills.enabled": "Enabled",
-  "home.skills.disabled": "Disabled",
-  "home.skills.edit": "Edit skill",
-  "home.skills.copy": "Copy content",
-  "home.skills.delete": "Delete skill",
-  "home.skills.delete.confirm": "Delete skill {{name}}? This will remove its SKILL.md file from disk.",
-  "home.skills.save": "Save",
-  "home.skills.cancel": "Cancel",
-  "home.skills.updated": "Skill saved",
-  "home.skills.deleted": "Skill deleted",
-  "home.skills.toggled": "Skill {{name}} {{state}}",
+  "home.skills": "技能",
+
+  "home.skills.empty": "暂无技能",
+
+  "home.skills.empty.description": "技能存放在 .opencode/skills 或已配置的技能目录中",
+
+  "home.skills.enabled": "已启用",
+
+  "home.skills.disabled": "已禁用",
+
+  "home.skills.edit": "编辑技能",
+
+  "home.skills.copy": "复制内容",
+
+  "home.skills.delete": "删除技能",
+
+  "home.skills.delete.confirm": "确定删除技能 {{name}}？这会从磁盘中移除它的 SKILL.md 文件。",
+
+  "home.skills.save": "保存",
+
+  "home.skills.cancel": "取消",
+
+  "home.skills.updated": "技能已保存",
+
+  "home.skills.deleted": "技能已删除",
+
+  "home.skills.toggled": "技能 {{name}} {{state}}",
 
   "session.tab.session": "会话",
   "session.tab.review": "审查",
@@ -766,11 +779,16 @@ export const dict = {
   "session.error.notFound.description": "此标签页指向的会话已不存在于此服务器上。",
   "session.error.notFound.closeTab": "关闭标签页",
   "session.error.serverConnection": "无法连接到此服务器",
-  "session.slim.title": "Compact session into a new session with this summary",
-  "session.slim.progress.title": "Compacting session",
-  "session.slim.progress.description": "Summarizing this conversation into a new session...",
-  "session.slim.success.title": "Compact complete",
-  "session.slim.success.description": "New session started with the summary",
+  "session.slim.title": "压缩此对话",
+
+  "session.slim.progress.title": "正在压缩会话",
+
+  "session.slim.progress.description": "正在将此对话压缩为新会话…",
+
+  "session.slim.success.title": "压缩完成",
+
+  "session.slim.success.description": "会话已压缩，可以继续",
+
   "session.review.filesChanged": "{{count}} 个文件已更改",
   "session.review.change.one": "更改",
   "session.review.change.other": "更改",
@@ -791,7 +809,12 @@ export const dict = {
   "session.messages.loading": "正在加载消息...",
   "session.messages.jumpToLatest": "跳转到最新",
 
-  "session.thinking.elapsed": "{{activity}} since the last model output ({{time}}) · {{total}} since your prompt",
+  "devMenu.home": "主页",
+  "devMenu.refresh": "刷新",
+  "devMenu.clearCache": "清除缓存",
+  "devMenu.debug": "调试工具",
+  "session.thinking.elapsed": "距上次模型输出 {{activity}}（{{time}}）· 距你的提示 {{total}}",
+
   "session.context.addToContext": "将 {{selection}} 添加到上下文",
   "session.todo.title": "待办事项",
   "session.todo.collapse": "折叠",
@@ -887,8 +910,9 @@ export const dict = {
   "sidebar.menu.toggle": "切换菜单",
   "sidebar.nav.projectsAndSessions": "项目和会话",
   "sidebar.settings": "设置",
-  "sidebar.logout": "Log out",
-  "sidebar.logoutConfirm": "Are you sure you want to log out?",
+  "sidebar.logout": "退出登录",
+
+  "sidebar.logoutConfirm": "确定要退出登录吗？",
 
   "sidebar.help": "帮助",
   "sidebar.workspaces.enable": "启用工作区",
@@ -921,10 +945,14 @@ export const dict = {
   "settings.general.section.sounds": "音效",
   "settings.general.section.feed": "动态",
   "settings.general.section.display": "显示",
-  "settings.general.section.debug": "Debug",
-  "settings.general.row.testNotification.title": "Test notification",
-  "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
-  "settings.general.row.testNotification.sendLabel": "Send test",
+  "settings.general.section.debug": "调试",
+
+  "settings.general.row.testNotification.title": "测试通知",
+
+  "settings.general.row.testNotification.description": "点击后 5 秒发送一条系统通知",
+
+  "settings.general.row.testNotification.sendLabel": "发送测试",
+
   "settings.general.row.language.title": "语言",
   "settings.general.row.language.description": "更改 OpenCode 的显示语言",
   "settings.general.row.shell.title": "终端 Shell",
@@ -1050,13 +1078,17 @@ export const dict = {
   "settings.general.notifications.rss.title": "RSS 订阅地址",
   "settings.general.notifications.rss.description":
     "订阅会话通知的 RSS 源（完成、错误、提问、权限请求）。无需登录即可访问；请勿公开分享此地址",
-  "settings.general.notifications.rss.copied": "Copied!",
-  "settings.general.notifications.rss.copy": "Copy RSS URL",
-  "settings.general.notifications.rss.dialog.title": "RSS feed URL",
-  "settings.general.notifications.rss.dialog.description":
-    "Copied to clipboard. The URL is selectable below for manual copying",
-  "settings.general.notifications.rss.dialog.copyAll": "Copy URL",
-  "settings.general.notifications.rss.dialog.done": "Done",
+  "settings.general.notifications.rss.copied": "已复制！",
+
+  "settings.general.notifications.rss.copy": "复制 RSS 地址",
+
+  "settings.general.notifications.rss.dialog.title": "RSS 订阅地址",
+
+  "settings.general.notifications.rss.dialog.description": "已复制到剪贴板。你可以在下方选中该地址手动复制",
+
+  "settings.general.notifications.rss.dialog.copyAll": "复制地址",
+
+  "settings.general.notifications.rss.dialog.done": "完成",
 
   "settings.general.sounds.agent.title": "智能体",
   "settings.general.sounds.agent.description": "当智能体完成或需要注意时播放声音",
@@ -1093,23 +1125,34 @@ export const dict = {
   "settings.providers.tag.other": "其他",
 
   "settings.models.title": "模型",
-  "settings.tab.admin": "Admin",
-  "settings.admin.section.webui": "Web UI server",
-  "settings.admin.row.autoStart.title": "Start the web UI automatically",
-  "settings.admin.row.autoStart.description":
-    "Serve the web interface on this port whenever opencode starts, so other devices on your network can reach it.",
-  "settings.admin.row.autoStart.on.title": "Web UI auto-start enabled",
-  "settings.admin.row.autoStart.off.title": "Web UI auto-start disabled",
-  "settings.admin.row.port.title": "Web UI port",
-  "settings.admin.row.port.description":
-    "TCP port for the web interface. Saved in the global config file, and applied the next time opencode starts.",
-  "settings.admin.row.port.invalid": "Enter a port between 1 and 65535.",
-  "settings.admin.row.port.saved.title": "Web UI port saved: {{port}}",
-  "settings.admin.note.running": "Running on port {{running}}.",
-  "settings.admin.note.restartRequired":
-    "Running on port {{running}}. Restart opencode to serve on port {{configured}}.",
-  "settings.admin.note.unconfigured": "Not set in the config file. Running on port {{running}}.",
-  "settings.admin.note.noListener": "This process is not serving the web interface, so there is no port to change.",
+  "settings.tab.admin": "管理",
+
+  "settings.admin.section.webui": "Web UI 服务器",
+
+  "settings.admin.row.autoStart.title": "自动启动 Web UI",
+
+  "settings.admin.row.autoStart.description": "每次启动 opencode 时都在此端口上提供网页界面，这样局域网内的其他设备也能访问。",
+
+  "settings.admin.row.autoStart.on.title": "已启用 Web UI 自动启动",
+
+  "settings.admin.row.autoStart.off.title": "已停用 Web UI 自动启动",
+
+  "settings.admin.row.port.title": "Web UI 端口",
+
+  "settings.admin.row.port.description": "网页界面使用的 TCP 端口。保存在全局配置文件中，并在下次启动 opencode 时生效。",
+
+  "settings.admin.row.port.invalid": "请输入 1 到 65535 之间的端口。",
+
+  "settings.admin.row.port.saved.title": "已保存 Web UI 端口：{{port}}",
+
+  "settings.admin.note.running": "正在端口 {{running}} 上运行。",
+
+  "settings.admin.note.restartRequired": "正在端口 {{running}} 上运行。重启 opencode 后将改用端口 {{configured}}。",
+
+  "settings.admin.note.unconfigured": "配置文件中未设置。正在端口 {{running}} 上运行。",
+
+  "settings.admin.note.noListener": "此进程未提供网页界面，因此没有可更改的端口。",
+
   "settings.models.description": "可在此处配置模型设置。",
 
   "settings.agents.title": "智能体",
@@ -1188,7 +1231,8 @@ export const dict = {
   "workspace.reset.archived.many": "将归档 {{count}} 个会话。",
   "workspace.reset.note": "这将把工作区重置为与默认分支一致。",
   "common.open": "打开",
-  "common.reload": "Reload",
+  "common.reload": "重新加载",
+
   "dialog.releaseNotes.action.getStarted": "开始",
   "dialog.releaseNotes.action.next": "下一步",
   "dialog.releaseNotes.action.hideFuture": "不再显示",
