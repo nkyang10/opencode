@@ -269,7 +269,11 @@ const layer = Layer.effect(
         const direction = input.anchor?.direction ?? "next"
         const requestedOrder = input.order ?? "desc"
         const order = direction === "previous" ? (requestedOrder === "asc" ? "desc" : "asc") : requestedOrder
-        const sortColumn = SessionTable.time_created
+        // Order by last activity, not creation: a session started days ago and used minutes
+        // ago is "newest" to every caller, and the v1 route already sorts this way. Sorting by
+        // creation pushed such sessions past a bounded page's limit and out of the Home list.
+        // The index on (time_updated, id) makes the order-by + keyset anchor an index walk.
+        const sortColumn = SessionTable.time_updated
         const conditions: SQL[] = []
         if ("directory" in input) conditions.push(eq(SessionTable.directory, input.directory))
         if (input.workspaceID) conditions.push(eq(SessionTable.workspace_id, input.workspaceID))

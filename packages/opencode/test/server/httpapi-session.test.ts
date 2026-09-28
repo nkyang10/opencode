@@ -190,6 +190,17 @@ const setLegacySummaryDiff = (sessionID: SessionIDType) =>
       .pipe(Effect.orDie)
   })
 
+const setSessionTimes = (sessionID: SessionIDType, timeCreated: number, timeUpdated: number) =>
+  Effect.gen(function* () {
+    const { db } = yield* Database.Service
+    yield* db
+      .update(SessionTable)
+      .set({ time_created: timeCreated, time_updated: timeUpdated })
+      .where(eq(SessionTable.id, sessionID))
+      .run()
+      .pipe(Effect.orDie)
+  })
+
 const getWorkspaceID = (sessionID: SessionIDType) =>
   Effect.gen(function* () {
     const { db } = yield* Database.Service
@@ -516,6 +527,37 @@ describe("session HttpApi", () => {
         expect(yield* responseJson(invalidMessageCursor)).toMatchObject({
           _tag: "InvalidCursorError",
           message: "Invalid cursor",
+        })
+      }),
+    { git: true, config: { formatter: false, lsp: false } },
+  )
+
+  it.instance(
+    "orders the v2 session list by last activity so a long-running session stays on page one",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const headers = { "x-opencode-directory": test.directory }
+        const startedFirst = yield* createSession({ title: "v2 order a" })
+        const startedSecond = yield* createSession({ title: "v2 order b" })
+        yield* setSessionTimes(startedFirst.id, 1_000, 1_000)
+        yield* setSessionTimes(startedSecond.id, 2_000, 2_000)
+        // The first session has been running since before the second one was created and was
+        // used most recently, so it is the newest entry even though it is the older row.
+        yield* setSessionTimes(startedFirst.id, 1_000, 3_000)
+
+        const page = yield* requestJson<{ data: Session.Info[]; cursor: { next?: string } }>(
+          `/api/session?${new URLSearchParams({ limit: "1", order: "desc", directory: test.directory })}`,
+          { headers },
+        )
+
+        expect(page.data.map((item) => item.id)).toEqual([startedFirst.id])
+        // The cursor must anchor on the same column the list sorts by, or the next page repeats
+        // or skips the row the page ended on.
+        expect(JSON.parse(Buffer.from(page.cursor.next!, "base64url").toString("utf8")).anchor).toMatchObject({
+          id: startedFirst.id,
+          time: 3_000,
+          direction: "next",
         })
       }),
     { git: true, config: { formatter: false, lsp: false } },
