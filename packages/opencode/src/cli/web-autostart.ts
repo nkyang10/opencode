@@ -68,6 +68,18 @@ export function resolveAutoStart(input: {
 /** The suggested port for auto-start when the config sets none. */
 export const suggestedPort = Webui.DefaultPort
 
+/**
+ * The address `web --autostart` asks for. Precedence: an explicit `--hostname` wins, then the configured
+ * `server.hostname`, then the **wildcard** — because serving other devices is the whole point of the setting,
+ * and {@link resolveAutoStart} downgrades a wildcard request to loopback whenever no password makes it safe.
+ *
+ * Kept here, not at the call site, because this ordering is the one thing about the feature that is easy to
+ * write backwards and impossible to notice by looking at a running machine.
+ */
+export function autostartHostname(input: { configured?: string; explicit?: string }) {
+  return input.explicit ?? input.configured ?? "0.0.0.0"
+}
+
 export async function autoStartWebServer(input: {
   autoStart: boolean | undefined
   alreadyListening: boolean

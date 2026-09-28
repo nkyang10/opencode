@@ -53,6 +53,24 @@ describe("web auto start", () => {
     expect(WebuiAutostart.suggestedPort).toBe(4446)
   })
 
+  describe("address precedence for web --autostart", () => {
+    // The desktop spawns a bare `web --autostart`, so "nothing configured" must mean "serve the network" —
+    // the policy then decides whether that is safe. Getting this backwards is invisible on a laptop.
+    test("asks for the wildcard address when nothing is configured", () => {
+      expect(WebuiAutostart.autostartHostname({})).toBe("0.0.0.0")
+    })
+
+    test("prefers the configured hostname over the wildcard", () => {
+      expect(WebuiAutostart.autostartHostname({ configured: "127.0.0.1" })).toBe("127.0.0.1")
+    })
+
+    test("lets an explicit --hostname win over the config, like resolveNetworkOptionsNoConfig", () => {
+      expect(WebuiAutostart.autostartHostname({ configured: "127.0.0.1", explicit: "192.168.1.5" })).toBe(
+        "192.168.1.5",
+      )
+    })
+  })
+
   test("reports what it did without binding anything when disabled", async () => {
     const result = await WebuiAutostart.autoStartWebServer({
       ...base,

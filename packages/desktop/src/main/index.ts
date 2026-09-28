@@ -48,6 +48,7 @@ import { spawnWslSidecar } from "./wsl/sidecar"
 import { migrate } from "./migrate"
 import { cleanupStoreFiles } from "./store-cleanup"
 import { startBackgroundCli } from "./background-cli"
+import { startWebuiAutostart, type WebuiAutostartHandle } from "./webui-autostart"
 import { setNativeTranslations } from "./native-translations"
 
 const APP_NAMES: Record<string, string> = {
@@ -164,7 +165,9 @@ const main = Effect.gen(function* () {
       },
     },
   )
+  let webuiAutostart: WebuiAutostartHandle | undefined
   const stopSidecars = async () => {
+    await webuiAutostart?.stop().catch(() => {})
     await killSidecar()
     wslServers.stopAll()
   }
@@ -407,6 +410,25 @@ const main = Effect.gen(function* () {
   }).pipe(forwardInitializationFailure(serverReady), Effect.forkChild)
 
   yield* Fiber.await(loadingTask)
+
+  // FE-026: once this app's own server is up, bring the web interface up too, so a browser (or a phone on the
+  // LAN) can reach the same UI. It is a separate process serving the same state, it is opt-in via
+  // `server.webui.autoStart`, and `stopSidecars` takes it down on quit / relaunch. Failures are logged, never
+  // fatal: the window works without it.
+  webuiAutostart = yield* Effect.promise(() =>
+    startWebuiAutostart(logger, {
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      platform: process.platform,
+    }),
+  ).pipe(
+    Effect.catch((error) =>
+      Effect.sync(() => {
+        logger.error("web ui auto-start could not start", { error: String(error) })
+        return undefined
+      }),
+    ),
+  )
 
   app.on("window-all-closed", () => {
     if (process.platform === "darwin") return

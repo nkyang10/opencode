@@ -121,6 +121,21 @@ comments when the file is `.jsonc`. Three rules keep this honest:
   It is **opt-in**, and the wildcard address is only used when `OPENCODE_SERVER_PASSWORD` is set; without a
   password it falls back to `127.0.0.1` and says so, because `web --hostname 0.0.0.0` unsecured exposes the
   agent to the whole LAN.
+- **The desktop app is a different entry point and used to be a hole (FE-026, DEC-055, 2026-09-28).** FE-024
+  lives in `cli/cmd/tui.ts`, so starting the **desktop app** did nothing — it starts an in-process sidecar
+  (`main/sidecar.ts`) on a random loopback port with a random UUID password and
+  `OPENCODE_DISABLE_EMBEDDED_WEB_UI=true`. The desktop now spawns the **portable `opencode.exe` the installer
+  already ships** (`resources/opencode.exe`, same lookup as `background-cli.ts:21-22`) as `web --autostart`
+  (`packages/desktop/src/main/webui-autostart.ts`; stopped by `stopSidecars`). Three traps, all in that file:
+  the child must **not** inherit `OPENCODE_DISABLE_EMBEDDED_WEB_UI` (it would serve a 404) or
+  `OPENCODE_CLIENT=desktop`; `XDG_STATE_HOME` **is** inherited on purpose, so the phone and the desktop window
+  share one database; and the child has no terminal, so `web --autostart` never calls `open()` and logs a
+  failed bind instead of printing a banner nobody sees. **Do not "simplify" this by serving the page from the
+  desktop's own server**: that bundle is built by `script/build-node.ts`, which stubs the embedded UI to an
+  **empty** file (`build-node.ts:29`) — only `build.ts:189` embeds the app — and a second `Server.listen`
+  clobbers `server/server.ts:71`'s module-level `url`. The decision needs the global config, so it is made in
+  the child by the already-tested policy in `cli/web-autostart.ts`; do not re-read `opencode.json(c)` inside
+  Electron (that means reimplementing the file order and JSONC parsing, and then drifting).
 - There is **no user or role model** in this server (one shared Basic credential), so "admin" means "any
   authenticated browser" — it can already `PATCH /global/config`, dispose instances and trigger an upgrade.
 - The v1 settings page is **dead code** (its "new interface designs" toggle is past its sunset date and
