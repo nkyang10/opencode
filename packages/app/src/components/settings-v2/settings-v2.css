@@ -204,6 +204,32 @@
   border-bottom: 1px solid var(--v2-border-border-base);
 }
 
+/* FU-077(a): the category labels can still overflow on a narrow screen in a long locale. The strip
+   scrolls (`safe center` keeps the first tab reachable) but nothing said so. These four layers are the
+   pure-CSS scroll shadow: the two `local` covers match the header and hide a shadow when that end is
+   already reached, so a fade appears only while there is more strip in that direction — and nothing is
+   drawn at all when the categories fit. The shadow colour and direction follow the tab strip's
+   `titlebar-tabs-fade-*` affordance, so the two strips read the same way. */
+.settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="horizontal"] [data-slot="tabs-v2-list"] {
+  background-image:
+    linear-gradient(to right, var(--v2-background-bg-base), transparent),
+    linear-gradient(to left, var(--v2-background-bg-base), transparent),
+    linear-gradient(to right, var(--v2-background-bg-deep), transparent),
+    linear-gradient(to left, var(--v2-background-bg-deep), transparent);
+  background-position:
+    0 0,
+    100% 0,
+    0 0,
+    100% 0;
+  background-repeat: no-repeat;
+  background-size:
+    20px 100%,
+    20px 100%,
+    12px 100%,
+    12px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
 /* Keep the side nav from eating the content column on medium widths (it is a fixed
    240px above 640px, which squeezed the key/value rows on tablets/split screens). */
 .settings-v2[data-component="tabs-v2"][data-variant="settings"][data-orientation="vertical"] [data-slot="tabs-v2-list"] {
