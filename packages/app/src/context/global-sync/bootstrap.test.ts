@@ -60,6 +60,7 @@ function directoryState() {
     },
     session_diff: {},
     todo: {},
+    commentary: {},
     permission: {},
     question: {},
     mcp_ready: true,

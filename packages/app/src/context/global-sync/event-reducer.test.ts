@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { Message, Part, PermissionRequest, Project, QuestionRequest, Session } from "@opencode-ai/sdk/v2/client"
-import { createStore } from "solid-js/store"
+import { createStore, type SetStoreFunction } from "solid-js/store"
 import type { State } from "./types"
 import { applyDirectoryEvent, applyGlobalEvent, cleanupDroppedSessionCaches } from "./event-reducer"
 
@@ -73,6 +73,7 @@ const baseState = (input: Partial<State> = {}) =>
     session_status: {},
     session_diff: {},
     todo: {},
+    commentary: {},
     permission: {},
     question: {},
     mcp: {},
@@ -612,5 +613,55 @@ describe("applyDirectoryEvent", () => {
 
     expect(pushes).toEqual(["/tmp"])
     expect(lspLoads).toBe(1)
+  })
+})
+
+// FE-028: a narration line arrives every ten seconds, so the reducer must append it without touching the
+// message store — that isolation is what keeps the timeline from re-rendering, and the benchmark measures it.
+describe("applyDirectoryEvent commentary", () => {
+  const entry = (seq: number, text: string) => ({ seq, time: seq, text, anchor: `msg_${seq}` })
+
+  const send = (store: State, setStore: SetStoreFunction<State>, properties: unknown) =>
+    applyDirectoryEvent({
+      event: { type: "session.commentary", properties },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+    })
+
+  test("appends a line to its own per-session list", () => {
+    const [store, setStore] = createStore(baseState())
+    send(store, setStore, { sessionID: "session", entry: entry(1, "first") })
+    send(store, setStore, { sessionID: "session", entry: entry(2, "second") })
+    expect(store.commentary.session?.map((item) => item.text)).toEqual(["first", "second"])
+  })
+
+  test("a replayed line is ignored rather than duplicated", () => {
+    const [store, setStore] = createStore(baseState())
+    send(store, setStore, { sessionID: "session", entry: entry(1, "first") })
+    send(store, setStore, { sessionID: "session", entry: entry(1, "first") })
+    expect(store.commentary.session).toHaveLength(1)
+  })
+
+  test("a line does not touch the message store", () => {
+    const [store, setStore] = createStore(baseState())
+    send(store, setStore, { sessionID: "session", entry: entry(1, "first") })
+    expect(Object.keys(store.message)).toEqual([])
+  })
+
+  test("narration survives session content being trimmed", () => {
+    const [store, setStore] = createStore(baseState())
+    applyDirectoryEvent({
+      event: { type: "session.commentary", properties: { sessionID: "session", entry: entry(1, "first") } },
+      store,
+      setStore,
+      push() {},
+      directory: "/tmp",
+      loadLsp() {},
+      sessionContent: false,
+    })
+    expect(store.commentary.session).toHaveLength(1)
   })
 })

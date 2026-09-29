@@ -14,6 +14,7 @@ import type {
   VcsInfo,
 } from "@opencode-ai/sdk/v2/client"
 import type { FileDiffInfo } from "@opencode-ai/client/promise"
+import type { SessionCommentaryEvent } from "@opencode-ai/schema/session-commentary-event"
 import { NormalizedProviderListResponse } from "@opencode-ai/session-ui/context"
 import type { CommandInfo, McpResource, McpServer, SessionMessageInfo } from "@opencode-ai/client/promise"
 import type { Accessor } from "solid-js"
@@ -53,6 +54,10 @@ export type State = {
   }
   todo: {
     [sessionID: string]: Todo[]
+  }
+  /** FE-028: the live narration for a session, oldest first. Only written by `session.commentary`. */
+  commentary: {
+    [sessionID: string]: SessionCommentaryEvent.Entry[]
   }
   permission: {
     [sessionID: string]: PermissionRequest[]

@@ -146,6 +146,17 @@ export default {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`session_commentary\` (
+          \`session_id\` text NOT NULL,
+          \`seq\` integer NOT NULL,
+          \`time\` integer NOT NULL,
+          \`text\` text NOT NULL,
+          \`anchor\` text NOT NULL,
+          CONSTRAINT \`session_commentary_pk\` PRIMARY KEY(\`session_id\`, \`seq\`),
+          CONSTRAINT \`fk_session_commentary_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`session_context_epoch\` (
           \`session_id\` text PRIMARY KEY,
           \`baseline\` text NOT NULL,

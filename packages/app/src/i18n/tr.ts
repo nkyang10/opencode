@@ -160,6 +160,7 @@ export const dict = {
   "command.terminal.toggle": "Terminali aç/kapat",
   "command.fileTree.toggle": "Dosya ağacını aç/kapat",
   "command.review.toggle": "İncelemeyi aç/kapat",
+  "command.commentary.toggle": "Toggle commentary",
   "command.terminal.new": "Yeni terminal",
   "command.terminal.new.description": "Yeni bir terminal sekmesi oluştur",
   "command.steps.toggle": "Adımları aç/kapat",
@@ -770,6 +771,10 @@ export const dict = {
 
   "session.tab.session": "Oturum",
   "session.tab.review": "İnceleme",
+  "session.commentary.title": "Commentary",
+  "session.commentary.empty": "Nothing narrated yet",
+  "session.commentary.empty.description": "Commentary appears here while the agent works.",
+  "session.commentary.waiting": "Watching the agent",
   "session.tab.context": "Bağlam",
   "session.tab.unknown": "Bilinmeyen Oturum",
   "session.panel.reviewAndFiles": "İnceleme ve dosyalar",

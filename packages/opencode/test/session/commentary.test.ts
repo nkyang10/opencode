@@ -1,0 +1,321 @@
+import { describe, expect, test } from "bun:test"
+import { SessionV1 } from "@opencode-ai/core/v1/session"
+import { MessageID, SessionID } from "../../src/session/schema"
+import {
+  DEFAULT_INTERVAL,
+  DEFAULT_MAX_ENTRIES_PER_TURN,
+  DEFAULT_MIN_ACTIVITY_CHARS,
+  DEFAULT_NARRATION_HISTORY,
+  LEASE_TTL_MS,
+  MAX_DIGEST_CHARS,
+  MAX_ENTRY_CHARS,
+  MAX_RESULT_CHARS,
+  MIN_GAP_MS,
+  SEED_MESSAGES,
+  cursorOf,
+  digest,
+  entriesInCurrentTurn,
+  narration,
+  parse,
+  prompt,
+  serializeMessage,
+  settings,
+  sliceFrom,
+  trimFront,
+} from "../../src/session/commentary"
+
+const session = SessionID.make("ses_test")
+let seq = 0
+const messageID = () => MessageID.make(`msg_${String(++seq).padStart(6, "0")}`)
+
+const user = (text: string, id = messageID()) =>
+  ({
+    info: { id, sessionID: session, role: "user", time: { created: 1 }, agent: "build" },
+    parts: [{ id: "prt_1", sessionID: session, messageID: id, type: "text", text }],
+  }) as unknown as SessionV1.WithParts
+
+const assistant = (parts: unknown[], id = messageID()) =>
+  ({
+    info: { id, sessionID: session, role: "assistant", time: { created: 1 }, parentID: "msg_000000", mode: "build" },
+    parts,
+  }) as unknown as SessionV1.WithParts
+
+const text = (value: string) => ({ type: "text", text: value })
+const tool = (name: string, input: unknown, output: string) => ({
+  type: "tool",
+  tool: name,
+  state: { status: "completed", input, output, title: name, metadata: {}, time: { start: 1, end: 2 } },
+})
+const erroredTool = (name: string, error: string) => ({
+  type: "tool",
+  tool: name,
+  state: { status: "error", input: {}, error, metadata: {}, time: { start: 1, end: 2 } },
+})
+
+const entry = (seq: number, text: string, anchor: string) => ({ seq, time: seq, text, anchor })
+
+describe("settings", () => {
+  test("an absent section behaves like an empty one", () => {
+    expect(settings(undefined)).toEqual({
+      enabled: true,
+      interval: DEFAULT_INTERVAL,
+      model: "session",
+      maxEntriesPerTurn: DEFAULT_MAX_ENTRIES_PER_TURN,
+      minActivityChars: DEFAULT_MIN_ACTIVITY_CHARS,
+      narrationHistory: DEFAULT_NARRATION_HISTORY,
+      minGap: MIN_GAP_MS,
+    })
+    expect(settings({})).toEqual(settings(undefined))
+  })
+
+  test("every field is independently overridable", () => {
+    expect(settings({ enabled: false }).enabled).toBe(false)
+    expect(settings({ interval: 2_000 }).interval).toBe(2_000)
+    expect(settings({ model: "small" }).model).toBe("small")
+    expect(settings({ maxEntriesPerTurn: 1 }).maxEntriesPerTurn).toBe(1)
+    expect(settings({ minActivityChars: 1 }).minActivityChars).toBe(1)
+    expect(settings({ narrationHistory: 1 }).narrationHistory).toBe(1)
+    expect(settings({ minGap: 1 }).minGap).toBe(1)
+  })
+
+  test("the client heartbeat interval stays comfortably under the lease", () => {
+    // The panel refreshes every 15s; a TTL at or below that would let one dropped request end the narration.
+    expect(LEASE_TTL_MS).toBeGreaterThan(15_000)
+    expect(MIN_GAP_MS).toBeGreaterThan(0)
+  })
+})
+
+describe("serializeMessage", () => {
+  test("renders a user message with its attachments", () => {
+    const id = messageID()
+    const message = {
+      info: { id, sessionID: session, role: "user", time: { created: 1 }, agent: "build" },
+      parts: [
+        { type: "text", text: "fix the flaky test" },
+        { type: "file", mime: "image/png", filename: "shot.png", url: "data:image/png;base64,AAAA" },
+      ],
+    } as unknown as SessionV1.WithParts
+    expect(serializeMessage(message)).toEqual([
+      "user: fix the flaky test [attached image/png: shot.png]",
+    ])
+  })
+
+  test("excludes reasoning, step markers, snapshots and patches", () => {
+    const lines = serializeMessage(
+      assistant([
+        { type: "step-start" },
+        { type: "reasoning", text: "internal chain of thought that must never be narrated" },
+        { type: "snapshot", snapshot: "abc123" },
+        { type: "patch", files: ["a.ts"] },
+        { type: "text", text: "Found the cause.", synthetic: true },
+        text("The retry counter is off by one."),
+        { type: "step-finish" },
+      ]),
+    )
+    expect(lines).toEqual(["assistant: The retry counter is off by one."])
+  })
+
+  test("renders tool calls with their result, and errors as errors", () => {
+    expect(serializeMessage(assistant([tool("read", { path: "main.ts" }, "export const x = 1")]))).toEqual([
+      "call read({\"path\":\"main.ts\"})",
+      "  -> export const x = 1",
+    ])
+    expect(serializeMessage(assistant([erroredTool("bash", "exit 1: no such file")]))).toEqual([
+      "call bash({})",
+      "  -> error: exit 1: no such file",
+    ])
+  })
+
+  test("reports an in-flight tool rather than pretending it finished", () => {
+    expect(
+      serializeMessage(
+        assistant([
+          {
+            type: "tool",
+            tool: "grep",
+            state: { status: "running", input: {}, time: { start: 1 } },
+          },
+        ]),
+      ),
+    ).toEqual(["call grep({})", "  -> running"])
+  })
+
+  test("names an assistant error even when the error carries no message", () => {
+    const message = {
+      info: {
+        id: messageID(),
+        sessionID: session,
+        role: "assistant",
+        time: { created: 1 },
+        error: { name: "ProviderAuthError", data: { providerID: "dgx" } },
+      },
+      parts: [],
+    } as unknown as SessionV1.WithParts
+    expect(serializeMessage(message)).toEqual(["error: ProviderAuthError"])
+  })
+
+  test("collapses whitespace and caps a long result", () => {
+    const [call, line] = serializeMessage(assistant([tool("bash", {}, "x".repeat(5_000))]))
+    expect(call).toBe("call bash({})")
+    // The cap applies to the result itself, not to the "  -> " prefix that introduces it.
+    const result = line!.slice("  -> ".length)
+    expect(result).toHaveLength(MAX_RESULT_CHARS)
+    expect(result.endsWith("…")).toBe(true)
+  })
+
+  test("an assistant message with nothing worth saying produces no lines", () => {
+    expect(serializeMessage(assistant([{ type: "step-start" }]))).toEqual([])
+    expect(serializeMessage(user("   "))).toEqual([])
+  })
+})
+
+describe("trimFront", () => {
+  test("keeps the newest chunks when over budget", () => {
+    expect(trimFront(["a".repeat(10), "b".repeat(10), "c".repeat(10)], 22)).toEqual(["b".repeat(10), "c".repeat(10)])
+  })
+
+  test("always keeps at least one chunk, however large", () => {
+    expect(trimFront(["x".repeat(500)], 10)).toEqual(["x".repeat(500)])
+  })
+
+  test("returns everything when under budget", () => {
+    expect(trimFront(["a", "b", "c"], 100)).toEqual(["a", "b", "c"])
+    expect(trimFront([], 100)).toEqual([])
+  })
+})
+
+describe("digest", () => {
+  test("stays within the cap no matter how much happened", () => {
+    const messages = Array.from({ length: 400 }, (_, index) =>
+      assistant([tool("bash", { cmd: "ls" }, "y".repeat(4_000))], MessageID.make(`msg_${String(index).padStart(6, "0")}`)),
+    )
+    const text = digest(messages).join("\n")
+    expect(text.length).toBeLessThanOrEqual(MAX_DIGEST_CHARS + MAX_DIGEST_CHARS)
+  })
+
+  test("keeps the newest activity when it has to trim", () => {
+    const older = assistant([text("oldest news")], MessageID.make("msg_000001"))
+    const newest = assistant([text("newest news")], MessageID.make("msg_000002"))
+    const joined = digest([older, newest]).join("\n")
+    expect(joined).toContain("newest news")
+  })
+})
+
+describe("the cursor", () => {
+  test("is the anchor of the newest entry", () => {
+    expect(cursorOf([entry(1, "one", "msg_a"), entry(2, "two", "msg_b")])).toBe("msg_b")
+    expect(cursorOf([])).toBeUndefined()
+  })
+
+  test("slices strictly after the anchor", () => {
+    const messages = [user("a", MessageID.make("msg_1")), user("b", MessageID.make("msg_2")), user("c", MessageID.make("msg_3"))]
+    expect(sliceFrom(messages, "msg_1").map((m) => String(m.info.id))).toEqual(["msg_2", "msg_3"])
+  })
+
+  test("seeds from the tail when there is no cursor, so the first line is about now", () => {
+    const messages = Array.from({ length: 40 }, (_, index) => user(`m${index}`, MessageID.make(`msg_${String(index)}`)))
+    const sliced = sliceFrom(messages, undefined)
+    expect(sliced).toHaveLength(SEED_MESSAGES)
+    expect(String(sliced.at(-1)!.info.id)).toBe("msg_39")
+  })
+
+  test("falls back to the seed when the anchor is gone (revert, delete)", () => {
+    const messages = Array.from({ length: 10 }, (_, index) => user(`m${index}`, MessageID.make(`msg_${String(index)}`)))
+    expect(sliceFrom(messages, "msg_vanished")).toHaveLength(SEED_MESSAGES)
+  })
+
+  test("an anchor at the newest message means there is nothing new", () => {
+    const messages = [user("a", MessageID.make("msg_1")), user("b", MessageID.make("msg_2"))]
+    expect(sliceFrom(messages, "msg_2")).toEqual([])
+  })
+})
+
+describe("entriesInCurrentTurn", () => {
+  const messages = [
+    user("first ask", MessageID.make("msg_1")),
+    assistant([text("working")], MessageID.make("msg_2")),
+    user("second ask", MessageID.make("msg_3")),
+    assistant([text("working again")], MessageID.make("msg_4")),
+  ]
+
+  test("counts only the entries anchored in the current turn", () => {
+    expect(entriesInCurrentTurn(messages, [entry(1, "old", "msg_2")])).toBe(0)
+    expect(entriesInCurrentTurn(messages, [entry(1, "old", "msg_2"), entry(2, "new", "msg_4")])).toBe(1)
+  })
+
+  test("counts everything when the session has no user message yet", () => {
+    expect(entriesInCurrentTurn([assistant([text("x")], MessageID.make("msg_1"))], [entry(1, "a", "msg_1")])).toBe(1)
+  })
+
+  test("an entry whose anchor no longer exists does not count against the budget", () => {
+    expect(entriesInCurrentTurn(messages, [entry(1, "orphan", "msg_vanished")])).toBe(0)
+  })
+})
+
+describe("parse", () => {
+  test("reads a well-formed line", () => {
+    expect(parse('{"speak": true, "text": "The retry cap is off by one."}')).toEqual({
+      speak: true,
+      text: "The retry cap is off by one.",
+    })
+  })
+
+  test("honours silence", () => {
+    expect(parse('{"speak": false}')).toEqual({ speak: false, text: "" })
+    expect(parse('{"speak":false,"text":"unused"}')).toEqual({ speak: false, text: "" })
+  })
+
+  test("survives a fenced block, a think block and leading prose", () => {
+    const raw = '<think>hmm</think>Here you go:\n```json\n{"speak": true, "text": "Reading the retry table."}\n```'
+    expect(parse(raw)).toEqual({ speak: true, text: "Reading the retry table." })
+  })
+
+  test("a malformed object falls back to the raw text rather than dropping the line", () => {
+    expect(parse('{"speak": true, "text": ')).toEqual({ speak: true, text: '{"speak": true, "text":' })
+  })
+
+  test("a model that ignored the format entirely still gets shown", () => {
+    expect(parse("The agent is editing the parser.")).toEqual({ speak: true, text: "The agent is editing the parser." })
+  })
+
+  test("whitespace-only output is silence", () => {
+    expect(parse("   \n  ")).toEqual({ speak: false, text: "" })
+  })
+
+  test("speak:true with a blank text is silence, not the JSON itself", () => {
+    expect(parse('{"speak": true, "text": "   "}')).toEqual({ speak: false, text: "" })
+    expect(parse('{"speak": true}')).toEqual({ speak: false, text: "" })
+  })
+
+  test("caps a runaway line", () => {
+    const result = parse(JSON.stringify({ speak: true, text: "z".repeat(5_000) }))
+    expect(result.text.length).toBe(MAX_ENTRY_CHARS)
+    expect(result.text.endsWith("…")).toBe(true)
+  })
+
+  test("collapses a multi-paragraph answer into one line", () => {
+    expect(parse(JSON.stringify({ speak: true, text: "one\n\ntwo   three" })).text).toBe("one two three")
+  })
+})
+
+describe("prompt", () => {
+  test("carries the narration and the new activity in separate blocks", () => {
+    const text = prompt({ narration: ["first line"], digest: ["call read(a.ts)", "  -> ok"] })
+    expect(text).toContain("<narration-so-far>\nfirst line\n</narration-so-far>")
+    expect(text).toContain("<new-activity>\ncall read(a.ts)\n  -> ok\n</new-activity>")
+    expect(text).toContain("never refer to the previous lines")
+  })
+
+  test("says so when it is the first line", () => {
+    expect(prompt({ narration: [], digest: ["x"] })).toContain("This is the first line of the narration.")
+  })
+
+  test("does not claim there was activity when there was none", () => {
+    expect(prompt({ narration: [], digest: [] })).toContain("(nothing new)")
+  })
+
+  test("the narration budget drops the oldest lines, not the newest", () => {
+    const entries = [entry(1, "a".repeat(400), "msg_1"), entry(2, "b".repeat(400), "msg_2")]
+    expect(narration(entries, 500).join("")).toBe("b".repeat(400))
+  })
+})

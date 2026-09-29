@@ -40,7 +40,7 @@ import { OpenInAppV2 } from "@/components/session/open-in-app-v2"
 import { useCommand } from "@/context/command"
 import { useFile, type SelectedLineRange } from "@/context/file"
 import { useLanguage } from "@/context/language"
-import { useLayout } from "@/context/layout"
+import { useLayout, COMMENTARY_PANEL_WIDTH_MAX, COMMENTARY_PANEL_WIDTH_MIN } from "@/context/layout"
 import { useSDK } from "@/context/sdk"
 import { useSettings } from "@/context/settings"
 import { createFileTabListSync } from "@/pages/session/file-tab-scroll"
@@ -74,6 +74,8 @@ export function SessionSidePanel(props: {
   reviewHasFocusableContent: () => boolean
   reviewCount: () => number
   reviewPanel: () => JSX.Element
+  /** FE-028: the narration column, rendered beside the review pane. */
+  commentaryPanel?: () => JSX.Element
   reviewSidebarToggle?: (disabled: boolean) => JSX.Element
   fileBrowserState?: SessionFileBrowserState
   activeDiff?: string
@@ -104,11 +106,15 @@ export function SessionSidePanel(props: {
         opened: layout.fileTree.opened(),
       }),
   )
-  const open = createMemo(() => reviewOpen() || fileOpen())
+  // FE-028. Opening the narration keeps the review pane exactly as it was and drops the file tree, so the
+  // chat column never has to compete for width with three panels at once.
+  const commentaryOpen = createMemo(() => isDesktop() && view().commentaryPanel.opened())
+  const open = createMemo(() => reviewOpen() || fileOpen() || commentaryOpen())
   const fileTreeWidth = createMemo(() => Math.max(FILE_TREE_WIDTH_MIN, layout.fileTree.width()))
   const reviewTab = createMemo(() => isDesktop())
   const panelWidth = createMemo(() => {
     if (!open()) return "0px"
+    if (commentaryOpen() && !reviewOpen() && !fileOpen()) return `${view().commentaryPanel.width()}px`
     if (reviewOpen()) return "auto"
     return `${fileTreeWidth()}px`
   })
@@ -752,6 +758,30 @@ export function SessionSidePanel(props: {
                       </Tabs>
                     </DndKitProvider>
                   </Show>
+                </div>
+              </div>
+            </Show>
+
+            <Show when={commentaryOpen()}>
+              <div
+                id="commentary-panel"
+                aria-label={language.t("session.commentary.title")}
+                class="relative min-w-0 h-full shrink-0 overflow-hidden border-l border-border-weaker-base"
+                style={{ width: `${view().commentaryPanel.width()}px` }}
+              >
+                <div class="size-full">{props.commentaryPanel?.()}</div>
+                <div onPointerDown={() => props.size.start()}>
+                  <ResizeHandle
+                    direction="horizontal"
+                    edge="end"
+                    size={view().commentaryPanel.width()}
+                    min={COMMENTARY_PANEL_WIDTH_MIN}
+                    max={COMMENTARY_PANEL_WIDTH_MAX}
+                    onResize={(width) => {
+                      props.size.touch()
+                      view().commentaryPanel.resize(width)
+                    }}
+                  />
                 </div>
               </div>
             </Show>

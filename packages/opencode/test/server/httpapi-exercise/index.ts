@@ -1337,6 +1337,36 @@ const scenarios: Scenario[] = [
     .json(200, (body, ctx) => {
       check(stable(body) === stable(ctx.state.todos), "todos should match seeded state")
     }),
+  // FE-028. Asserted on a real session but with an empty commentary list: the point of the coverage entry
+  // is that the route exists, decodes, and is readable — seeding entries would depend on the narration
+  // service, and this harness must stay free of order-dependent setup (FU-094).
+  http.protected
+    .get("/session/{sessionID}/commentary", "session.commentary.list")
+    .seeded((ctx) => ctx.session({ title: "Commentary session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/commentary", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body) => {
+      array(body)
+      check(body.length === 0, "a session with no narration should list no entries")
+    }),
+  http.protected
+    .post("/session/{sessionID}/commentary/watch", "session.commentary.watch")
+    .seeded((ctx) => ctx.session({ title: "Commentary watch session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/commentary/watch", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body) => check(body === true, "watching should acknowledge the lease")),
+  http.protected
+    .post("/session/{sessionID}/commentary/unwatch", "session.commentary.unwatch")
+    .seeded((ctx) => ctx.session({ title: "Commentary unwatch session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/commentary/unwatch", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body) => check(body === true, "unwatching should acknowledge the release")),
   http.protected
     .get("/session/{sessionID}/diff", "session.diff")
     .seeded((ctx) => ctx.session({ title: "Diff session" }))

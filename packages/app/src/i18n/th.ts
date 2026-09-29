@@ -154,6 +154,7 @@ export const dict = {
   "command.terminal.toggle": "สลับเทอร์มินัล",
   "command.fileTree.toggle": "สลับแผนผังไฟล์",
   "command.review.toggle": "สลับการตรวจสอบ",
+  "command.commentary.toggle": "Toggle commentary",
   "command.terminal.new": "เทอร์มินัลใหม่",
   "command.terminal.new.description": "สร้างแท็บเทอร์มินัลใหม่",
   "command.steps.toggle": "สลับขั้นตอน",
@@ -758,6 +759,10 @@ export const dict = {
 
   "session.tab.session": "เซสชัน",
   "session.tab.review": "ตรวจสอบ",
+  "session.commentary.title": "Commentary",
+  "session.commentary.empty": "Nothing narrated yet",
+  "session.commentary.empty.description": "Commentary appears here while the agent works.",
+  "session.commentary.waiting": "Watching the agent",
   "session.tab.context": "บริบท",
   "session.tab.unknown": "เซสชันที่ไม่รู้จัก",
   "session.panel.reviewAndFiles": "ตรวจสอบและไฟล์",

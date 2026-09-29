@@ -158,6 +158,7 @@ export const dict = {
   "command.terminal.toggle": "切換終端機",
   "command.fileTree.toggle": "切換檔案樹",
   "command.review.toggle": "切換檢閱",
+  "command.commentary.toggle": "Toggle commentary",
   "command.terminal.new": "新增終端機",
   "command.terminal.new.description": "建立新的終端機分頁",
   "command.steps.toggle": "切換步驟",
@@ -767,6 +768,10 @@ export const dict = {
 
   "session.tab.session": "工作階段",
   "session.tab.review": "檢閱",
+  "session.commentary.title": "Commentary",
+  "session.commentary.empty": "Nothing narrated yet",
+  "session.commentary.empty.description": "Commentary appears here while the agent works.",
+  "session.commentary.waiting": "Watching the agent",
   "session.tab.context": "上下文",
   "session.tab.unknown": "未知的工作階段",
   "session.panel.reviewAndFiles": "檢閱與檔案",

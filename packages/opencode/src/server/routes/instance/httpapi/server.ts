@@ -37,6 +37,7 @@ import { SessionRevert } from "@/session/revert"
 import { SessionRunState } from "@/session/run-state"
 import { Session } from "@/session/session"
 import { SessionStatus } from "@/session/status"
+import { SessionCommentary } from "@/session/commentary"
 import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
 import { SessionShare } from "@/share/session"
@@ -270,6 +271,7 @@ const app = LayerNode.group([
   SessionCompaction.node,
   SessionRevert.node,
   SessionSummary.node,
+  SessionCommentary.node,
   SessionPrompt.node,
   Instruction.node,
   LLM.node,

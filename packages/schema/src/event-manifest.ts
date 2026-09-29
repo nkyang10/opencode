@@ -21,6 +21,7 @@ import { Question } from "./question"
 import { QuestionV1 } from "./question-v1"
 import { Reference } from "./reference"
 import { ServerEvent } from "./server-event"
+import { SessionCommentaryEvent } from "./session-commentary-event"
 import { SessionCompactionEvent } from "./session-compaction-event"
 import { SessionEvent } from "./session-event"
 import { SessionStatusEvent } from "./session-status-event"
@@ -73,6 +74,7 @@ export const Definitions = Event.inventory(
   ...LegacyEvent.Definitions,
   ...Project.Event.Definitions,
   ...SessionStatusEvent.Definitions,
+  ...SessionCommentaryEvent.Definitions,
   ...QuestionV1.Event.Definitions,
   ...SessionCompactionEvent.Definitions,
   ...VcsEvent.Definitions,

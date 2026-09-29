@@ -9,7 +9,9 @@ describe("public event manifest", () => {
     expect(EventManifest.Definitions).toBe(SchemaEventManifest.Definitions)
     expect(EventManifest.Latest).toBe(SchemaEventManifest.Latest)
     expect(EventManifest.Durable).toBe(SchemaEventManifest.Durable)
-    expect(EventManifest.Latest.size).toBe(88)
+    // 88 -> 89 is FE-028's `session.commentary`. Note there is a second copy of this pin in
+    // packages/schema/test/event-manifest.test.ts; both must move together or one of them is red.
+    expect(EventManifest.Latest.size).toBe(89)
     expect(EventManifest.Latest.get("session.next.step.ended")).toBe(SessionEvent.Step.Ended)
     expect(EventManifest.Latest.get("todo.updated")).toBe(Todo.Event.Updated)
     expect(EventManifest.Latest.has("ide.installed")).toBe(false)

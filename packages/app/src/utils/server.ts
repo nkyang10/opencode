@@ -1,6 +1,7 @@
 import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import { OpenCode, type OpenCodeClient } from "@opencode-ai/client/promise"
 import type { ServerConnection } from "@/context/server"
+import type { SessionCommentaryEvent } from "@opencode-ai/schema/session-commentary-event"
 import { decode64 } from "@/utils/base64"
 
 export function authTokenFromCredentials(input: { username?: string; password: string }) {
@@ -131,4 +132,53 @@ export async function fetchWebuiStatus(input: {
   })
   if (!response.ok) return undefined
   return (await response.json()) as WebuiStatus
+}
+
+// FE-028: the commentary routes are called with a hand-rolled fetch rather than the generated client, the
+// same way `fetchWebuiStatus` does it — the lease has to be refreshable from a timer and released with
+// `navigator.sendBeacon` on pagehide, neither of which the generated client makes convenient.
+export async function fetchCommentary(input: {
+  server: ServerConnection.HttpBase
+  sessionID: string
+  limit?: number
+  fetch?: typeof globalThis.fetch
+}): Promise<SessionCommentaryEvent.Entry[]> {
+  const query = input.limit === undefined ? "" : `?limit=${input.limit}`
+  const response = await (input.fetch ?? globalThis.fetch)(
+    `${input.server.url}/session/${input.sessionID}/commentary${query}`,
+    {
+      headers: input.server.password
+        ? {
+            Authorization: `Basic ${authTokenFromCredentials({
+              username: input.server.username,
+              password: input.server.password,
+            })}`,
+          }
+        : undefined,
+    },
+  )
+  if (!response.ok) return []
+  return (await response.json()) as SessionCommentaryEvent.Entry[]
+}
+
+export async function setCommentaryWatch(input: {
+  server: ServerConnection.HttpBase
+  sessionID: string
+  watching: boolean
+  fetch?: typeof globalThis.fetch
+}): Promise<void> {
+  await (input.fetch ?? globalThis.fetch)(
+    `${input.server.url}/session/${input.sessionID}/commentary/${input.watching ? "watch" : "unwatch"}`,
+    {
+      method: "POST",
+      headers: input.server.password
+        ? {
+            Authorization: `Basic ${authTokenFromCredentials({
+              username: input.server.username,
+              password: input.server.password,
+            })}`,
+          }
+        : undefined,
+    },
+  ).catch(() => undefined)
 }

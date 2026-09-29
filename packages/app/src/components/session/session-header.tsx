@@ -478,6 +478,27 @@ export function SessionHeader() {
                         </Button>
                       </TooltipKeybind>
 
+                      {/* FE-028: opens the narration column. It is the only control that takes a lease, so
+                          the server only spends a model call while this panel is actually on screen. */}
+                      <TooltipKeybind
+                        title={language.t("command.commentary.toggle")}
+                        keybind={command.keybind("commentary.toggle")}
+                      >
+                        <Button
+                          variant="ghost"
+                          class="group/commentary-toggle titlebar-icon w-8 h-6 p-0 box-border"
+                          onClick={() => view().commentaryPanel.toggle()}
+                          aria-label={language.t("command.commentary.toggle")}
+                          aria-expanded={view().commentaryPanel.opened()}
+                          aria-controls="commentary-panel"
+                        >
+                          <Icon
+                            size="small"
+                            name={view().commentaryPanel.opened() ? "commentary-active" : "commentary"}
+                          />
+                        </Button>
+                      </TooltipKeybind>
+
                       <TooltipKeybind
                         title={language.t("command.fileTree.toggle")}
                         keybind={command.keybind("fileTree.toggle")}

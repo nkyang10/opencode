@@ -7,6 +7,7 @@ import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
 import { SessionRevert } from "@/session/revert"
 import { SessionStatus } from "@/session/status"
+import { SessionCommentary } from "@/session/commentary"
 import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
 import { MessageID, PartID, SessionID } from "@/session/schema"
@@ -46,6 +47,11 @@ export const MessagesQuery = Schema.Struct({
   before: Schema.optional(Schema.String),
 })
 export const StatusMap = Schema.Record(Schema.String, SessionStatus.Info)
+// FE-028. `limit` is the initial paint size for the commentary panel; the running list arrives over SSE.
+export const CommentaryQuery = Schema.Struct({
+  ...WorkspaceRoutingQueryFields,
+  limit: Schema.optional(Schema.NumberFromString.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1))),
+})
 export const UpdatePayload = Schema.Struct({
   title: Schema.optional(Schema.String),
   metadata: Schema.optional(Session.Metadata),
@@ -81,6 +87,9 @@ export const SessionPaths = {
   get: `${root}/:sessionID`,
   children: `${root}/:sessionID/children`,
   todo: `${root}/:sessionID/todo`,
+  commentary: `${root}/:sessionID/commentary`,
+  commentaryWatch: `${root}/:sessionID/commentary/watch`,
+  commentaryUnwatch: `${root}/:sessionID/commentary/unwatch`,
   diff: `${root}/:sessionID/diff`,
   messages: `${root}/:sessionID/message`,
   message: `${root}/:sessionID/message/:messageID`,
@@ -163,6 +172,46 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.todo",
             summary: "Get session todos",
             description: "Retrieve the todo list associated with a specific session, showing tasks and action items.",
+          }),
+        ),
+        // FE-028. The two watch routes are the lease the narration loop runs on: the panel heartbeats
+        // `watch` while it is visible and the server only spends a model call while some client holds it.
+        HttpApiEndpoint.get("commentaryList", SessionPaths.commentary, {
+          params: { sessionID: SessionID },
+          query: CommentaryQuery,
+          success: described(Schema.Array(SessionCommentary.Entry), "Commentary entries, oldest first"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.commentary.list",
+            summary: "Get session commentary",
+            description:
+              "Retrieve the commentary narration written for a session. New entries are delivered over the event stream; this is the initial paint.",
+          }),
+        ),
+        HttpApiEndpoint.post("commentaryWatch", SessionPaths.commentaryWatch, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "Watching"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.commentary.watch",
+            summary: "Watch session commentary",
+            description:
+              "Start or refresh the lease that keeps the commentary narration running. Call again before the lease expires to keep it alive.",
+          }),
+        ),
+        HttpApiEndpoint.post("commentaryUnwatch", SessionPaths.commentaryUnwatch, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "No longer watching"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.commentary.unwatch",
+            summary: "Stop watching session commentary",
+            description: "Release the commentary lease. A client that disappears without calling this is dropped when its lease expires.",
           }),
         ),
         HttpApiEndpoint.get("diff", SessionPaths.diff, {

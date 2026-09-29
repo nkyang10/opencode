@@ -55,6 +55,25 @@ it.instance("returns default native agents when no config", () =>
     expect(names).toContain("compaction")
     expect(names).toContain("title")
     expect(names).toContain("summary")
+    expect(names).toContain("commentary")
+  }),
+)
+
+// FE-028: the commentator narrates in a sidecar call with no tools, so it must resolve by name (it is
+// hidden, and a hidden agent that cannot be fetched would silently disable the whole feature) and it must
+// deny everything. It must also carry no model override, or it would stop narrating on the session model.
+it.instance("commentary agent is hidden, denies all tools, and does not pin a model", () =>
+  Effect.gen(function* () {
+    const commentary = yield* load((svc) => svc.get("commentary"))
+    expect(commentary).toBeDefined()
+    expect(commentary?.mode).toBe("primary")
+    expect(commentary?.native).toBe(true)
+    expect(commentary?.hidden).toBe(true)
+    expect(commentary?.model).toBeUndefined()
+    expect(evalPerm(commentary, "edit")).toBe("deny")
+    expect(evalPerm(commentary, "bash")).toBe("deny")
+    expect(evalPerm(commentary, "read")).toBe("deny")
+    expect(commentary?.prompt).toContain("speak")
   }),
 )
 

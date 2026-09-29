@@ -59,6 +59,7 @@ export const dict = {
   "command.terminal.toggle": "Toggle terminal",
   "command.fileTree.toggle": "Toggle file tree",
   "command.review.toggle": "Toggle review",
+  "command.commentary.toggle": "Toggle commentary",
   "command.terminal.new": "New terminal",
   "command.terminal.new.description": "Create a new terminal tab",
   "command.steps.toggle": "Toggle steps",
@@ -687,6 +688,10 @@ export const dict = {
 
   "session.tab.session": "Session",
   "session.tab.review": "Review",
+  "session.commentary.title": "Commentary",
+  "session.commentary.empty": "Nothing narrated yet",
+  "session.commentary.empty.description": "Commentary appears here while the agent works.",
+  "session.commentary.waiting": "Watching the agent",
   "session.tab.context": "Context",
   "session.tab.unknown": "Unknown Session",
   "session.panel.reviewAndFiles": "Review and files",

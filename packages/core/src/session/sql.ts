@@ -176,3 +176,23 @@ export const SessionContextEpochTable = sqliteTable("session_context_epoch", {
   snapshot: text({ mode: "json" }).notNull().$type<SystemContext.Snapshot>(),
   baseline_seq: integer().notNull(),
 })
+
+// FE-028: the live commentary narration. `anchor` is the last message this entry describes, so the next
+// digest is everything strictly after it — the cursor is derived from the newest row and never stored
+// separately (a stored cursor would have to live in `session.metadata`, whose every write publishes a full
+// `session.updated`, i.e. a whole-session broadcast per tick). The (session_id, seq) primary key is also
+// the read path: the panel lists one session's entries in seq order and the cursor is a `seq DESC LIMIT 1`.
+export const SessionCommentaryTable = sqliteTable(
+  "session_commentary",
+  {
+    session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    seq: integer().notNull(),
+    time: integer().notNull(),
+    text: text().notNull(),
+    anchor: text().$type<MessageID>().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.session_id, table.seq] })],
+)

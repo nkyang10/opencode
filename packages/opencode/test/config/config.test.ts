@@ -357,6 +357,43 @@ it.instance(
   { config: { shell: "bash" } },
 )
 
+// FE-028: an undeclared config key is dropped by `onExcessProperty: "ignore"`, so a `commentary` section
+// that no schema declares would parse cleanly and then silently do nothing. This asserts the section
+// survives the real load path, and that an empty section is a no-op rather than an error.
+it.instance(
+  "loads the commentary section (FE-028)",
+  Effect.gen(function* () {
+    const config = yield* Config.use.get()
+    expect(config.commentary).toEqual({
+      interval: 10_000,
+      model: "small",
+      maxEntriesPerTurn: 5,
+      minActivityChars: 200,
+      narrationHistory: 20,
+    })
+  }),
+  {
+    config: {
+      commentary: {
+        interval: 10_000,
+        model: "small",
+        maxEntriesPerTurn: 5,
+        minActivityChars: 200,
+        narrationHistory: 20,
+      },
+    },
+  },
+)
+
+it.instance(
+  "an empty commentary section is accepted and every field is optional",
+  Effect.gen(function* () {
+    const config = yield* Config.use.get()
+    expect(config.commentary).toEqual({})
+  }),
+  { config: { commentary: {} } },
+)
+
 it.instance("updates config and preserves empty shell sentinel", () =>
   Effect.gen(function* () {
     const test = yield* TestInstance

@@ -11,6 +11,7 @@ import { ProviderTransform } from "@/provider/transform"
 
 import PROMPT_GENERATE from "./generate.txt"
 import PROMPT_COMPACTION from "./prompt/compaction.txt"
+import PROMPT_COMMENTARY from "./prompt/commentary.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
@@ -246,6 +247,24 @@ const layer = Layer.effect(
               user,
             ),
             prompt: PROMPT_TITLE,
+          },
+          // FE-028: narrates what the agent is doing, for the commentary panel. Hidden so it never appears
+          // in the agent picker, and no model override so it narrates on whatever model the turn is using.
+          commentary: {
+            name: "commentary",
+            mode: "primary",
+            options: {},
+            native: true,
+            hidden: true,
+            temperature: 0.5,
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                "*": "deny",
+              }),
+              user,
+            ),
+            prompt: PROMPT_COMMENTARY,
           },
           summary: {
             name: "summary",

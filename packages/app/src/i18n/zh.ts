@@ -170,6 +170,7 @@ export const dict = {
   "command.fileTree.toggle": "切换文件树",
 
   "command.review.toggle": "切换审查",
+  "command.commentary.toggle": "Toggle commentary",
 
   "command.terminal.new": "新建终端",
   "command.terminal.new.description": "创建新的终端标签页",
@@ -772,6 +773,10 @@ export const dict = {
 
   "session.tab.session": "会话",
   "session.tab.review": "审查",
+  "session.commentary.title": "Commentary",
+  "session.commentary.empty": "Nothing narrated yet",
+  "session.commentary.empty.description": "Commentary appears here while the agent works.",
+  "session.commentary.waiting": "Watching the agent",
   "session.tab.context": "上下文",
   "session.tab.unknown": "未知会话",
   "session.panel.reviewAndFiles": "审查和文件",

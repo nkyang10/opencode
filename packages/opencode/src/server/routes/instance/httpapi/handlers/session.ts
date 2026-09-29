@@ -6,6 +6,7 @@ import { Command } from "@/command"
 import { Permission } from "@/permission"
 import { SessionShare } from "@/share/session"
 import { Session } from "@/session/session"
+import { SessionCommentary } from "@/session/commentary"
 import { SessionCompaction } from "@/session/compaction"
 import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
@@ -58,6 +59,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const statusSvc = yield* SessionStatus.Service
     const todoSvc = yield* Todo.Service
     const summary = yield* SessionSummary.Service
+    const commentary = yield* SessionCommentary.Service
     const events = yield* EventV2Bridge.Service
     const scope = yield* Scope.Scope
 
@@ -292,6 +294,33 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       return true
     })
 
+    // FE-028. `watch` is idempotent and refreshes a deadline rather than taking a reference count, so two
+    // panels on one session still produce one narration. `unwatch` is the polite release; a client that
+    // vanishes is dropped when its lease expires, so nothing has to be reconciled.
+    const commentaryList = Effect.fn("SessionHttpApi.commentaryList")(function* (ctx: {
+      params: { sessionID: SessionID }
+      query: { limit?: number }
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      return yield* commentary.list({ sessionID: ctx.params.sessionID, limit: ctx.query.limit })
+    })
+
+    const commentaryWatch = Effect.fn("SessionHttpApi.commentaryWatch")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      yield* commentary.watch(ctx.params.sessionID)
+      return true
+    })
+
+    const commentaryUnwatch = Effect.fn("SessionHttpApi.commentaryUnwatch")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      yield* commentary.unwatch(ctx.params.sessionID)
+      return true
+    })
+
     const prompt = Effect.fn("SessionHttpApi.prompt")(function* (ctx: {
       params: { sessionID: SessionID }
       payload: typeof PromptPayload.Type
@@ -428,6 +457,9 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("share", share)
       .handle("unshare", unshare)
       .handle("summarize", summarize)
+      .handle("commentaryList", commentaryList)
+      .handle("commentaryWatch", commentaryWatch)
+      .handle("commentaryUnwatch", commentaryUnwatch)
       .handle("prompt", prompt)
       .handle("promptAsync", promptAsync)
       .handle("command", command)

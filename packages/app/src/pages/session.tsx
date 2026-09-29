@@ -74,6 +74,7 @@ import {
 import { createOpenReviewFile, createSessionTabs, createSizing, shouldShowFileTree } from "@/pages/session/helpers"
 import { MessageTimeline } from "@/pages/session/timeline/message-timeline"
 import { createTimelineModel } from "@/pages/session/timeline/model"
+import { CommentaryPanel } from "@/pages/session/commentary-panel"
 import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/pages/session/review-tab"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { restorePromptModel, syncPromptModel, syncSessionModel } from "@/pages/session/session-model-helpers"
@@ -449,6 +450,9 @@ export default function Page() {
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const size = createSizing()
   const desktopReviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
+  // FE-028: the narration column. Desktop-only for now, exactly like the review panel it sits beside.
+  const desktopCommentaryOpen = createMemo(() => isDesktop() && view().commentaryPanel.opened())
+  const commentaryWidth = createMemo(() => (desktopCommentaryOpen() ? view().commentaryPanel.width() : 0))
   const desktopV2ReviewOpen = createMemo(() => newSessionDesign() && desktopReviewOpen() && !!params.id)
   const terminalOpen = createMemo(() => view().terminal.opened())
   const desktopTerminalOpen = createMemo(() => isDesktop() && terminalOpen())
@@ -466,7 +470,7 @@ export default function Page() {
   const desktopSessionResizeOpen = createMemo(() =>
     newSessionDesign() ? desktopV2ReviewOpen() || desktopTerminalOpen() : desktopReviewOpen(),
   )
-  const desktopSidePanelOpen = createMemo(() => desktopSessionResizeOpen() || desktopFileTreeOpen())
+  const desktopSidePanelOpen = createMemo(() => desktopSessionResizeOpen() || desktopFileTreeOpen() || desktopCommentaryOpen())
   let panelRow: HTMLDivElement | undefined
   const [panelRowWidth, setPanelRowWidth] = createSignal<number>()
   createResizeObserver(
@@ -486,7 +490,7 @@ export default function Page() {
   const sessionPanelMax = createMemo(() => {
     const available = sessionPanelAvailable()
     if (available === undefined) return 1000
-    return sessionPanelWidthMax({ available, split: splitReview() })
+    return sessionPanelWidthMax({ available, split: splitReview(), commentary: commentaryWidth() })
   })
   // Clamp at render time so window or sidebar resizes squeeze the chat panel
   // instead of the review pane, without overwriting the persisted width.
@@ -495,12 +499,13 @@ export default function Page() {
       width: layout.session.width(),
       available: sessionPanelAvailable(),
       split: splitReview(),
+      commentary: commentaryWidth(),
     }),
   )
   const sessionPanelWidth = createMemo(() => {
     if (!desktopSidePanelOpen()) return "100%"
     if (desktopSessionResizeOpen()) return `${sessionPanelResizedWidth()}px`
-    return `calc(100% - ${layout.fileTree.width()}px)`
+    return `calc(100% - ${layout.fileTree.width()}px - ${commentaryWidth()}px)`
   })
   const centered = createMemo(() => isDesktop() && (newSessionDesign() || !desktopReviewOpen()))
   const desktopV2PanelLayout = createMemo(() =>
@@ -1355,6 +1360,14 @@ export default function Page() {
         <ReviewPanelV2 {...reviewPanelV2Props()} />
       </Show>
     </div>
+  )
+
+  // FE-028: the narration column. `desktopCommentaryOpen` lives here so the side panel decides whether the
+  // column exists at all, and the component takes the lease only while it is mounted.
+  const commentaryPanel = () => (
+    <Show when={params.id}>
+      <CommentaryPanel sessionID={params.id} />
+    </Show>
   )
 
   const reviewPanel = () => (
@@ -2315,6 +2328,7 @@ export default function Page() {
               reviewHasFocusableContent={hasReview}
               reviewCount={reviewCount}
               reviewPanel={reviewPanel}
+              commentaryPanel={commentaryPanel}
               activeDiff={activeReviewFile()}
               focusReviewDiff={focusReviewDiff}
               reviewSnap={ui.reviewSnap}
@@ -2337,6 +2351,7 @@ export default function Page() {
                       reviewHasFocusableContent={() => hasReview() || reviewV2State.sidebarOpened()}
                       reviewCount={reviewCount}
                       reviewPanel={reviewPanelV2}
+                      commentaryPanel={commentaryPanel}
                       reviewSidebarToggle={(disabled) => (
                         <SessionReviewV2SidebarToggle
                           opened={reviewV2State.sidebarOpened()}

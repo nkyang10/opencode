@@ -11,6 +11,7 @@ import type {
   Todo,
 } from "@opencode-ai/sdk/v2/client"
 import type { FileDiffInfo } from "@opencode-ai/client/promise"
+import type { SessionCommentaryEvent } from "@opencode-ai/schema/session-commentary-event"
 import type { State, VcsCache } from "./types"
 import { trimSessions } from "./session-trim"
 import { dropSessionCaches } from "./session-cache"
@@ -18,6 +19,9 @@ import { diffs as list, message as clean } from "@/utils/diffs"
 import { messageKey } from "@/utils/session-message"
 
 const SKIP_PARTS = new Set(["patch", "step-start", "step-finish"])
+// Events dropped when a consumer asked for no session content. FE-028 deliberately keeps commentary OUT of
+// this set: a narration line is one short string per ten seconds, and a trimmed view is exactly the case
+// where a cheap running summary beats holding the whole transcript.
 const SESSION_CONTENT_EVENTS = new Set([
   "session.diff",
   "todo.updated",
@@ -256,6 +260,26 @@ export function applyDirectoryEvent(input: {
     case "session.diff": {
       const props = event.properties as { sessionID: string; diff: FileDiffInfo[] }
       input.setStore("session_diff", props.sessionID, reconcile(list(props.diff) as FileDiffInfo[], { key: "file" }))
+      break
+    }
+    // FE-028. The narration is its own list so a line arriving every ten seconds cannot touch the message
+    // store — the isolation is the point, and the benchmark asserts the timeline does not re-render.
+    case "session.commentary": {
+      const props = event.properties as { sessionID: string; entry: SessionCommentaryEvent.Entry }
+      const existing = input.store.commentary[props.sessionID]
+      if (!existing) {
+        input.setStore("commentary", props.sessionID, [props.entry])
+        break
+      }
+      // The server numbers entries per session, so a repeat is a reconnect replay, not a new line.
+      if (existing.some((item) => item.seq === props.entry.seq)) break
+      input.setStore(
+        "commentary",
+        props.sessionID,
+        produce((draft) => {
+          draft.push(props.entry)
+        }),
+      )
       break
     }
     case "todo.updated": {

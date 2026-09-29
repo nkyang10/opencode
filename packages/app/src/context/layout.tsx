@@ -32,6 +32,10 @@ const DEFAULT_FILE_TREE_WIDTH = 200
 const DEFAULT_SESSION_WIDTH = 600
 const DEFAULT_TERMINAL_HEIGHT = 280
 const DEFAULT_REVIEW_PANEL_OPENED = false
+// FE-028. Absent means closed, so a new key needs no migrate branch and no layout.v6 bump (DEC-052).
+export const DEFAULT_COMMENTARY_PANEL_WIDTH = 340
+export const COMMENTARY_PANEL_WIDTH_MIN = 260
+export const COMMENTARY_PANEL_WIDTH_MAX = 520
 export type AvatarColorKey = (typeof AVATAR_COLOR_KEYS)[number]
 
 export function getAvatarColors(key?: string) {
@@ -285,6 +289,10 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         review: {
           diffStyle: "split" as ReviewDiffStyle,
           panelOpened: DEFAULT_REVIEW_PANEL_OPENED,
+        },
+        commentary: {
+          panelOpened: false,
+          width: DEFAULT_COMMENTARY_PANEL_WIDTH,
         },
         fileTree: {
           opened: false,
@@ -820,6 +828,8 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         })
         const terminalOpened = createMemo(() => store.terminal?.opened ?? false)
         const reviewPanelOpened = createMemo(() => store.review?.panelOpened ?? DEFAULT_REVIEW_PANEL_OPENED)
+      const commentaryPanelOpened = createMemo(() => store.commentary?.panelOpened ?? false)
+      const fileTreeOpened = createMemo(() => store.fileTree?.opened ?? false)
         const reviewPanelSource = createMemo(() => (reviewPanelOpened() ? ephemeral.reviewPanelSource : "other"))
 
         function setTerminalOpened(next: boolean) {
@@ -913,6 +923,27 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
             },
             toggle() {
               setReviewPanelOpened(!reviewPanelOpened(), "other")
+            },
+          },
+          commentaryPanel: {
+            opened: createMemo(() => store.commentary?.panelOpened ?? false),
+            width: createMemo(() => store.commentary?.width ?? DEFAULT_COMMENTARY_PANEL_WIDTH),
+            open() {
+              // Three columns do not fit beside a chat that has to stay readable, and of the three the file
+              // tree is the least useful while a turn is running. It has its own persisted flag, so this is
+              // reversible and the user can reopen it.
+              setStore("commentary", "panelOpened", true)
+              if (fileTreeOpened()) setStore("fileTree", "opened", false)
+            },
+            close() {
+              setStore("commentary", "panelOpened", false)
+            },
+            toggle() {
+              setStore("commentary", "panelOpened", !commentaryPanelOpened())
+              if (fileTreeOpened()) setStore("fileTree", "opened", false)
+            },
+            resize(width: number) {
+              setStore("commentary", "width", Math.min(COMMENTARY_PANEL_WIDTH_MAX, Math.max(COMMENTARY_PANEL_WIDTH_MIN, width)))
             },
           },
           review: {
