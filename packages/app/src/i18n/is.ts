@@ -415,6 +415,8 @@ export const dict = {
   "app.server.unreachable": "Ekki tókst að ná í {{server}}",
   "app.server.retrying": "Reynir sjálfkrafa aftur...",
   "app.server.otherServers": "Aðrir netþjónar",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Netþjónar",
   "dialog.server.description": "Skiptu um hvaða OpenCode miðlara þetta app tengist.",
   "dialog.server.search.placeholder": "Leitaðu að netþjónum",

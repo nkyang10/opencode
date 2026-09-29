@@ -411,6 +411,8 @@ export const dict = {
   "app.server.unreachable": "Nelze dosáhnout {{server}}",
   "app.server.retrying": "Automaticky opakování...",
   "app.server.otherServers": "Jiné servery",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "servery",
   "dialog.server.description": "Přepněte, ke kterému OpenCode serveru se tato aplikace připojuje.",
   "dialog.server.search.placeholder": "Vyhledávací servery",

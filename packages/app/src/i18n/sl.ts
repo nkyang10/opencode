@@ -410,6 +410,8 @@ export const dict = {
   "app.server.unreachable": "Ni bilo mogoče doseči {{server}}",
   "app.server.retrying": "Samodejni ponovni poskus ...",
   "app.server.otherServers": "Drugi strežniki",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Strežniki",
   "dialog.server.description": "Preklopite, s katerim strežnikom OpenCode se povezuje ta aplikacija.",
   "dialog.server.search.placeholder": "Iskanje strežnikov",

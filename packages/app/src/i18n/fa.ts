@@ -411,6 +411,8 @@ export const dict = {
   "app.server.unreachable": "نمی توان به {{server}} رسید",
   "app.server.retrying": "تلاش مجدد به صورت خودکار...",
   "app.server.otherServers": "سرورهای دیگر",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "سرورها",
   "dialog.server.description": "این برنامه به کدام سرور OpenCode متصل است، تغییر دهید.",
   "dialog.server.search.placeholder": "جستجو در سرورها",

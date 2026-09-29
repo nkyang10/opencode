@@ -851,6 +851,8 @@ export const dict = {
   "app.server.unreachable": "{{server}}에 연결할 수 없습니다",
   "app.server.retrying": "자동으로 재시도 중...",
   "app.server.otherServers": "다른 서버",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.add.usernamePlaceholder": "사용자 이름",
   "dialog.server.add.passwordPlaceholder": "비밀번호",
   "server.row.noUsername": "사용자 이름 없음",

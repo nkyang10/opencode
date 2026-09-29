@@ -416,3 +416,28 @@ const table = sqliteTable("session", {
   `diffSummaryOverflow` / `diffSummaryVisible` were extracted to
   `timeline/diff-summary-state.ts` because `packages/app` has **no** `*.test.tsx`, so only pure logic is
   unit-testable.
+
+**The window title counts agent tabs (2026-09-29, FE-027 / DEC-056):** `document.title` reads
+`MarkCode` with no counter, or `MarkCode [1 of 2]` once agent tabs are open — **1 = the open agent
+tabs that are finished/idle, 2 = every open agent tab**. It is written by
+`packages/app/src/components/document-title.tsx`, mounted in `SharedProviders` (`app.tsx`) beside
+`BodyDesignClass`, i.e. inside the router root so it survives every route change and covers the
+browser tab, the installed PWA and the desktop window at once. Four things to know before changing it:
+
+- **It reuses two existing sources and must not grow a third.** The tabs are `useTabs().store` (the
+  persisted titlebar list) and the status is `sync.session.data.session_working(sessionID)`
+  (`server-session.ts:214`), reached per server through `useGlobal().ensureServerCtx`. A second status
+  source is how the title would start disagreeing with the sidebar dot and the Thinking row.
+- **`session_working` is the whole definition of "not finished"** — `busy` and `retry` both count, and a
+  session that has no status entry counts as idle. A tab blocked on a permission/question therefore
+  counts as **finished** (it is the user's move, not the agent's), exactly as the sidebar treats it
+  (`pages/layout/sidebar-items.tsx:173-176`).
+- **Draft tabs are excluded from both numbers.** A `DraftTab` has no session and cannot be busy, so
+  counting it would report an agent that does not exist yet as finished. This is observable: with a
+  draft open next to one busy session the title stays `[0 of 1]` while the tab strip shows two tabs.
+  The moment the draft is promoted (`promoteDraft`, i.e. the first prompt) it joins the count.
+- **`MarkCode` is not an i18n key; the counter is.** The product name stays in code (it is already the
+  static `index.html:9`). The counter is `app.title.tabs` in `packages/app/src/i18n/en.ts` + **all 61**
+  non-English locales — English source copy byte-for-byte except `zh`/`zht`
+  (`[已完成 {{done}} / 共 {{total}}]`) — because `i18n/parity.test.ts` fails if one is missing. Adding a
+  second visible string to the title means 61 more locale edits.

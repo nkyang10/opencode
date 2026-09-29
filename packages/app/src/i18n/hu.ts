@@ -415,6 +415,8 @@ export const dict = {
   "app.server.unreachable": "A {{server}} nem érhető el",
   "app.server.retrying": "Automatikus újrapróbálkozás...",
   "app.server.otherServers": "Egyéb szerverek",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Szerverek",
   "dialog.server.description": "Állítsa be, hogy ez az alkalmazás melyik OpenCode szerverhez csatlakozzon.",
   "dialog.server.search.placeholder": "Szerverek keresése",

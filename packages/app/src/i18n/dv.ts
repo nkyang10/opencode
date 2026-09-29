@@ -417,6 +417,8 @@ export const dict = {
   "app.server.unreachable": "{{server}} އަށް ވާސިލްވެވޭ ގޮތެއް ނުވިއެވެ",
   "app.server.retrying": "އޮޓޮމެޓިކުން އަލުން މަސައްކަތް ކުރަނީ...",
   "app.server.otherServers": "އެހެން ސަރވަރތަކެވެ",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "ސަރވަރސް",
   "dialog.server.description": "މި އެޕް ގުޅޭނީ ކޮން OpenCode ސަރވަރަކާ ބަދަލުކޮށްލާށެވެ.",
   "dialog.server.search.placeholder": "ސަރވަރތައް ހޯދުން",

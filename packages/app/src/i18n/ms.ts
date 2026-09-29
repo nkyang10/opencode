@@ -411,6 +411,8 @@ export const dict = {
   "app.server.unreachable": "Tidak dapat menghubungi {{server}}",
   "app.server.retrying": "Mencuba semula secara automatik...",
   "app.server.otherServers": "Pelayan lain",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Pelayan",
   "dialog.server.description": "Tukar pelayan OpenCode yang disambungkan oleh aplikasi ini.",
   "dialog.server.search.placeholder": "Cari pelayan",

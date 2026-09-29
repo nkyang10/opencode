@@ -410,6 +410,8 @@ export const dict = {
   "app.server.unreachable": "មិនអាចទៅដល់ {{server}} បានទេ។",
   "app.server.retrying": "កំពុងព្យាយាមម្តងទៀតដោយស្វ័យប្រវត្តិ...",
   "app.server.otherServers": "ម៉ាស៊ីនមេផ្សេងទៀត។",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "ម៉ាស៊ីនមេ",
   "dialog.server.description": "ប្តូរម៉ាស៊ីនមេ OpenCode ដែលកម្មវិធីនេះភ្ជាប់ទៅ។",
   "dialog.server.search.placeholder": "ម៉ាស៊ីនមេស្វែងរក",

@@ -410,6 +410,8 @@ export const dict: Record<string, string> = {
   "app.server.unreachable": "{{server}} වෙත ළඟා විය නොහැක",
   "app.server.retrying": "ස්වයංක්‍රීයව නැවත උත්සාහ කරමින්...",
   "app.server.otherServers": "වෙනත් සේවාදායකයන්",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "සේවාදායකයන්",
   "dialog.server.description": "මෙම යෙදුම සම්බන්ධ වන්නේ කුමන OpenCode සේවාදායකයටද යන්න මාරු කරන්න.",
   "dialog.server.search.placeholder": "සර්වර් සොයන්න",

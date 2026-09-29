@@ -320,6 +320,8 @@ export const dict = {
   "app.server.unreachable": "Impossibile raggiungere {{server}}",
   "app.server.retrying": "Nuovo tentativo automatico...",
   "app.server.otherServers": "Altri server",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Server",
   "dialog.server.description": "Cambia il server OpenCode a cui si connette l'app.",
   "dialog.server.search.placeholder": "Cerca server",

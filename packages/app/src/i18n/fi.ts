@@ -318,6 +318,8 @@ export const dict = {
   "app.server.unreachable": "Palvelimeen {{server}} ei saatu yhteyttä",
   "app.server.retrying": "Yritetään automaattisesti uudelleen...",
   "app.server.otherServers": "Muut palvelimet",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Palvelimet",
   "dialog.server.description": "Vaihda OpenCode-palvelimeen, johon tämä sovellus muodostaa yhteyden.",
   "dialog.server.search.placeholder": "Etsi palvelimia",

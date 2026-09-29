@@ -411,6 +411,8 @@ export const dict = {
   "app.server.unreachable": "Neizdevās sasniegt {{server}}",
   "app.server.retrying": "Automātiska atkārtota mēģināšana...",
   "app.server.otherServers": "Citi serveri",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Serveri",
   "dialog.server.description": "Mainiet, pie kura OpenCode servera šī lietotne pieslēdzas.",
   "dialog.server.search.placeholder": "Meklēt serverus",

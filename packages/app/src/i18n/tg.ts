@@ -413,6 +413,8 @@ export const dict = {
   "app.server.unreachable": "Ба {{server}} расида натавонистам",
   "app.server.retrying": "Кӯшиши худкор...",
   "app.server.otherServers": "Дигар серверҳо",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Серверҳо",
   "dialog.server.description": "Гузариш кунед, ки ин барнома ба кадом сервери OpenCode пайваст мешавад.",
   "dialog.server.search.placeholder": "Ҷустуҷӯи серверҳо",

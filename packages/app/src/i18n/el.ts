@@ -413,6 +413,8 @@ export const dict = {
   "app.server.unreachable": "Δεν ήταν δυνατή η πρόσβαση στο {{server}}",
   "app.server.retrying": "Αυτόματη προσπάθεια επανάληψης...",
   "app.server.otherServers": "Άλλοι διακομιστές",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Διακομιστές",
   "dialog.server.description": "Αλλαγή σε ποιον διακομιστή OpenCode συνδέεται αυτή η εφαρμογή.",
   "dialog.server.search.placeholder": "Αναζήτηση διακομιστών",

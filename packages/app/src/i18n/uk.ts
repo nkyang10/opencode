@@ -447,6 +447,8 @@ export const dict = {
   "app.server.retrying": "Автоматична повторна спроба...",
   "app.server.otherServers": "Інші сервери",
 
+  "app.title.tabs": "[{{done}} of {{total}}]",
+
   "dialog.server.title": "Сервери",
   "dialog.server.description": "Перемкніть сервер OpenCode, до якого підключається ця програма.",
   "dialog.server.search.placeholder": "Пошук серверів",

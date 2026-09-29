@@ -412,6 +412,8 @@ export const dict = {
   "app.server.unreachable": "Kunde inte nå {{server}}",
   "app.server.retrying": "Försöker igen automatiskt...",
   "app.server.otherServers": "Andra servrar",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Servrar",
   "dialog.server.description": "Växla vilken OpenCode-server som denna app ansluter till.",
   "dialog.server.search.placeholder": "Sök servrar",

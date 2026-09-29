@@ -416,6 +416,8 @@ export const dict = {
   "app.server.unreachable": "Nepavyko pasiekti {{server}}",
   "app.server.retrying": "Automatiškai bandoma iš naujo...",
   "app.server.otherServers": "Kiti serveriai",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Serveriai",
   "dialog.server.description": "Perjunkite, prie kurio OpenCode serverio jungiasi ši programa.",
   "dialog.server.search.placeholder": "Paieškos serveriai",

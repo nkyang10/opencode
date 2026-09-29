@@ -410,6 +410,8 @@ export const dict = {
   "app.server.unreachable": "Nepodarilo sa kontaktovať {{server}}",
   "app.server.retrying": "Automaticky opakujem...",
   "app.server.otherServers": "Iné servery",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Servery",
   "dialog.server.description": "Vyberte, ku ktorému OpenCode serveru sa aplikácia pripája.",
   "dialog.server.search.placeholder": "Hľadať servery",

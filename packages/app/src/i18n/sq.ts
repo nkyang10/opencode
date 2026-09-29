@@ -412,6 +412,8 @@ export const dict = {
   "app.server.unreachable": "{{server}} nuk mund të arrihet",
   "app.server.retrying": "Po riprovohet automatikisht...",
   "app.server.otherServers": "Serverë të tjerë",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Serverat",
   "dialog.server.description": "Ndrysho me cilin server OpenCode lidhet ky aplikacion.",
   "dialog.server.search.placeholder": "Kërko serverët",

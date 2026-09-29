@@ -420,6 +420,8 @@ export const dict = {
   "app.server.unreachable": "{{server}} تک نہیں پہنچ سکا",
   "app.server.retrying": "خودکار طور پر دوبارہ کوشش کر رہا ہے...",
   "app.server.otherServers": "دوسرے سرورز",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "سرورز",
   "dialog.server.description": "سوئچ کریں کہ یہ ایپ کس OpenCode سرور سے منسلک ہے۔",
   "dialog.server.search.placeholder": "سرورز تلاش کریں۔",

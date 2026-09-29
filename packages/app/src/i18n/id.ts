@@ -446,6 +446,8 @@ export const dict = {
   "app.server.retrying": "Mencoba ulang secara otomatis...",
   "app.server.otherServers": "Server lainnya",
 
+  "app.title.tabs": "[{{done}} of {{total}}]",
+
   "dialog.server.title": "Server",
   "dialog.server.description": "Ganti server OpenCode mana yang terhubung dengan aplikasi ini.",
   "dialog.server.search.placeholder": "Cari server",

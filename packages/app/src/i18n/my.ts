@@ -415,6 +415,8 @@ export const dict = {
   "app.server.unreachable": "{{server}} သို့ မရောက်ရှိနိုင်ပါ။",
   "app.server.retrying": "အလိုအလျောက် ပြန်ကြိုးစားနေသည်...",
   "app.server.otherServers": "အခြားဆာဗာများ",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "ဆာဗာများ",
   "dialog.server.description": "ဤအက်ပ်နှင့်ချိတ်ဆက်သည့် OpenCode ဆာဗာကို ပြောင်းပါ။",
   "dialog.server.search.placeholder": "ဆာဗာများကို ရှာဖွေပါ။",

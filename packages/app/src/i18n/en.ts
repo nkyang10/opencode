@@ -348,6 +348,8 @@ export const dict = {
   "app.server.retrying": "Retrying automatically...",
   "app.server.otherServers": "Other servers",
 
+  "app.title.tabs": "[{{done}} of {{total}}]",
+
   "dialog.server.title": "Servers",
   "dialog.server.description": "Switch which OpenCode server this app connects to.",
   "dialog.server.search.placeholder": "Search servers",

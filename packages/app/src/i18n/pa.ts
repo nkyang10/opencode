@@ -418,6 +418,8 @@ export const dict = {
   "app.server.unreachable": "{{server}} تک نئیں اپڑ سکیا",
   "app.server.retrying": "خود بخود دوبارہ کوشش کر رئے آں...",
   "app.server.otherServers": "ہور سرور",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "سرورز",
   "dialog.server.description": "ایہہ ایپ کس OpenCode سرور نال جڑدی اے، اس نوں سوئچ کرو۔",
   "dialog.server.search.placeholder": "سرچ سرورز",

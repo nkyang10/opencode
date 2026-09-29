@@ -410,6 +410,8 @@ export const dict = {
   "app.server.unreachable": "ບໍ່ສາມາດບັນລຸ {{server}}",
   "app.server.retrying": "ກຳລັງລອງໃໝ່ໂດຍອັດຕະໂນມັດ...",
   "app.server.otherServers": "ເຊີບເວີອື່ນໆ",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "ເຊີບເວີ",
   "dialog.server.description": "ສະຫຼັບເຊີບເວີ OpenCode ທີ່ແອັບຯນີ້ເຊື່ອມຕໍ່ກັບ.",
   "dialog.server.search.placeholder": "ເຊີບເວີຄົ້ນຫາ",

@@ -68,6 +68,7 @@ import { createSessionLineage } from "@/pages/session/session-lineage"
 import { SessionPage, SessionRouteErrorBoundary, TargetSessionRouteContent } from "@/pages/session"
 import { NewHome } from "@/pages/home"
 import { LegacyHome } from "@/pages/home/legacy-home"
+import { DocumentTitle } from "@/components/document-title"
 
 const NewSession = lazy(() => import("@/pages/new-session"))
 
@@ -314,6 +315,7 @@ function SharedProviders(props: ParentProps) {
   return (
     <>
       <BodyDesignClass />
+      <DocumentTitle />
       <CommandProvider>
         <DesktopCommands />
         <HighlightsProvider>{props.children}</HighlightsProvider>

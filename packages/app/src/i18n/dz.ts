@@ -416,6 +416,8 @@ export const dict: Record<string, string> = {
   "app.server.unreachable": "{{server}} ལུ་ལྷོད་མ་ཚུགས།",
   "app.server.retrying": "རང་བཞིན་གྱིས་ལོག་འབད་རྩོལ་བསྐྱེད་དོ།",
   "app.server.otherServers": "སར་བར་གཞན་ཚུ།",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "སར་བར་ཚུ།",
   "dialog.server.description": "གློག་རིམ་འདི་གིས་OpenCodeསར་བར་ག་ལུ་མཐུདཔ་ཨིན་ན་སོར་བསྒྱུར་འབད།",
   "dialog.server.search.placeholder": "སར་བར་ཚུ་འཚོལ་ཞིབ་འབད།",

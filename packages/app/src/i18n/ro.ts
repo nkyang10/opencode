@@ -410,6 +410,8 @@ export const dict = {
   "app.server.unreachable": "Nu s-a putut accesa {{server}}",
   "app.server.retrying": "Se reîncearcă automat...",
   "app.server.otherServers": "Alte servere",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Servere",
   "dialog.server.description": "Schimbă serverul OpenCode la care se conectează aplicația.",
   "dialog.server.search.placeholder": "Caută servere",

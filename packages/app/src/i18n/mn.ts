@@ -414,6 +414,8 @@ export const dict = {
   "app.server.unreachable": "{{server}}-д хүрч чадсангүй",
   "app.server.retrying": "Автоматаар дахин оролдож байна...",
   "app.server.otherServers": "Бусад серверүүд",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Серверүүд",
   "dialog.server.description": "Энэ апп аль OpenCode серверт холбогдохыг сэлгэнэ үү.",
   "dialog.server.search.placeholder": "Хайлтын серверүүд",

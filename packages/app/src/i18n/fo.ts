@@ -410,6 +410,8 @@ export const dict = {
   "app.server.unreachable": "Kundi ikki náa {{server}}.",
   "app.server.retrying": "Roynir aftur sjálvvirkandi...",
   "app.server.otherServers": "Aðrir ambætarar",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Ambætarar",
   "dialog.server.description": "Skift hvønn OpenCode ambætara henda appin hevur samband við.",
   "dialog.server.search.placeholder": "Leita eftir ambætarum",

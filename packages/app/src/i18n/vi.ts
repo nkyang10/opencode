@@ -418,6 +418,8 @@ export const dict = {
   "app.server.unreachable": "Không thể đạt tới {{server}}",
   "app.server.retrying": "Đang tự động thử lại...",
   "app.server.otherServers": "Máy chủ khác",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Máy chủ",
   "dialog.server.description": "Chuyển máy chủ OpenCode mà ứng dụng này kết nối tới.",
   "dialog.server.search.placeholder": "Tìm kiếm máy chủ",

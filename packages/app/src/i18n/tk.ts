@@ -411,6 +411,8 @@ export const dict = {
   "app.server.unreachable": "{{server}} baryp bilmedi",
   "app.server.retrying": "Awtomatiki usulda gaýtadan synanyşmak ...",
   "app.server.otherServers": "Beýleki serwerler",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Serwerler",
   "dialog.server.description": "Bu programmanyň haýsy OpenCode serwerine birikýändigini üýtgediň.",
   "dialog.server.search.placeholder": "Serwerleri gözläň",

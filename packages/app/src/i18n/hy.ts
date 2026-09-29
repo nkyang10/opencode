@@ -413,6 +413,8 @@ export const dict = {
   "app.server.unreachable": "Չհաջողվեց հասնել {{server}}",
   "app.server.retrying": "Նորից ինքնաբերաբար...",
   "app.server.otherServers": "Այլ սերվերներ",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Սերվերներ",
   "dialog.server.description": "Փոխարկեք, թե որ OpenCode սերվերին է միանում այս հավելվածը։",
   "dialog.server.search.placeholder": "Որոնման սերվերներ",

@@ -407,6 +407,8 @@ export const dict = {
   "app.server.unreachable": "{{server}}ን መድረስ አልተቻለም",
   "app.server.retrying": "በራስ ሰር እንደገና በመሞከር ላይ...",
   "app.server.otherServers": "ሌሎች አገልጋዮች",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "አገልጋዮች",
   "dialog.server.description": "ይህ መተግበሪያ ከየትኛው OpenCode አገልጋይ ጋር እንደሚገናኝ ይቀይሩ።",
   "dialog.server.search.placeholder": "የፍለጋ አገልጋዮች",

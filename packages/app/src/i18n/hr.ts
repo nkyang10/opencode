@@ -415,6 +415,8 @@ export const dict = {
   "app.server.unreachable": "Nije moguće doći do {{server}}",
   "app.server.retrying": "Automatski ponovni pokušaj...",
   "app.server.otherServers": "Ostali poslužitelji",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "poslužitelji",
   "dialog.server.description": "Promijenite na koji se OpenCode poslužitelj povezuje ova aplikacija.",
   "dialog.server.search.placeholder": "Pretraživanje poslužitelja",

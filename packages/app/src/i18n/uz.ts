@@ -413,6 +413,8 @@ export const dict = {
   "app.server.unreachable": "{{server}} ga etib boʻlmadi",
   "app.server.retrying": "Avtomatik qayta urinish...",
   "app.server.otherServers": "Boshqa serverlar",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Serverlar",
   "dialog.server.description": "Ushbu ilova qaysi OpenCode serveriga ulanishini almashtiring.",
   "dialog.server.search.placeholder": "Serverlarni qidirish",

@@ -410,6 +410,8 @@ export const dict = {
   "app.server.unreachable": "Ei saanud ühendust {{server}}",
   "app.server.retrying": "Automaatne uuesti proovimine...",
   "app.server.otherServers": "Muud serverid",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Serverid",
   "dialog.server.description": "Lülitage, millise OpenCode serveriga see rakendus ühenduse loob.",
   "dialog.server.search.placeholder": "Otsi serveritest",

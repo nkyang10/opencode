@@ -413,6 +413,8 @@ export const dict = {
   "app.server.unreachable": "No s'ha pogut arribar a {{server}}",
   "app.server.retrying": "S'està tornant a provar automàticament...",
   "app.server.otherServers": "Altres servidors",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "Servidors",
   "dialog.server.description": "Canvia a quin OpenCode servidor es connecta aquesta aplicació.",
   "dialog.server.search.placeholder": "Servidors de cerca",

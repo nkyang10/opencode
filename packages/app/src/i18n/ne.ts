@@ -412,6 +412,8 @@ export const dict: Record<string, string> = {
   "app.server.unreachable": "{{server}} मा पुग्न सकिएन",
   "app.server.retrying": "स्वतः पुन: प्रयास गर्दै...",
   "app.server.otherServers": "अन्य सर्भरहरू",
+
+  "app.title.tabs": "[{{done}} of {{total}}]",
   "dialog.server.title": "सर्भरहरू",
   "dialog.server.description": "यो एप जडान भएको OpenCode सर्भरलाई स्विच गर्नुहोस्।",
   "dialog.server.search.placeholder": "सर्भरहरू खोज्नुहोस्",
