@@ -970,6 +970,7 @@ export const dict = {
   "settings.general.section.feed": "Oziqlantirish",
   "settings.general.section.display": "Displey",
   "settings.general.section.debug": "Debug",
+  "settings.general.section.commentary": "Commentary",
   "settings.general.row.testNotification.title": "Test notification",
   "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
   "settings.general.row.testNotification.sendLabel": "Send test",
@@ -1024,6 +1025,15 @@ export const dict = {
   "settings.general.row.editToolPartsExpanded.description":
     "Vaqt jadvalida sukut boʻyicha kengaytirilgan tahrirlash, yozish va tuzatish vositalari qismlarini koʻrsatish",
   "settings.general.row.newInterface.title": "Yangi tartib",
+  "settings.general.commentary.row.enabled.title": "Narrate while the agent works",
+  "settings.general.commentary.row.enabled.description":
+    "When this is off, this device does not ask the server to narrate. Other devices are not affected.",
+  "settings.general.commentary.row.instructions.title": "Narration preferences",
+  "settings.general.commentary.row.instructions.description":
+    "How the narration should be written: tone, technical level, point of view. Added to the prompt that writes each line.",
+  "settings.general.commentary.row.instructions.placeholder":
+    "For example: explain like a senior engineer pairing with me. Be concrete and skip the basics.",
+  "settings.general.commentary.row.instructions.saved.title": "Narration preferences saved",
   "settings.general.row.newInterface.badge": "Yangi",
   "settings.general.row.newInterface.description":
     "Yangi yorliqlar va uy tartibidan foydalaning. Cheklangan vaqt uchun tartiblar o'rtasida almashinish.",

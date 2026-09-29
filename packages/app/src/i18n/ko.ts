@@ -608,6 +608,7 @@ export const dict = {
   "settings.general.section.feed": "피드",
   "settings.general.section.display": "디스플레이",
   "settings.general.section.debug": "Debug",
+  "settings.general.section.commentary": "Commentary",
   "settings.general.row.testNotification.title": "Test notification",
   "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
   "settings.general.row.testNotification.sendLabel": "Send test",
@@ -1113,6 +1114,15 @@ export const dict = {
   "settings.general.row.showCustomAgents.description":
     "입력창에서 에이전트를 전환합니다. 숨기면 기본적으로 Build 에이전트를 사용합니다.",
   "settings.general.row.newInterface.title": "새 레이아웃",
+  "settings.general.commentary.row.enabled.title": "Narrate while the agent works",
+  "settings.general.commentary.row.enabled.description":
+    "When this is off, this device does not ask the server to narrate. Other devices are not affected.",
+  "settings.general.commentary.row.instructions.title": "Narration preferences",
+  "settings.general.commentary.row.instructions.description":
+    "How the narration should be written: tone, technical level, point of view. Added to the prompt that writes each line.",
+  "settings.general.commentary.row.instructions.placeholder":
+    "For example: explain like a senior engineer pairing with me. Be concrete and skip the basics.",
+  "settings.general.commentary.row.instructions.saved.title": "Narration preferences saved",
   "settings.general.row.newInterface.badge": "신규",
   "settings.general.row.newInterface.description":
     "새 탭과 홈 화면 레이아웃을 사용합니다. 제한된 기간 동안 레이아웃을 전환할 수 있습니다.",

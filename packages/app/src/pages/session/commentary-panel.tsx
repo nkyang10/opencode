@@ -1,27 +1,27 @@
-import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { Icon } from "@opencode-ai/ui/icon"
 import type { SessionCommentaryEvent } from "@opencode-ai/schema/session-commentary-event"
 import { useLanguage } from "@/context/language"
 import { useServer } from "@/context/server"
 import { useSync } from "@/context/sync"
-import { fetchCommentary, setCommentaryWatch } from "@/utils/server"
+import { fetchCommentary } from "@/utils/server"
 import { getRelativeTime } from "@/utils/time"
 
 /**
  * FE-028: the live narration of what the agent is doing. Entries are written by the server
  * (`SessionCommentary`) and arrive over SSE; the initial paint comes from `GET /session/{id}/commentary`.
  *
- * Mounting this component is also what takes the lease: while it is on screen the server keeps a
- * narration running, and when it unmounts the lease expires within `LEASE_TTL_MS`. That is why the watch
- * heartbeat lives here rather than in the store — visibility of the panel *is* the signal.
+ * This component is presentational. It used to own the lease itself — take it on mount, release on
+ * unmount — which was right on desktop where this column *is* the watch signal, but wrong on mobile where
+ * the panel is a tab: tapping back to the chat would have stopped the narration. The lease now belongs to
+ * the session view via `createCommentaryWatch`, so the same component renders unchanged in both places.
  */
 export function CommentaryPanel(props: { sessionID: string | undefined }) {
   const language = useLanguage()
   const server = useServer()
   const sync = useSync()
   let scroller: HTMLDivElement | undefined
-  let heartbeat: number | undefined
   let atBottom = true
 
   // The sync store is written only by the event reducer, so the initial paint is kept here and merged with
@@ -48,13 +48,6 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
 
   const http = createMemo(() => server.current?.http)
 
-  const watch = (watching: boolean) => {
-    const id = sessionID()
-    const base = http()
-    if (!id || !base) return
-    void setCommentaryWatch({ server: base, sessionID: id, watching })
-  }
-
   const onScroll = () => {
     const el = scroller
     if (!el) return
@@ -63,25 +56,15 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
     atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24
   }
 
+  // The initial paint only. The lease is owned by the session view (see `commentary-watch.ts`), so this
+  // component can be mounted and unmounted freely without ever stopping the narration.
   createEffect(() => {
     const id = sessionID()
     const base = http()
     if (!id || !base) return
-    watch(true)
-    // The initial paint; anything after this arrives over SSE.
     setInitial([])
     void fetchCommentary({ server: base, sessionID: id, limit: 50 }).then((rows) => {
       if (rows.length > 0) setInitial(rows)
-    })
-    // 15s heartbeat against a 45s lease: one dropped request (a sleeping phone, a tunnel hiccup) must not
-    // end the narration, and the TTL is the backstop for a tab that closes without releasing.
-    heartbeat = window.setInterval(() => watch(true), 15_000)
-    onCleanup(() => {
-      if (heartbeat !== undefined) window.clearInterval(heartbeat)
-      watch(false)
-      const release = () => watch(false)
-      window.addEventListener("pagehide", release, { once: true })
-      onCleanup(() => window.removeEventListener("pagehide", release))
     })
   })
 

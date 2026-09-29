@@ -146,6 +146,25 @@
   justify-content: flex-end;
 }
 
+/* A stacked row is for a control that needs the full width (a textarea), so it drops under the copy
+   instead of competing with it, and its buttons stay right-aligned against the field. */
+[data-component="settings-v2-row"][data-stacked] {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+[data-component="settings-v2-row"][data-stacked] [data-slot="settings-v2-row-control"] {
+  width: 100%;
+  flex-shrink: 1;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+[data-component="settings-v2-row"][data-stacked] [data-slot="settings-v2-row-control"] [data-component="textarea-v2"] {
+  width: 100%;
+}
+
 [data-slot="settings-v2-row-control"] > div:has([data-component="switch"]),
 [data-slot="settings-v2-row-control"] > [data-component="switch"] {
   display: inline-flex;

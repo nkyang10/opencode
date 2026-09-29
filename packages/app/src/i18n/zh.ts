@@ -951,6 +951,7 @@ export const dict = {
   "settings.general.section.feed": "动态",
   "settings.general.section.display": "显示",
   "settings.general.section.debug": "调试",
+  "settings.general.section.commentary": "Commentary",
 
   "settings.general.row.testNotification.title": "测试通知",
 
@@ -1001,6 +1002,15 @@ export const dict = {
   "settings.general.row.editToolPartsExpanded.title": "展开编辑工具调用",
   "settings.general.row.editToolPartsExpanded.description": "默认在时间线中展开 edit、write 和 patch 工具调用详情",
   "settings.general.row.newInterface.title": "新布局",
+  "settings.general.commentary.row.enabled.title": "Narrate while the agent works",
+  "settings.general.commentary.row.enabled.description":
+    "When this is off, this device does not ask the server to narrate. Other devices are not affected.",
+  "settings.general.commentary.row.instructions.title": "Narration preferences",
+  "settings.general.commentary.row.instructions.description":
+    "How the narration should be written: tone, technical level, point of view. Added to the prompt that writes each line.",
+  "settings.general.commentary.row.instructions.placeholder":
+    "For example: explain like a senior engineer pairing with me. Be concrete and skip the basics.",
+  "settings.general.commentary.row.instructions.saved.title": "Narration preferences saved",
   "settings.general.row.newInterface.badge": "新",
   "settings.general.row.newInterface.description": "使用新的标签页和主页布局。在有限时间内可在不同布局之间切换。",
   "settings.general.row.newInterfaceNotice.title": "你现在使用的是新布局",

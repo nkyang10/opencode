@@ -293,6 +293,8 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         commentary: {
           panelOpened: false,
           width: DEFAULT_COMMENTARY_PANEL_WIDTH,
+          enabled: true,
+          instructions: "",
         },
         fileTree: {
           opened: false,
@@ -601,6 +603,19 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
     let sessionFrame: number | undefined
     let sessionTimer: number | undefined
 
+    /**
+     * The narration preferences, per browser (FE-029). Declared as locals because they are exposed twice —
+     * once at the top of the layout for the Settings dialog, which is reachable outside any session route,
+     * and once on `view().commentaryPanel` for the session view. One declaration, so the switch and the
+     * panel it controls can never disagree. `store.commentary` is read through `?.` because a store
+     * persisted before FE-029 has no `enabled` or `instructions` key, and absent means the defaults.
+     */
+    const commentaryEnabled = createMemo(() => store.commentary?.enabled ?? true)
+    const commentaryInstructions = createMemo(() => store.commentary?.instructions ?? "")
+    const setCommentaryEnabled = (enabled: boolean) => setStore("commentary", "enabled", enabled)
+    const setCommentaryInstructions = (instructions: string) =>
+      setStore("commentary", "instructions", instructions)
+
     onMount(() => {
       sessionFrame = requestAnimationFrame(() => {
         sessionFrame = undefined
@@ -749,6 +764,17 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           }
           setStore("fileTree", "width", width)
         },
+      },
+      /**
+       * The narration preferences, per browser (FE-029). Exposed here as well as on
+       * `view().commentaryPanel` because the Settings dialog is reachable outside any session route, and
+       * both surfaces read the same two memos declared above.
+       */
+      commentary: {
+        enabled: commentaryEnabled,
+        instructions: commentaryInstructions,
+        setEnabled: setCommentaryEnabled,
+        setInstructions: setCommentaryInstructions,
       },
       session: {
         width: createMemo(() => store.session?.width ?? DEFAULT_SESSION_WIDTH),
@@ -928,6 +954,14 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           commentaryPanel: {
             opened: createMemo(() => store.commentary?.panelOpened ?? false),
             width: createMemo(() => store.commentary?.width ?? DEFAULT_COMMENTARY_PANEL_WIDTH),
+            /**
+             * Whether this device narrates at all, and how it likes the narration written. Delegates to
+             * the top-level `commentary` accessor, which the Settings dialog also reads.
+             */
+            enabled: commentaryEnabled,
+            instructions: commentaryInstructions,
+            setEnabled: setCommentaryEnabled,
+            setInstructions: setCommentaryInstructions,
             open() {
               // Three columns do not fit beside a chat that has to stay readable, and of the three the file
               // tree is the least useful while a turn is running. It has its own persisted flag, so this is

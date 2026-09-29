@@ -165,20 +165,32 @@ export async function setCommentaryWatch(input: {
   server: ServerConnection.HttpBase
   sessionID: string
   watching: boolean
+  /**
+   * The reader's narration preferences, sent on every heartbeat so an edit in Settings applies on the next
+   * tick without a restart. Ignored when unwatching. The server normalises and caps it.
+   */
+  instructions?: string
   fetch?: typeof globalThis.fetch
 }): Promise<void> {
+  const auth = input.server.password
+    ? {
+        Authorization: `Basic ${authTokenFromCredentials({
+          username: input.server.username,
+          password: input.server.password,
+        })}`,
+      }
+    : undefined
+  // The watch route declares a payload, so its body is always sent — `{}` when there is nothing to say. The
+  // unwatch route takes no payload, so it keeps sending no body.
+  const body = input.watching
+    ? JSON.stringify(input.instructions === undefined ? {} : { instructions: input.instructions })
+    : undefined
   await (input.fetch ?? globalThis.fetch)(
     `${input.server.url}/session/${input.sessionID}/commentary/${input.watching ? "watch" : "unwatch"}`,
     {
       method: "POST",
-      headers: input.server.password
-        ? {
-            Authorization: `Basic ${authTokenFromCredentials({
-              username: input.server.username,
-              password: input.server.password,
-            })}`,
-          }
-        : undefined,
+      headers: body === undefined ? auth : { "Content-Type": "application/json", ...auth },
+      body,
     },
   ).catch(() => undefined)
 }

@@ -961,6 +961,7 @@ export const dict: Record<string, string> = {
   "settings.general.section.feed": "খাওয়ান",
   "settings.general.section.display": "প্রদর্শন",
   "settings.general.section.debug": "Debug",
+  "settings.general.section.commentary": "Commentary",
   "settings.general.row.testNotification.title": "Test notification",
   "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
   "settings.general.row.testNotification.sendLabel": "Send test",
@@ -1010,6 +1011,15 @@ export const dict: Record<string, string> = {
   "settings.general.row.editToolPartsExpanded.description":
     "টাইমলাইনে ডিফল্টরূপে প্রসারিত সম্পাদনা, লিখুন এবং প্যাচ টুল অংশগুলি দেখান৷",
   "settings.general.row.newInterface.title": "নতুন লেআউট",
+  "settings.general.commentary.row.enabled.title": "Narrate while the agent works",
+  "settings.general.commentary.row.enabled.description":
+    "When this is off, this device does not ask the server to narrate. Other devices are not affected.",
+  "settings.general.commentary.row.instructions.title": "Narration preferences",
+  "settings.general.commentary.row.instructions.description":
+    "How the narration should be written: tone, technical level, point of view. Added to the prompt that writes each line.",
+  "settings.general.commentary.row.instructions.placeholder":
+    "For example: explain like a senior engineer pairing with me. Be concrete and skip the basics.",
+  "settings.general.commentary.row.instructions.saved.title": "Narration preferences saved",
   "settings.general.row.newInterface.badge": "নতুন",
   "settings.general.row.newInterface.description":
     "নতুন ট্যাব এবং হোম লেআউট ব্যবহার করুন. একটি সীমিত সময়ের জন্য লেআউটগুলির মধ্যে স্যুইচ করুন৷",

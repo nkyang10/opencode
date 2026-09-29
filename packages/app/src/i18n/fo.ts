@@ -962,6 +962,7 @@ export const dict = {
   "settings.general.section.feed": "Fóður",
   "settings.general.section.display": "Sýn",
   "settings.general.section.debug": "Debug",
+  "settings.general.section.commentary": "Commentary",
   "settings.general.row.testNotification.title": "Test notification",
   "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
   "settings.general.row.testNotification.sendLabel": "Send test",
@@ -1011,6 +1012,15 @@ export const dict = {
   "settings.general.row.editToolPartsExpanded.description":
     "Vís rætta, skriva og lappa tólpartar víðkaðir sum standard á tíðarlinjuni",
   "settings.general.row.newInterface.title": "Nýggj uppseting",
+  "settings.general.commentary.row.enabled.title": "Narrate while the agent works",
+  "settings.general.commentary.row.enabled.description":
+    "When this is off, this device does not ask the server to narrate. Other devices are not affected.",
+  "settings.general.commentary.row.instructions.title": "Narration preferences",
+  "settings.general.commentary.row.instructions.description":
+    "How the narration should be written: tone, technical level, point of view. Added to the prompt that writes each line.",
+  "settings.general.commentary.row.instructions.placeholder":
+    "For example: explain like a senior engineer pairing with me. Be concrete and skip the basics.",
+  "settings.general.commentary.row.instructions.saved.title": "Narration preferences saved",
   "settings.general.row.newInterface.badge": "Nýtt",
   "settings.general.row.newInterface.description":
     "Brúka nýggju fliparnar og heimauppsetingina. Skift millum uppsetingar í eina avmarkaða tíð.",

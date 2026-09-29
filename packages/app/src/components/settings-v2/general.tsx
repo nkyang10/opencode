@@ -4,9 +4,12 @@ import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
 import { Switch } from "@opencode-ai/ui/v2/switch-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
+import { TextareaV2 } from "@opencode-ai/ui/v2/textarea-v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLanguage } from "@/context/language"
+import { useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
+import { showToast } from "@/utils/toast"
 import { useUpdaterAction } from "../updater-action"
 import { useSettings } from "@/context/settings"
 import { ExternalLink } from "../external-link"
@@ -241,6 +244,71 @@ const SoundSetting: Component<{
         gutter={6}
       />
     </SettingsRowV2>
+  )
+}
+
+/**
+ * FE-029: the commentary narration. Both rows are per browser and read the same persisted store the
+ * narration lease reads, so switching commentary off here genuinely stops this device asking for
+ * narration rather than only hiding the panel.
+ */
+const CommentarySection: Component = () => {
+  const language = useLanguage()
+  const layout = useLayout()
+  const commentary = () => layout.commentary
+  // The draft is local until Save, so a half-written persona is never sent to the server. The dialog is
+  // remounted each time it opens, so seeding from the store here cannot miss a later change.
+  const [draft, setDraft] = createSignal(commentary().instructions())
+  const dirty = createMemo(() => draft() !== commentary().instructions())
+
+  const save = () => {
+    commentary().setInstructions(draft())
+    showToast({
+      variant: "success",
+      icon: "circle-check",
+      title: language.t("settings.general.commentary.row.instructions.saved.title"),
+    })
+  }
+
+  return (
+    <div class="settings-v2-section">
+      <h3 class="settings-v2-section-title">{language.t("settings.general.section.commentary")}</h3>
+      <SettingsListV2>
+        <SettingsRowV2
+          title={language.t("settings.general.commentary.row.enabled.title")}
+          description={language.t("settings.general.commentary.row.enabled.description")}
+        >
+          <div data-action="settings-commentary-enabled">
+            <Switch checked={commentary().enabled()} onChange={(checked) => commentary().setEnabled(checked)} />
+          </div>
+        </SettingsRowV2>
+
+        <SettingsRowV2
+          stacked
+          title={language.t("settings.general.commentary.row.instructions.title")}
+          description={language.t("settings.general.commentary.row.instructions.description")}
+        >
+          <div class="flex w-full flex-col gap-3" data-action="settings-commentary-instructions">
+            <TextareaV2
+              rows={5}
+              value={draft()}
+              disabled={!commentary().enabled()}
+              placeholder={language.t("settings.general.commentary.row.instructions.placeholder")}
+              spellcheck={false}
+              autocorrect="off"
+              autocapitalize="off"
+              aria-label={language.t("settings.general.commentary.row.instructions.title")}
+              onInput={(event) => setDraft(event.currentTarget.value)}
+            />
+            <div class="flex items-center justify-end">
+              <ButtonV2 size="normal" variant="neutral" disabled={!dirty()} onClick={save}>
+                {language.t("common.save")}
+              </ButtonV2>
+            </div>
+          </div>
+        </SettingsRowV2>
+      </SettingsListV2>
+    </div>
   )
 }
 
@@ -644,6 +712,8 @@ export const SettingsGeneralV2: Component<{
         </Show>
 
         <GeneralSection />
+
+        <CommentarySection />
 
         <AppearanceSection controller={appearance} />
 

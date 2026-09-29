@@ -977,6 +977,7 @@ export const dict = {
   "settings.general.section.feed": "Pašaras",
   "settings.general.section.display": "Ekranas",
   "settings.general.section.debug": "Debug",
+  "settings.general.section.commentary": "Commentary",
   "settings.general.row.testNotification.title": "Test notification",
   "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
   "settings.general.row.testNotification.sendLabel": "Send test",
@@ -1028,6 +1029,15 @@ export const dict = {
   "settings.general.row.editToolPartsExpanded.description":
     "Rodyti pagal numatytuosius nustatymus laiko juostoje išplėstas redagavimo, rašymo ir pataisymo įrankio dalis",
   "settings.general.row.newInterface.title": "Naujas išdėstymas",
+  "settings.general.commentary.row.enabled.title": "Narrate while the agent works",
+  "settings.general.commentary.row.enabled.description":
+    "When this is off, this device does not ask the server to narrate. Other devices are not affected.",
+  "settings.general.commentary.row.instructions.title": "Narration preferences",
+  "settings.general.commentary.row.instructions.description":
+    "How the narration should be written: tone, technical level, point of view. Added to the prompt that writes each line.",
+  "settings.general.commentary.row.instructions.placeholder":
+    "For example: explain like a senior engineer pairing with me. Be concrete and skip the basics.",
+  "settings.general.commentary.row.instructions.saved.title": "Narration preferences saved",
   "settings.general.row.newInterface.badge": "Nauja",
   "settings.general.row.newInterface.description":
     "Naudokite naujus skirtukus ir pagrindinio puslapio išdėstymą. Perjungti išdėstymą ribotą laiką.",

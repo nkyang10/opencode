@@ -75,6 +75,7 @@ import { createOpenReviewFile, createSessionTabs, createSizing, shouldShowFileTr
 import { MessageTimeline } from "@/pages/session/timeline/message-timeline"
 import { createTimelineModel } from "@/pages/session/timeline/model"
 import { CommentaryPanel } from "@/pages/session/commentary-panel"
+import { commentaryShouldWatch, createCommentaryWatch } from "@/pages/session/commentary-watch"
 import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/pages/session/review-tab"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { restorePromptModel, syncPromptModel, syncSessionModel } from "@/pages/session/session-model-helpers"
@@ -115,7 +116,11 @@ type VcsMode = "git" | "branch"
 
 const sessionViewState = () => ({
   messageId: undefined as string | undefined,
-  mobileTab: "session" as "session" | "changes",
+  mobileTab: "session" as "session" | "changes" | "commentary",
+  // FU-111: once you have opened the Commentary tab on a phone, the narration keeps running for the rest of
+  // this page visit, so you can read the chat and still get lines. Deliberately NOT persisted — this store
+  // is local, and persisting it would narrate every session you ever opened.
+  commentaryLatched: false,
 })
 
 function isCurrentSessionNotFoundError(error: unknown, sessionID: string | undefined) {
@@ -354,6 +359,7 @@ function SessionPanelFrame(props: ParentProps<{ newLayout: boolean; raised?: boo
 
 export default function Page() {
   const serverSync = useServerSync()
+  const server = useServer()
   const layout = useLayout()
   const local = useLocal()
   const file = useFile()
@@ -453,6 +459,22 @@ export default function Page() {
   // FE-028: the narration column. Desktop-only for now, exactly like the review panel it sits beside.
   const desktopCommentaryOpen = createMemo(() => isDesktop() && view().commentaryPanel.opened())
   const commentaryWidth = createMemo(() => (desktopCommentaryOpen() ? view().commentaryPanel.width() : 0))
+
+  // FU-028 / FU-111: the lease. Desktop watches while the column is open; mobile watches once the user has
+  // opened the Commentary tab in this visit, so reading the chat on a phone does not stop the narration.
+  // Mounted here, once per session view, so the panel itself can be mounted and unmounted freely.
+  createCommentaryWatch({
+    sessionID: () => params.id,
+    http: () => server.current?.http,
+    enabled: () => view().commentaryPanel.enabled(),
+    instructions: () => view().commentaryPanel.instructions(),
+    watching: () => !!params.id && commentaryShouldWatch({
+      isDesktop: isDesktop(),
+      panelOpened: view().commentaryPanel.opened(),
+      latched: store.commentaryLatched,
+      enabled: view().commentaryPanel.enabled(),
+    }),
+  })
   const desktopV2ReviewOpen = createMemo(() => newSessionDesign() && desktopReviewOpen() && !!params.id)
   const terminalOpen = createMemo(() => view().terminal.opened())
   const desktopTerminalOpen = createMemo(() => isDesktop() && terminalOpen())
@@ -672,6 +694,7 @@ export default function Page() {
     return list
   })
   const mobileChanges = createMemo(() => !isDesktop() && store.mobileTab === "changes")
+  const mobileCommentary = createMemo(() => !isDesktop() && store.mobileTab === "commentary")
   const wantsReview = createMemo(() =>
     isDesktop()
       ? desktopFileTreeOpen() ||
@@ -1362,8 +1385,8 @@ export default function Page() {
     </div>
   )
 
-  // FE-028: the narration column. `desktopCommentaryOpen` lives here so the side panel decides whether the
-  // column exists at all, and the component takes the lease only while it is mounted.
+  // FE-028 / FU-111: the narration itself, shared verbatim between the desktop column and the mobile tab.
+  // The lease is owned by `createCommentaryWatch` above, not by this component.
   const commentaryPanel = () => (
     <Show when={params.id}>
       <CommentaryPanel sessionID={params.id} />
@@ -2041,10 +2064,10 @@ export default function Page() {
         <Tabs.Trigger
           value="session"
           classList={{
-            "!w-1/2 !max-w-none": true,
+            "!w-1/3 !max-w-none": true,
             "!border-b-0 !border-t !border-border-weak-base [&:has([data-selected])]:!border-t-transparent": bottom,
           }}
-          classes={{ button: compact ? "w-full !py-2" : "w-full" }}
+          classes={{ button: compact ? "w-full !px-1 !py-2" : "w-full !px-1" }}
           onClick={() => setStore("mobileTab", "session")}
         >
           {language.t("session.tab.session")}
@@ -2052,15 +2075,31 @@ export default function Page() {
         <Tabs.Trigger
           value="changes"
           classList={{
-            "!w-1/2 !max-w-none !border-r-0": true,
+            "!w-1/3 !max-w-none": true,
             "!border-b-0 !border-t !border-border-weak-base [&:has([data-selected])]:!border-t-transparent": bottom,
           }}
-          classes={{ button: compact ? "w-full !py-2" : "w-full" }}
+          classes={{ button: compact ? "w-full !px-1 !py-2" : "w-full !px-1" }}
           onClick={() => setStore("mobileTab", "changes")}
         >
           {hasReview()
             ? language.t("session.review.filesChanged", { count: reviewCount() })
             : language.t("session.review.change.other")}
+        </Tabs.Trigger>
+        {/* FU-111: the narration tab. Selecting it latches the lease for the rest of this page visit, so
+            switching back to the chat does not stop the narration — a phone cannot show both at once. */}
+        <Tabs.Trigger
+          value="commentary"
+          classList={{
+            "!w-1/3 !max-w-none !border-r-0": true,
+            "!border-b-0 !border-t !border-border-weak-base [&:has([data-selected])]:!border-t-transparent": bottom,
+          }}
+          classes={{ button: compact ? "w-full !px-1 !py-2" : "w-full !px-1" }}
+          onClick={() => {
+            setStore("commentaryLatched", true)
+            setStore("mobileTab", "commentary")
+          }}
+        >
+          {language.t("session.commentary.title")}
         </Tabs.Trigger>
       </Tabs.List>
     </Tabs>
@@ -2082,6 +2121,9 @@ export default function Page() {
       </Show>
       <div class="flex-1 min-h-0 overflow-hidden">
         <Switch>
+          <Match when={params.id && mobileCommentary()}>
+            <div class="relative h-full overflow-hidden">{commentaryPanel()}</div>
+          </Match>
           <Match when={params.id && mobileChanges()}>
             <div class="relative h-full overflow-hidden">
               {reviewContent({
@@ -2144,7 +2186,9 @@ export default function Page() {
         </Switch>
       </div>
 
-      <Show when={(params.id || !newSessionDesign()) && !mobileChanges()}>
+      {/* `!mobileCommentary()` here is load-bearing: without it the chat and composer render underneath
+          the commentary tab, because this is the <Switch>'s fallback branch. */}
+      <Show when={(params.id || !newSessionDesign()) && !mobileChanges() && !mobileCommentary()}>
         {(_) => {
           const controller = createSessionComposerRegionController({
             state: composer,

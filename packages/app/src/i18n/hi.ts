@@ -971,6 +971,7 @@ export const dict = {
   "settings.general.section.feed": "फ़ीड",
   "settings.general.section.display": "प्रदर्शन",
   "settings.general.section.debug": "Debug",
+  "settings.general.section.commentary": "Commentary",
   "settings.general.row.testNotification.title": "Test notification",
   "settings.general.row.testNotification.description": "Send a system notification 5 seconds after clicking",
   "settings.general.row.testNotification.sendLabel": "Send test",
@@ -1021,6 +1022,15 @@ export const dict = {
   "settings.general.row.editToolPartsExpanded.description":
     "टाइमलाइन में डिफ़ॉल्ट रूप से विस्तारित संपादित करें, लिखें और पैच टूल पार्ट्स दिखाएं",
   "settings.general.row.newInterface.title": "नया लेआउट",
+  "settings.general.commentary.row.enabled.title": "Narrate while the agent works",
+  "settings.general.commentary.row.enabled.description":
+    "When this is off, this device does not ask the server to narrate. Other devices are not affected.",
+  "settings.general.commentary.row.instructions.title": "Narration preferences",
+  "settings.general.commentary.row.instructions.description":
+    "How the narration should be written: tone, technical level, point of view. Added to the prompt that writes each line.",
+  "settings.general.commentary.row.instructions.placeholder":
+    "For example: explain like a senior engineer pairing with me. Be concrete and skip the basics.",
+  "settings.general.commentary.row.instructions.saved.title": "Narration preferences saved",
   "settings.general.row.newInterface.badge": "नया",
   "settings.general.row.newInterface.description":
     "नए टैब और होम लेआउट का उपयोग करें. सीमित समय के लिए लेआउट के बीच स्विच करें।",
