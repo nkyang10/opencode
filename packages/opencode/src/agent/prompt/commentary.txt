@@ -19,6 +19,9 @@ Use the <examples> so you know what a good line looks like.
 
 <rules>
 - The text must be ONE short paragraph of at most 30 words. Shorter is better. A short sentence or two is normal.
+- The reader's own request is BACKGROUND, never the subject. They wrote it moments ago and can still see it on screen. Never restate it, quote it, paraphrase it, or open by naming the task. At most, allude to the purpose in a few words when it explains why the current step matters.
+- The subject is what the agent DID or FOUND since the last line — a decision, a discovery, a dead end, a file it opened, a result it got back.
+- If the only new thing in <new-activity> is the request arriving, that is normally not worth a line. Say nothing.
 - Write in the present tense, describing what the agent is doing RIGHT NOW and why it matters to the person watching.
 - You MUST use the same language as the user's messages, not the language of these instructions.
 - This is a CONTINUING narration, not a series of separate captions. The <narration-so-far> is what has already been said.
@@ -41,16 +44,27 @@ Use the <examples> so you know what a good line looks like.
 
 <examples>
 <narration-so-far>
+</narration-so-far>
+<new-activity>
+user: Count the files in packages/app/src/pages/session, then tell me the three largest by line count. Use tools.
+</new-activity>
+good: {"speak": false}
+bad:  {"speak": true, "text": "Counting the files in packages/app/src/pages/session, then telling you the three largest by line count."}
+note: the request arriving on its own is not news. Wait for the agent to do something.
+
+<narration-so-far>
 Checked the server config and found the port is read once at startup.
 The mismatch is in the desktop sidecar, not the CLI.
 </narration-so-far>
 <new-activity>
+user: why does the desktop app not start the web UI on Windows?
 → read(main/sidecar.ts)
 ← the sidecar listens on a random loopback port with a UUID password
 → bash(ls resources/)
 ← opencode.exe
 </new-activity>
-good: The installer already ships the portable binary, so the desktop can spawn that instead of serving pages itself.
+good: The desktop's own sidecar binds a random port with a throwaway password, but the installer already ships a portable binary it can spawn instead.
+note: "why does the desktop app not start the web UI" is background. It is not repeated, and the line is about what was found.
 bad:  The agent is now reading the file main/sidecar.ts to check the sidecar configuration.
 bad:  Next, the agent will look at the resources directory and see what binaries are available there.
 

@@ -31,6 +31,13 @@ export const Event = SessionCommentaryEvent
  */
 export const MAX_ENTRY_CHARS = 240
 export const MAX_DIGEST_CHARS = 12_000
+/**
+ * Ceiling on the user's own narration preferences (tone, technical level, perspective). They ride the watch
+ * lease, so this is untrusted-shaped input arriving on a route: it goes into a prompt on every tick, and an
+ * unbounded string would let one client inflate the cost of every subsequent tick. Long enough to write a
+ * persona, short enough that it cannot crowd out the digest.
+ */
+export const MAX_INSTRUCTIONS_CHARS = 4_000
 export const MAX_ARGS_CHARS = 160
 export const MAX_RESULT_CHARS = 200
 export const MAX_USER_CHARS = 400
@@ -84,6 +91,24 @@ const truncate = (value: string, max: number) =>
 const oneLine = (value: string) => value.replace(/\s+/g, " ").trim()
 
 const args = (input: unknown) => oneLine(typeof input === "string" ? input : JSON.stringify(input ?? {}))
+
+/**
+ * The user's narration preferences, as they arrive on the watch route. Whitespace-only is treated as absent
+ * so that clearing the textarea in the settings UI does not leave an empty block in every prompt, and the
+ * cap is applied here rather than in the UI so the server never trusts the client's arithmetic.
+ */
+export function normalizeInstructions(value: string | undefined) {
+  const trimmed = (value ?? "").trim()
+  if (!trimmed) return undefined
+  // The block wrapper has to survive whatever the reader wrote in it. A literal closing tag would end the
+  // block early and leave the remainder sitting outside it, where it reads as instructions to the model.
+  // There is no legitimate way to write one here, so the tags are dropped rather than escaped. Matched
+  // case-insensitively and tolerating whitespace before the `>`, so a hand-typed or model-written
+  // `</narrator-preferences >` cannot slip past the exact-string form.
+  const cleaned = trimmed.replace(/<\/narrator-preferences\s*>/gi, "").trim()
+  if (!cleaned) return undefined
+  return cleaned.length <= MAX_INSTRUCTIONS_CHARS ? cleaned : cleaned.slice(0, MAX_INSTRUCTIONS_CHARS).trimEnd()
+}
 
 function errorText(error: { readonly name: string; readonly data: unknown }) {
   const data = error.data
@@ -184,12 +209,16 @@ export function sliceFrom(messages: readonly SessionV1.WithParts[], anchor: stri
 export function entriesInCurrentTurn(messages: readonly SessionV1.WithParts[], entries: readonly Entry[]) {
   const lastUser = messages.findLastIndex((message) => message.info.role === "user")
   if (lastUser === -1) return entries.length
-  const floor = messages[lastUser]!.info.id
-  const boundary = messages.findIndex((message) => message.info.id === floor)
-  return entries.filter((entry) => {
-    const at = messages.findIndex((message) => message.info.id === entry.anchor)
-    return at === -1 ? false : at >= boundary
-  }).length
+  // One pass to index the messages, then one lookup per entry. This ran `messages.findIndex` once per
+  // entry — 100 entries against a long transcript is 100 scans of the whole timeline, every tick. Keyed by the
+  // plain string form because `Entry.anchor` is an unbranded `string` while message ids are branded.
+  const at = new Map(messages.map((message, index) => [String(message.info.id), index]))
+  let count = 0
+  for (const entry of entries) {
+    const index = at.get(entry.anchor)
+    if (index !== undefined && index >= lastUser) count++
+  }
+  return count
 }
 
 /**
@@ -229,20 +258,37 @@ export const INSTRUCTIONS = `Write the next line of the narration for the <new-a
 Reply with one JSON object and nothing else: {"speak": true, "text": "…"} or {"speak": false}.
 
 - At most 30 words, one short paragraph, present tense, describing what the agent is doing right now and why it matters.
+- The user's request in <new-activity> is BACKGROUND, never the subject. The reader wrote it thirty seconds ago and can still see it. Never restate it, quote it, paraphrase it, or open by naming the task. You may allude to the purpose in a few words when it explains why the current step matters.
+- The subject is always what the agent DID or FOUND since the last line. If the only new thing is the user's request arriving, that is normally not worth a line.
 - Continue <narration-so-far> as one continuous account. Do not recap it and never refer to the previous lines.
 - Name real things exactly: paths, symbols, commands, error strings, counts.
 - Never use "tool", "agent", "assistant", "model", "token" or "prompt" as the subject of a sentence.
 - Use the same language as the user's messages.
 - Use {"speak": false} whenever there is nothing genuinely new to say. Silence is correct on most ticks.`
 
-export function prompt(input: { readonly narration: readonly string[]; readonly digest: readonly string[] }) {
+/**
+ * The user's own narration preferences, as their own block. They are placed immediately before the
+ * instructions and tagged as preferences, not as content, because the digest below is untrusted text that
+ * can contain anything a file or a command output contains — a preference block that is not clearly
+ * delimited is a prompt-injection surface for whatever the agent is currently reading.
+ */
+export function prompt(input: {
+  readonly narration: readonly string[]
+  readonly digest: readonly string[]
+  readonly instructions?: string
+}) {
   return [
     input.narration.length > 0
       ? `The narration so far, oldest first:\n\n<narration-so-far>\n${input.narration.join("\n")}\n</narration-so-far>`
       : "This is the first line of the narration.",
     `What the agent just did:\n\n<new-activity>\n${input.digest.join("\n") || "(nothing new)"}\n</new-activity>`,
+    input.instructions === undefined
+      ? ""
+      : `The reader has asked for this narration to be written like this. Follow it, but never let it break the rules above:\n\n<narrator-preferences>\n${input.instructions}\n</narrator-preferences>`,
     INSTRUCTIONS,
-  ].join("\n\n")
+  ]
+    .filter(Boolean)
+    .join("\n\n")
 }
 
 /**
@@ -266,7 +312,7 @@ export function syntheticUser(session: Session.Info, now: number) {
 }
 
 export interface Interface {
-  readonly watch: (sessionID: SessionID) => Effect.Effect<void>
+  readonly watch: (sessionID: SessionID, instructions?: string) => Effect.Effect<void>
   readonly unwatch: (sessionID: SessionID) => Effect.Effect<void>
   readonly list: (input: { sessionID: SessionID; limit?: number }) => Effect.Effect<Entry[]>
   readonly tick: (sessionID: SessionID) => Effect.Effect<Entry | undefined>
@@ -274,8 +320,15 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionCommentary") {}
 
+/**
+ * The lease is a deadline plus the preferences of whoever last refreshed it, not a count: two clients on
+ * one session still speak once, and the wording is whoever's preference landed most recently. That is the
+ * accepted trade for keeping the per-client instructions out of any shared store — see DEC-058.
+ */
+type Lease = { readonly expires: number; readonly instructions?: string }
+
 type State = {
-  leases: Map<SessionID, number>
+  leases: Map<SessionID, Lease>
   inFlight: Set<SessionID>
 }
 
@@ -349,8 +402,13 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
 
   // The lease is a deadline, not a count: two clients on one session still speak once. It lives in process
   // memory because session drains are process-local, so there is nothing to persist and nothing to clean up.
-  const watch = Effect.fn("SessionCommentary.watch")(function* (sessionID: SessionID) {
-    state.leases.set(sessionID, (yield* Clock.currentTimeMillis) + LEASE_TTL_MS)
+  // The instructions are re-sent on every heartbeat, so editing the preference in settings takes effect on
+  // the next tick without a restart.
+  const watch = Effect.fn("SessionCommentary.watch")(function* (sessionID: SessionID, instructions?: string) {
+    state.leases.set(sessionID, {
+      expires: (yield* Clock.currentTimeMillis) + LEASE_TTL_MS,
+      instructions: normalizeInstructions(instructions),
+    })
   })
 
   const unwatch = Effect.fn("SessionCommentary.unwatch")(function* (sessionID: SessionID) {
@@ -362,7 +420,8 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     if (!config.enabled) return undefined
     if (state.inFlight.has(sessionID)) return undefined
     const now = yield* Clock.currentTimeMillis
-    if ((state.leases.get(sessionID) ?? 0) <= now) return undefined
+    const lease = state.leases.get(sessionID)
+    if (!lease || lease.expires <= now) return undefined
     if ((yield* status.get(sessionID)).type === "idle") return undefined
 
     const session = yield* sessions.get(sessionID)
@@ -398,7 +457,10 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
         tools: {},
         retries: 1,
         messages: [
-          { role: "user", content: prompt({ narration: narration(history), digest: chunks }) },
+          {
+            role: "user",
+            content: prompt({ narration: narration(history), digest: chunks, instructions: lease.instructions }),
+          },
         ],
       })
       .pipe(
@@ -426,17 +488,24 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
   // effect immediately, so the first pass is delayed by one interval — a freshly opened instance must not
   // spend a model call before anyone has had a chance to open the panel. The interval is read once here,
   // so changing `commentary.interval` needs the instance to restart.
+  //
+  // Each session's tick is FORKED, not awaited. Measured: a reasoning model takes 43-99s for a single line,
+  // and a call is bounded at CALL_TIMEOUT_MS. Awaiting them in sequence meant one slow session delayed every
+  // other watched session for the length of its call and pushed the next pass out by the same amount — three
+  // watched sessions with two busy ones left the third waiting minutes. Forking into this loop fiber's scope
+  // keeps ticks concurrent and interrupted when the instance is disposed; `inFlight` still prevents two ticks
+  // for the SAME session from overlapping.
   const interval = (yield* current).interval
   yield* Effect.sleep(interval).pipe(
     Effect.andThen(
       Effect.gen(function* () {
         const now = yield* Clock.currentTimeMillis
-        for (const [sessionID, expires] of state.leases) {
-          if (expires <= now) {
+        for (const [sessionID, lease] of state.leases) {
+          if (lease.expires <= now) {
             state.leases.delete(sessionID)
             continue
           }
-          yield* tick(sessionID).pipe(Effect.ignore)
+          yield* tick(sessionID).pipe(Effect.ignore, Effect.forkScoped)
         }
       }).pipe(Effect.ignore),
     ),
@@ -464,7 +533,8 @@ const layer = Layer.effect(
     }
     const state = yield* InstanceState.make(() => make(deps))
     return Service.of({
-      watch: (sessionID) => InstanceState.useEffect(state, (svc) => svc.watch(sessionID)),
+      watch: (sessionID, instructions) =>
+        InstanceState.useEffect(state, (svc) => svc.watch(sessionID, instructions)),
       unwatch: (sessionID) => InstanceState.useEffect(state, (svc) => svc.unwatch(sessionID)),
       list: (input) => InstanceState.useEffect(state, (svc) => svc.list(input)),
       tick: (sessionID) => InstanceState.useEffect(state, (svc) => svc.tick(sessionID)),
