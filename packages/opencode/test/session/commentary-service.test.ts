@@ -7,7 +7,7 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { LLMEvent } from "@opencode-ai/llm"
-import { Effect, Layer, Schema } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Schema } from "effect"
 import * as Stream from "effect/Stream"
 import { Agent } from "@/agent/agent"
 import { GlobalBus } from "@/bus/global"
@@ -421,4 +421,73 @@ it.instance(
     }).pipe(Effect.provide(env(failing)))
   },
   { config: () => ({ commentary: commentaryConfig }) },
+)
+
+// The loop forks each session's tick rather than awaiting it. A reasoning model takes 43-99s for one line and
+// a call is bounded at CALL_TIMEOUT_MS, so awaiting ticks in sequence let one slow session delay every other
+// watched session for the length of its call. This drives two ticks concurrently and asserts the fast
+// session's line lands while the slow one is still in flight — the property the fork guarantees.
+it.instance("a slow session does not block a concurrent fast session", () =>
+  Effect.gen(function* () {
+    const gate = yield* Deferred.make<void>()
+    const slowStarted = yield* Deferred.make<void>()
+    const calls: Array<{ sessionID: string; fast: boolean }> = []
+    const layer = Layer.succeed(
+      LLM.Service,
+      LLM.Service.of({
+        stream: (input) => {
+          const id = String(input.sessionID)
+          const fast = !id.includes("slow")
+          calls.push({ sessionID: id, fast })
+          if (fast) {
+            return Stream.make(
+              LLMEvent.textStart({ id: "t" }),
+              LLMEvent.textDelta({ id: "t", text: '{"speak": true, "text": "Fast line."}' }),
+            )
+          }
+          // The slow call blocks on the gate until the test releases it, standing in for a 43-99s call.
+          return Stream.fromEffect(
+            Deferred.await(slowStarted).pipe(
+              Effect.andThen(Deferred.succeed(gate, undefined)),
+              Effect.as(LLMEvent.textDelta({ id: "t", text: '{"speak": true, "text": "Slow line."}' })),
+            ),
+          ).pipe(Stream.concat(Stream.make(LLMEvent.textStart({ id: "t" }))))
+        },
+      }),
+    )
+
+    return Effect.gen(function* () {
+      const ssn = yield* SessionNs.Service
+      const commentary = yield* SessionCommentary.Service
+
+      const mk = (kind: string) =>
+        Effect.gen(function* () {
+          const session = yield* ssn.create({ model: { id: ref.modelID, providerID: ref.providerID } })
+          const ask = yield* userMessage(session.id, `ask ${kind}`)
+          yield* assistantMessage(session.id, ask.id)
+          yield* SessionStatus.Service.use((status) => status.set(session.id, { type: "busy" }))
+          return session.id
+        })
+      const fast = yield* mk("fast")
+      const slow = yield* mk("slow")
+      yield* commentary.watch(fast)
+      yield* commentary.watch(slow)
+
+      // Launch both ticks concurrently, exactly as the forked loop does.
+      const fastFiber = yield* Effect.forkChild(commentary.tick(fast))
+      const slowFiber = yield* Effect.forkChild(commentary.tick(slow))
+
+      // The fast entry must be stored even though the slow call has not returned.
+      yield* Deferred.await(slowStarted)
+      const fastExit = yield* Fiber.await(fastFiber).pipe(Effect.timeout("5 seconds"))
+      expect(Exit.isSuccess(fastExit)).toBe(true)
+      expect((yield* commentary.list({ sessionID: fast })).map((entry) => entry.text)).toEqual(["Fast line."])
+      // Both calls were in flight together — concurrency, not sequencing.
+      expect(calls.length).toBe(2)
+
+      // Release the slow call and let it finish.
+      yield* commentary.unwatch(slow)
+      yield* Fiber.await(slowFiber).pipe(Effect.timeout("5 seconds"))
+    }).pipe(Effect.provide(env(layer)))
+  }),
 )

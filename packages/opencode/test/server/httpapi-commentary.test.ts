@@ -141,10 +141,20 @@ it.instance(
       const session = yield* createSession()
       const headers = { "x-opencode-directory": test.directory }
 
-      const watched = yield* requestJson<boolean>(`/session/${session.id}/commentary/watch`, { method: "POST", headers })
+      const watched = yield* requestJson<boolean>(`/session/${session.id}/commentary/watch`, {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: "{}",
+      })
       expect(watched).toBe(true)
       // A second panel on the same session refreshes the same lease rather than adding a reference.
-      expect(yield* requestJson<boolean>(`/session/${session.id}/commentary/watch`, { method: "POST", headers })).toBe(true)
+      expect(
+        yield* requestJson<boolean>(`/session/${session.id}/commentary/watch`, {
+          method: "POST",
+          headers: { ...headers, "content-type": "application/json" },
+          body: "{}",
+        }),
+      ).toBe(true)
 
       expect(yield* requestJson<boolean>(`/session/${session.id}/commentary/unwatch`, { method: "POST", headers })).toBe(
         true,
@@ -167,7 +177,11 @@ it.instance(
       const list = yield* request(`/session/${missing}/commentary`, { headers })
       expect(list.status).toBe(404)
 
-      const watch = yield* request(`/session/${missing}/commentary/watch`, { method: "POST", headers })
+      const watch = yield* request(`/session/${missing}/commentary/watch`, {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: "{}",
+      })
       expect(watch.status).toBe(404)
     }),
   { config: () => ({ commentary: { enabled: false } }) },
