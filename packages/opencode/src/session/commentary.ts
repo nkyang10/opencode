@@ -7,7 +7,7 @@ import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { LLMEvent } from "@opencode-ai/llm"
 import { desc, eq } from "drizzle-orm"
-import { Clock, Context, Effect, Layer, Schedule } from "effect"
+import { Cause, Clock, Context, Effect, Layer, Schedule } from "effect"
 import * as Stream from "effect/Stream"
 import { Agent } from "@/agent/agent"
 import { Config } from "@/config/config"
@@ -242,15 +242,19 @@ export function prompt(input: { readonly narration: readonly string[]; readonly 
  * A fresh user message per tick, carrying a generated id. It is never persisted: `llm.stream` outside the
  * session runner publishes nothing, which is the same property `SessionPrompt.ensureTitle` relies on. If a
  * `message.updated` event ever appears for one of these ids the narration is leaking into the timeline.
+ *
+ * The `model` MUST be the session's real model, not a placeholder. The v1 LLM path reads `user.model` for
+ * provider resolution and usage attribution, so a fabricated `providerID` selects a runtime and then dies
+ * with no completion — and because the tick swallows failures, that used to be invisible.
  */
-function syntheticUser(sessionID: SessionID, now: number) {
+export function syntheticUser(session: Session.Info, now: number) {
   return {
     id: MessageID.ascending(),
-    sessionID,
+    sessionID: session.id,
     role: "user" as const,
     time: { created: now },
     agent: "commentary",
-    model: { providerID: "commentary" as never, modelID: "commentary" as never },
+    model: { providerID: session.model!.providerID, modelID: session.model!.id },
   } as unknown as SessionV1.User
 }
 
@@ -375,7 +379,7 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     const text = yield* llm
       .stream({
         agent,
-        user: syntheticUser(sessionID, now),
+        user: syntheticUser(session, now),
         sessionID,
         model:
           config.model === "small"
@@ -394,7 +398,12 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
         Stream.filter(LLMEvent.is.textDelta),
         Stream.map((event) => event.text),
         Stream.mkString,
-        Effect.catchCause(() => Effect.succeed("")),
+        Effect.catchCause((cause) =>
+          Effect.logWarning("SessionCommentary: narration call failed", { sessionID }).pipe(
+            Effect.andThen(Effect.logDebug(Cause.pretty(cause))),
+            Effect.andThen(Effect.succeed("")),
+          ),
+        ),
         Effect.ensuring(Effect.sync(() => state.inFlight.delete(sessionID))),
       )
 

@@ -202,6 +202,12 @@ it.instance(
       expect(seen).toHaveLength(1)
       expect(Object.keys(seen[0]!.tools)).toHaveLength(0)
       expect(String(seen[0]!.model.id)).toBe("test-model")
+      // Regression: the synthetic carrier must present the SESSION's real model. A placeholder providerID
+      // makes the v1 LLM path select a runtime and then die with no completion, and because the tick
+      // swallows failures that was invisible on the live server.
+      expect(seen[0]!.user.model.providerID).toBe(ref.providerID)
+      expect(seen[0]!.user.model.modelID).toBe(ref.modelID)
+      expect(seen[0]!.user.sessionID).toBe(sessionID)
       expect(JSON.stringify(seen[0]!.messages)).toContain("why does the retry cap")
 
       // Nothing was appended to the session. If this ever fails, the narration is writing a phantom user
