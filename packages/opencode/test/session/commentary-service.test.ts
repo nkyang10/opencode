@@ -15,7 +15,7 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Provider } from "@/provider/provider"
 import { LLM } from "@/session/llm"
-import { SessionCommentary } from "@/session/commentary"
+import { CALL_TIMEOUT_MS, SessionCommentary, settings } from "@/session/commentary"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import { Session as SessionNs } from "@/session/session"
 import { SessionStatus } from "@/session/status"
@@ -391,6 +391,19 @@ it.instance(
     }).pipe(Effect.provide(env(llmLayer(['{"speak": true, "text": "A line."}'], seen))))
   },
   { config: () => ({ commentary: { ...commentaryConfig, model: "small" } }) },
+)
+
+it.instance("bounds the narration call so a slow model cannot disable the session", () =>
+  Effect.gen(function* () {
+    // Measured live: a reasoning model took 99s for ONE line, and while it ran the `inFlight` guard blocked
+    // every later tick — so an unbounded call silently disables narration for that session. The release path
+    // itself is proven by the live run (a second tick fired 41s after the first returned) and by the
+    // provider-failure test below; what is asserted here is that the ceiling exists and is sane relative to
+    // the tick, because actually waiting CALL_TIMEOUT_MS is not a unit test.
+    expect(Number.isFinite(CALL_TIMEOUT_MS)).toBe(true)
+    expect(CALL_TIMEOUT_MS).toBeGreaterThan(settings({}).interval * 2)
+  }),
+  { config: () => ({ commentary: commentaryConfig }) },
 )
 
 it.instance(

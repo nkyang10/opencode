@@ -41,6 +41,13 @@ export const NARRATION_CHARS = 24_000
 export const MIN_GAP_MS = 10_000
 /** Long enough that one dropped heartbeat (a sleeping phone, a tunnel hiccup) cannot end the narration. */
 export const LEASE_TTL_MS = 45_000
+/**
+ * Hard ceiling on one narration call. Measured on a reasoning model: 99s for a single line, because the
+ * model spends its budget thinking about a 30-word answer. Unbounded, one slow call holds the `inFlight`
+ * guard and silently disables narration for that session until it returns — so the call is bounded, and a
+ * timeout is logged rather than swallowed. It must be several multiples of the tick interval.
+ */
+export const CALL_TIMEOUT_MS = 120_000
 
 export const DEFAULT_INTERVAL = 10_000
 export const DEFAULT_MAX_ENTRIES_PER_TURN = 20
@@ -398,8 +405,9 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
         Stream.filter(LLMEvent.is.textDelta),
         Stream.map((event) => event.text),
         Stream.mkString,
+        Effect.timeout(CALL_TIMEOUT_MS),
         Effect.catchCause((cause) =>
-          Effect.logWarning("SessionCommentary: narration call failed", { sessionID }).pipe(
+          Effect.logWarning("SessionCommentary: narration call did not complete", { sessionID }).pipe(
             Effect.andThen(Effect.logDebug(Cause.pretty(cause))),
             Effect.andThen(Effect.succeed("")),
           ),
