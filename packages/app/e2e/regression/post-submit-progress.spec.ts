@@ -47,7 +47,13 @@ test("shows the progress row from the submit keystroke while the server is still
 
 // "Nothing has come back for a while" has to be distinguishable from "the connection is gone": the
 // row stops claiming the model is thinking and says it is still waiting, with the elapsed counter.
-test("says it is still waiting when the model has produced nothing", async ({ page }) => {
+//
+// Only the *simple* half of this is reachable in a browser fixture: the v1 event schema requires
+// `time.completed` on an assistant message, so no fixture can express the case that actually matters —
+// an open, still-empty assistant message, which is what a slow model looks like. That half is unit
+// tested in `turn-activity.test.ts` (`turnStage` + `turnProducedOutput`); this is the smoke that the
+// label and the counter render at all once the threshold is passed.
+test("says it is still waiting when the turn has produced nothing", async ({ page }) => {
   const timeline = await setupTimeline(page, {
     messages: [userMessage(undefined, { created: Date.now() - 30_000 })],
   })

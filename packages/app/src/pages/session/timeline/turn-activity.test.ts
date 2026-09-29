@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { AssistantMessage, Part } from "@opencode-ai/sdk/v2"
-import { latestTurnActivity } from "./turn-activity"
+import { latestTurnActivity, turnProducedOutput, turnStage } from "./turn-activity"
 
 const assistant = (input: { id: string; created: number; completed?: number }): AssistantMessage => ({
   id: input.id,
@@ -119,5 +119,52 @@ describe("latestTurnActivity", () => {
     expect(activity([message], [], 5_000).at).toBe(5_000)
     expect(activity([message], [tool({ id: "prb_1", start: 7_000 })], 5_000).at).toBe(7_000)
     expect(activity([], [], 5_000).key).toBe("")
+  })
+})
+
+// The "waiting" stage and the rule behind it. These are the two things that were wrong in the first
+// implementation: the threshold was 10s (too eager for a reasoning model's first token) and progress
+// was measured as "an assistant message exists" — true for every real turn, because the server creates
+// it the moment the turn starts.
+describe("turn stage", () => {
+  const base = { pending: false, producedOutput: false, silenceMs: 0, waitThreshold: 20_000 }
+
+  test("sending while this client has submitted and the server has not answered", () => {
+    expect(turnStage({ ...base, pending: true })).toBe("sending")
+    // even a long silence does not outrank a submission the server has not acknowledged
+    expect(turnStage({ ...base, pending: true, silenceMs: 90_000 })).toBe("sending")
+  })
+
+  test("waiting only after the threshold, and only with nothing produced", () => {
+    expect(turnStage({ ...base, silenceMs: 19_000 })).toBe("thinking")
+    expect(turnStage({ ...base, silenceMs: 20_000 })).toBe("waiting")
+    expect(turnStage({ ...base, silenceMs: 59_000 })).toBe("waiting")
+    // output beats silence: a long-running turn that said something is thinking, not waiting
+    expect(turnStage({ ...base, producedOutput: true, silenceMs: 59_000 })).toBe("thinking")
+  })
+})
+
+describe("turn produced output", () => {
+  test("an open, empty assistant message has produced nothing", () => {
+    expect(turnProducedOutput([])).toBe(false)
+  })
+
+  test("text and reasoning count once they carry content", () => {
+    expect(turnProducedOutput([{ type: "text", text: "" } as never])).toBe(false)
+    expect(turnProducedOutput([{ type: "text", text: "hi" } as never])).toBe(true)
+    expect(turnProducedOutput([{ type: "reasoning", text: "thinking" } as never])).toBe(true)
+  })
+
+  test("a running tool is progress; a finished one is output", () => {
+    expect(turnProducedOutput([{ type: "tool", state: { status: "running" } } as never])).toBe(false)
+    expect(turnProducedOutput([{ type: "tool", state: { status: "pending" } } as never])).toBe(false)
+    expect(turnProducedOutput([{ type: "tool", state: { status: "completed" } } as never])).toBe(true)
+    expect(turnProducedOutput([{ type: "tool", state: { status: "error" } } as never])).toBe(true)
+  })
+
+  test("internal markers are not output", () => {
+    expect(turnProducedOutput([{ type: "step-start" } as never])).toBe(false)
+    expect(turnProducedOutput([{ type: "step-finish" } as never])).toBe(false)
+    expect(turnProducedOutput([{ type: "patch", text: "diff" } as never])).toBe(false)
   })
 })

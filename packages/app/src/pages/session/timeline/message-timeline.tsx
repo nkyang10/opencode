@@ -82,7 +82,7 @@ import { sessionTitle } from "@/utils/session-title"
 import { scheduleConnectedMeasure } from "./measure"
 import { observeElementOffsetReconnectAware } from "./observe-element-offset"
 import { createTimelineProjection } from "./projection"
-import { latestTurnActivity } from "./turn-activity"
+import { latestTurnActivity, turnProducedOutput, turnStage } from "./turn-activity"
 import { diffSummaryOverflow, diffSummaryVisible } from "./diff-summary-state"
 import { TurnProgressState } from "@/utils/turn-progress"
 import { MessageComment, SummaryDiff, TimelineRow, TimelineRowMap } from "./rows"
@@ -142,10 +142,12 @@ const markBoundaryGesture = (input: {
   }
 }
 
-// Seconds of complete silence from the model before the row stops claiming it is "thinking" and
-// says it is still waiting instead. A long tool call must not trip this, so the caller only sets
-// `silent` while the turn has produced no output at all.
-const waitThreshold = 10_000
+// Milliseconds of complete silence from the model before the row stops claiming it is "thinking" and
+// says it is still waiting instead. Measured on a real turn (s073): a reasoning model held an open,
+// empty assistant message for 59s on a hard prompt, so 10s would have cried wolf on the ordinary
+// 15-20s first-token latency of that class of model. Only reached while the turn has produced no
+// output at all, so a long-running tool never trips it.
+const waitThreshold = 20_000
 
 function TimelineThinkingRow(props: {
   reasoningHeading?: string
@@ -153,7 +155,8 @@ function TimelineThinkingRow(props: {
   activityAt?: number
   promptAt?: number
   pending?: boolean
-  silent?: boolean
+  /** The turn has produced user-visible output (text, reasoning, or a finished tool). */
+  produced?: boolean
 }) {
   const language = useLanguage()
   const [now, setNow] = createSignal(Date.now())
@@ -175,8 +178,14 @@ function TimelineThinkingRow(props: {
   const lastOutput = () => since(props.activityAt)
   const sincePrompt = () => since(props.promptAt)
   const label = () => {
-    if (props.pending) return language.t("ui.sessionTurn.status.sending")
-    if (props.silent && lastOutput() * 1000 >= waitThreshold) return language.t("ui.sessionTurn.status.waiting")
+    const stage = turnStage({
+      pending: !!props.pending,
+      producedOutput: !!props.produced,
+      silenceMs: lastOutput() * 1000,
+      waitThreshold,
+    })
+    if (stage === "sending") return language.t("ui.sessionTurn.status.sending")
+    if (stage === "waiting") return language.t("ui.sessionTurn.status.waiting")
     return language.t("ui.sessionTurn.status.thinking")
   }
 
@@ -1349,6 +1358,11 @@ export function MessageTimeline(props: {
         const thinkingRow = row as Accessor<TimelineRowByTag<"Thinking">>
         const promptAt = createMemo(() => messageByID().get(thinkingRow().userMessageID)?.time.created)
         const turnAssistants = createMemo(() => assistantMessagesByParent().get(thinkingRow().userMessageID))
+        // An assistant message exists as soon as the turn starts, so its presence proves nothing about
+        // progress; the parts do. This is what makes the "waiting" stage reachable at all.
+        const producedOutput = createMemo(() =>
+          (turnAssistants() ?? []).some((message) => turnProducedOutput(getMsgParts(message.id))),
+        )
         const [observed, setObserved] = createSignal<number>()
         const activity = createMemo(() =>
           latestTurnActivity({
@@ -1375,7 +1389,7 @@ export function MessageTimeline(props: {
                 activityAt={activity().at ?? promptAt()}
                 promptAt={promptAt()}
                 pending={pendingMessageID() === thinkingRow().userMessageID}
-                silent={(turnAssistants()?.length ?? 0) === 0}
+                produced={producedOutput()}
               />
             </div>
           </TimelineRowFrame>
