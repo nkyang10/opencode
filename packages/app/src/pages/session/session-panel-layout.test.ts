@@ -17,3 +17,16 @@ describe("sessionPanelLayout", () => {
     })
   })
 })
+
+  // FE-028: without this the commentary toggle sets the store and lights the button while the side panel
+  // is never mounted, so nothing appears.
+  test("a commentary-only view is visible", () => {
+    expect(sessionPanelLayout({ review: false, terminal: false, files: false, commentary: true })).toEqual({
+      visible: true,
+      stacked: false,
+    })
+  })
+
+  test("commentary does not change the stacking rule", () => {
+    expect(sessionPanelLayout({ review: true, terminal: true, files: false, commentary: true }).stacked).toBe(true)
+  })

@@ -535,6 +535,7 @@ export default function Page() {
       review: desktopV2ReviewOpen(),
       terminal: desktopTerminalOpen(),
       files: desktopFileTreeOpen(),
+      commentary: desktopCommentaryOpen(),
     }),
   )
 
@@ -2383,7 +2384,10 @@ export default function Page() {
         <Show when={newSessionDesign()}>
           <Show when={isDesktop() ? desktopV2PanelLayout().visible : terminalOpen()}>
             <div class="min-w-0 h-full flex flex-1 flex-col">
-              <Show when={isDesktop() && (desktopV2ReviewOpen() || desktopFileTreeOpen())}>
+              {/* FE-028: `|| desktopCommentaryOpen()` — the commentary column lives inside this side panel,
+                  so a commentary-only view must mount it. Without it the toggle sets the store and lights
+                  the header button while nothing renders. */}
+              <Show when={isDesktop() && (desktopV2ReviewOpen() || desktopFileTreeOpen() || desktopCommentaryOpen())}>
                 <div class="min-h-0 flex-1">
                   <Suspense>
                     <SessionSidePanel

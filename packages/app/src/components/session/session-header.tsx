@@ -31,7 +31,7 @@ import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
-import { reviewTooltipKeybind } from "../command-tooltip-keybind"
+import { commentaryTooltipKeybind, reviewTooltipKeybind } from "../command-tooltip-keybind"
 import { useTitlebarRightMount } from "../titlebar"
 
 const OPEN_APPS = [
@@ -242,6 +242,11 @@ export function SessionHeader() {
     reviewVisible: isDesktop(),
     reviewOpened: view().reviewPanel.opened(),
     onReviewToggle: () => view().reviewPanel.toggle(),
+    commentaryLabel: language.t("command.commentary.toggle"),
+    commentaryKeybind: commentaryTooltipKeybind(command),
+    commentaryVisible: isDesktop(),
+    commentaryOpened: view().commentaryPanel.opened(),
+    onCommentaryToggle: () => view().commentaryPanel.toggle(),
   }))
 
   const selectApp = (app: OpenApp) => {
@@ -478,27 +483,6 @@ export function SessionHeader() {
                         </Button>
                       </TooltipKeybind>
 
-                      {/* FE-028: opens the narration column. It is the only control that takes a lease, so
-                          the server only spends a model call while this panel is actually on screen. */}
-                      <TooltipKeybind
-                        title={language.t("command.commentary.toggle")}
-                        keybind={command.keybind("commentary.toggle")}
-                      >
-                        <Button
-                          variant="ghost"
-                          class="group/commentary-toggle titlebar-icon w-8 h-6 p-0 box-border"
-                          onClick={() => view().commentaryPanel.toggle()}
-                          aria-label={language.t("command.commentary.toggle")}
-                          aria-expanded={view().commentaryPanel.opened()}
-                          aria-controls="commentary-panel"
-                        >
-                          <Icon
-                            size="small"
-                            name={view().commentaryPanel.opened() ? "commentary-active" : "commentary"}
-                          />
-                        </Button>
-                      </TooltipKeybind>
-
                       <TooltipKeybind
                         title={language.t("command.fileTree.toggle")}
                         keybind={command.keybind("fileTree.toggle")}
@@ -545,6 +529,11 @@ type SessionHeaderV2ActionsState = {
   reviewVisible: boolean
   reviewOpened: boolean
   onReviewToggle: () => void
+  commentaryLabel: string
+  commentaryKeybind: string[]
+  commentaryVisible: boolean
+  commentaryOpened: boolean
+  onCommentaryToggle: () => void
 }
 
 function SessionHeaderV2Actions(props: { state: SessionHeaderV2ActionsState }) {
@@ -581,6 +570,36 @@ function SessionHeaderV2Actions(props: { state: SessionHeaderV2ActionsState }) {
             aria-expanded={props.state.reviewOpened}
             aria-controls="review-panel"
             icon={<IconV2 name="sidebar-right" />}
+          />
+        </TooltipV2>
+      </Show>
+      {/* FE-028: this is the live header path — the inline block in the non-v2 branch below is the dead
+          legacy layout, so a toggle added only there never renders. The narration column is opened from
+          here, next to the review panel it sits beside. */}
+      <Show when={props.state.commentaryVisible}>
+        <TooltipV2
+          class="shrink-0"
+          placement="bottom"
+          value={
+            <>
+              {props.state.commentaryLabel}
+              <Show when={props.state.commentaryKeybind.length > 0}>
+                <KeybindV2 keys={props.state.commentaryKeybind} variant="neutral" />
+              </Show>
+            </>
+          }
+        >
+          <IconButtonV2
+            type="button"
+            variant="ghost-muted"
+            size="large"
+            class="!w-9 shrink-0"
+            state={props.state.commentaryOpened ? "pressed" : undefined}
+            onClick={props.state.onCommentaryToggle}
+            aria-label={props.state.commentaryLabel}
+            aria-expanded={props.state.commentaryOpened}
+            aria-controls="commentary-panel"
+            icon={<IconV2 name={props.state.commentaryOpened ? "commentary-active" : "commentary"} />}
           />
         </TooltipV2>
       </Show>
