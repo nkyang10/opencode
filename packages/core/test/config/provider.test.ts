@@ -266,4 +266,83 @@ describe("ConfigProviderPlugin.Plugin", () => {
       }),
     ),
   )
+
+  // End to end through the real plugin: a config model with no `limit` block against a gateway that
+  // answers like vLLM. A real Bun server, because the wiring under test is the request itself.
+  describe("filling a missing context size from the provider API", () => {
+    const withGateway = <A, E, R>(
+      body: unknown,
+      use: (url: string, seen: () => (string | undefined)[]) => Effect.Effect<A, E, R>,
+    ) =>
+      Effect.acquireUseRelease(
+        Effect.sync(() => {
+          const seen: (string | undefined)[] = []
+          const server = Bun.serve({
+            port: 0,
+            fetch: (request) => {
+              seen.push(request.headers.get("authorization") ?? undefined)
+              if (new URL(request.url).pathname !== "/v1/models") return new Response("not found", { status: 404 })
+              return Response.json(body)
+            },
+          })
+          return { server, seen }
+        }),
+        ({ server, seen }) => use(`${server.url.toString()}v1`, () => seen),
+        ({ server }) => Effect.sync(() => server.stop(true)),
+      )
+
+    const providerID = ProviderV2.ID.make("gateway")
+    const modelID = ModelV2.ID.make("general")
+
+    const configFor = (url: string, model: Record<string, unknown>) =>
+      Config.Service.of({
+        entries: () =>
+          Effect.succeed([
+            new Config.Document({
+              type: "document",
+              info: decode({
+                providers: {
+                  gateway: {
+                    api: { type: "aisdk", package: "@ai-sdk/openai-compatible", url, settings: { apiKey: "k" } },
+                    models: { general: model },
+                  },
+                },
+              }),
+            }),
+          ]),
+      })
+
+    it.effect("fills a zero context size from the gateway's own report", () =>
+      withGateway({ data: [{ id: "general", max_model_len: 1048576 }] }, (url, seen) =>
+        Effect.gen(function* () {
+          const catalog = yield* Catalog.Service
+          yield* addPlugin(configFor(url, { name: "Gateway" }))
+          expect(required(yield* catalog.model.get(providerID, modelID)).limit.context).toBe(1048576)
+          expect(seen()).toEqual(["Bearer k"])
+        }),
+      ),
+    )
+
+    it.effect("never overwrites a context size the config already set", () =>
+      withGateway({ data: [{ id: "general", max_model_len: 1048576 }] }, (url, seen) =>
+        Effect.gen(function* () {
+          const catalog = yield* Catalog.Service
+          yield* addPlugin(configFor(url, { name: "Gateway", limit: { context: 500000, output: 32000 } }))
+          expect(required(yield* catalog.model.get(providerID, modelID)).limit.context).toBe(500000)
+          expect(seen()).toEqual([])
+        }),
+      ),
+    )
+
+    it.effect("leaves the context size at zero when the gateway reports none", () =>
+      withGateway({ data: [{ id: "general", object: "model" }] }, (url, seen) =>
+        Effect.gen(function* () {
+          const catalog = yield* Catalog.Service
+          yield* addPlugin(configFor(url, { name: "Gateway" }))
+          expect(required(yield* catalog.model.get(providerID, modelID)).limit.context).toBe(0)
+          expect(seen().length).toBe(1)
+        }),
+      ),
+    )
+  })
 })

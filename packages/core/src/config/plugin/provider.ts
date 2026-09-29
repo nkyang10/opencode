@@ -2,7 +2,9 @@ export * as ConfigProviderPlugin from "./provider"
 
 import { define } from "../../plugin/internal"
 import { Effect } from "effect"
+import { HttpClient } from "effect/unstable/http"
 import { Config } from "../../config"
+import { ModelContextSize } from "../../model-context-size"
 import { ModelV2 } from "../../model"
 import { ProviderV2 } from "../../provider"
 
@@ -10,6 +12,9 @@ export const Plugin = define({
   id: "config-provider",
   effect: Effect.fn(function* (ctx) {
     const config = yield* Config.Service
+    // A catalog transform may not declare requirements, so the client is resolved once here and
+    // handed to the transform's own effect rather than pulled from the ambient fiber.
+    const http = yield* HttpClient.HttpClient
     yield* ctx.integration.transform(
       Effect.fn(function* (integrations) {
         const files = (yield* config.entries()).filter((entry): entry is Config.Document => entry.type === "document")
@@ -104,6 +109,33 @@ export const Plugin = define({
                 if (config.disabled !== undefined) model.enabled = !config.disabled
                 if (config.limit !== undefined) model.limit = { ...model.limit, ...config.limit }
               })
+
+              // A config model with no `limit` keeps the `Model.Info.empty` default of 0, and 0 is not
+              // a harmless placeholder: compaction bails on `context <= 0`, so such a session never
+              // compacts and the context meter has no denominator. Ask the provider's own API once.
+              // A limit the user wrote is never overwritten - only a missing one is filled.
+              const record = catalog.provider.get(providerID)
+              const baseURL = record?.provider.api.type === "aisdk" ? record.provider.api.url : undefined
+              const auth = record && ModelContextSize.headers(record.provider)
+              if (baseURL && auth) {
+                const current = catalog.model.get(providerID, id)?.limit.context ?? 0
+                const context = yield* ModelContextSize.fill({
+                  baseURL,
+                  headers: auth,
+                  modelID: id,
+                  current,
+                }).pipe(Effect.provideService(HttpClient.HttpClient, http))
+                if (context > 0 && context !== current) {
+                  catalog.model.update(providerID, id, (model) => {
+                    model.limit.context = context
+                  })
+                  yield* Effect.logInfo("filled a missing model context size from the provider API", {
+                    providerID,
+                    modelID: id,
+                    context,
+                  })
+                }
+              }
             }
           }
         }
