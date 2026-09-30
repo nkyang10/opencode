@@ -410,46 +410,52 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     const hash = yield* audio.render({ text: entry.text, voice: cfg.speech.voice, host: cfg.speech.host })
     if (!hash) return
 
-    yield* db
-      .update(SessionCommentaryTable)
-      .set({ audio: hash })
-      .where(and(eq(SessionCommentaryTable.session_id, sessionID), eq(SessionCommentaryTable.seq, entry.seq)))
-      .run()
-      .pipe(Effect.orDie)
-    yield* events.publish(Event.Posted, { sessionID, entry: { ...entry, audio: hash } })
-
-    // Keep only the newest `retention` audio references for this session, then drop files nothing references.
-    const rows = yield* db
-      .select({ seq: SessionCommentaryTable.seq, audio: SessionCommentaryTable.audio })
-      .from(SessionCommentaryTable)
-      .where(eq(SessionCommentaryTable.session_id, sessionID))
-      .orderBy(desc(SessionCommentaryTable.seq))
-      .all()
-      .pipe(Effect.orDie)
-    // `overflow` is the oldest row that has fallen out of the window, and its seq is the cut-off. There is no
-    // cut-off until there IS an overflow row: defaulting it to MAX_SAFE_INTEGER here would null the audio of
-    // every row in the session, which is exactly what it did before this guard existed — files on disk, and
-    // every entry silently text-only.
-    const overflow = rows[cfg.speech.retention]
-    if (overflow) {
+    // `render` holds the new file in its in-flight guard. It must stay guarded until AFTER the sweep so a
+    // concurrent global sweep from another session cannot delete the file between the write and this row
+    // commit — releasing too early reintroduces exactly that race. `ensuring` guarantees release even if the
+    // DB update or sweep below throws.
+    yield* Effect.gen(function* () {
       yield* db
         .update(SessionCommentaryTable)
-        .set({ audio: null })
-        .where(and(eq(SessionCommentaryTable.session_id, sessionID), lte(SessionCommentaryTable.seq, overflow.seq)))
+        .set({ audio: hash })
+        .where(and(eq(SessionCommentaryTable.session_id, sessionID), eq(SessionCommentaryTable.seq, entry.seq)))
         .run()
         .pipe(Effect.orDie)
-    }
+      yield* events.publish(Event.Posted, { sessionID, entry: { ...entry, audio: hash } })
 
-    // Re-read after the write, so `keep` is what the database actually says rather than what it said a moment
-    // ago. Files are content-addressed and shared, so this is the only place that knows what is still needed.
-    const referenced = yield* db
-      .select({ audio: SessionCommentaryTable.audio })
-      .from(SessionCommentaryTable)
-      .where(and(sql`${SessionCommentaryTable.audio} IS NOT NULL`, sql`${SessionCommentaryTable.audio} <> ''`))
-      .all()
-      .pipe(Effect.orDie)
-    const keep = new Set(referenced.flatMap((row) => (row.audio ? [row.audio] : [])))
-    yield* audio.sweep(keep)
+      // Keep only the newest `retention` audio references for this session, then drop files nothing references.
+      const rows = yield* db
+        .select({ seq: SessionCommentaryTable.seq, audio: SessionCommentaryTable.audio })
+        .from(SessionCommentaryTable)
+        .where(eq(SessionCommentaryTable.session_id, sessionID))
+        .orderBy(desc(SessionCommentaryTable.seq))
+        .all()
+        .pipe(Effect.orDie)
+      // `overflow` is the oldest row that has fallen out of the window, and its seq is the cut-off. There is
+      // no cut-off until there IS an overflow row: defaulting it to MAX_SAFE_INTEGER here would null the audio
+      // of every row in the session, which is exactly what it did before this guard existed — files on disk,
+      // and every entry silently text-only.
+      const overflow = rows[cfg.speech.retention]
+      if (overflow) {
+        yield* db
+          .update(SessionCommentaryTable)
+          .set({ audio: null })
+          .where(and(eq(SessionCommentaryTable.session_id, sessionID), lte(SessionCommentaryTable.seq, overflow.seq)))
+          .run()
+          .pipe(Effect.orDie)
+      }
+
+      // Re-read after the write, so `keep` is what the database actually says rather than what it said a moment
+      // ago. Files are content-addressed and shared, so this is the only place that knows what is still needed.
+      const referenced = yield* db
+        .select({ audio: SessionCommentaryTable.audio })
+        .from(SessionCommentaryTable)
+        .where(and(sql`${SessionCommentaryTable.audio} IS NOT NULL`, sql`${SessionCommentaryTable.audio} <> ''`))
+        .all()
+        .pipe(Effect.orDie)
+      const keep = new Set(referenced.flatMap((row) => (row.audio ? [row.audio] : [])))
+      yield* audio.sweep(keep)
+    }).pipe(Effect.ensuring(audio.release(hash)))
   })
 
   const list = Effect.fn("SessionCommentary.list")(function* (input: { sessionID: SessionID; limit?: number }) {

@@ -211,6 +211,39 @@ describe("CommentaryAudio queue", () => {
     expect(audio.enqueue(clip(1, "a"))).toBe(false)
   })
 
+  // The line arrives as text, then is republished a moment later with its audio hash. The text-only pass must
+  // NOT consume the high-water mark, or the audio pass would be refused as "history" and the line never
+  // spoken — the most common case in the whole feature.
+  test("a line republished with audio is still spoken, because the text pass did not consume its seq", async () => {
+    const seen: string[] = []
+    const { audio, tick } = setup({
+      gapMs: 400,
+      fetch: asFetch((input) => {
+        seen.push(String(input))
+        return Promise.resolve(okResponse())
+      }),
+    })
+    // Text-only pass: accepted, but must not mark seq 1 as spoken.
+    expect(audio.enqueue(textOnly(1, "s1", "a line"))).toBe(true)
+    // The republish carries the same seq, now with audio: it must be considered new.
+    expect(audio.enqueue(clip(1, "s1", "a line"))).toBe(true)
+    // The skipped text-only line still counts as occupying the slot, so the normal gap applies; let it elapse.
+    tick(400)
+    await new Promise((r) => setTimeout(r, 450))
+    expect(seen).toEqual([`/session/s1/commentary/audio/${hash(1)}`])
+  })
+
+  test("a genuinely text-only line does not leave a watermark that blocks an equal later line", async () => {
+    const audio = new CommentaryAudio({
+      sessionID: () => "s1",
+      fetch: asFetch(() => Promise.resolve(okResponse())),
+      createAudio: () => new FakeAudio() as unknown as HTMLAudioElement,
+    })
+    audio.enqueue(textOnly(3, "s1", "no audio"))
+    // A later republish of the same seq with audio is new (the text pass left no mark).
+    expect(audio.enqueue(clip(3, "s1", "no audio"))).toBe(true)
+  })
+
   test("fetches the audio the server rendered for that line, addressed by its hash", async () => {
     const seen: Array<{ url: string; cache?: string; method?: string }> = []
     const fetchMock = asFetch((input, init) => {

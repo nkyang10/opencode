@@ -54,13 +54,19 @@ export interface Interface {
   /**
    * Render `text` and return its hash, or `undefined` when there is no audio for it. Never fails the caller:
    * a line that cannot be spoken is a line that stays text-only.
+   *
+   * The hash is held in the in-flight guard until `release` is called, so a global retention sweep cannot
+   * delete the file between the write and the row commit. The caller must call `release` once the row is
+   * committed.
    */
   readonly render: (input: { text: string; voice?: string; host?: string }) => Effect.Effect<string | undefined>
+  /** Release an in-flight render guard once the row referencing it has been committed. */
+  readonly release: (hash: string) => Effect.Effect<void>
   /** The stored bytes, or `undefined` when the hash is unknown, malformed, or the file has been swept. */
   readonly read: (hash: string) => Effect.Effect<Uint8Array | undefined>
   /**
    * Drop stored audio nothing points at any more. `keep` is the set of hashes still referenced by surviving
-   * commentary rows; anything else on disk is unreachable and is removed.
+   * commentary rows; anything else on disk — unless it is still being rendered — is unreachable and removed.
    */
   readonly sweep: (keep: ReadonlySet<string>) => Effect.Effect<number>
 }
@@ -70,6 +76,12 @@ export class Service extends Context.Service<Service, Interface>()("@opencode-ai
 export const make = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem
   const http = yield* HttpClient.HttpClient
+
+  // Hashes currently being rendered. A file is on disk, then committed to its row a moment later; a global
+  // retention sweep in that window would otherwise think the file is orphaned and delete it before the row
+  // ever points at it, breaking playback permanently. `sweep` unions this in, so a file is never removed
+  // while its render is in flight.
+  const rendering = new Set<string>()
 
   const render: Interface["render"] = (input) =>
     Effect.gen(function* () {
@@ -87,45 +99,49 @@ export const make = Effect.gen(function* () {
       // Content-addressed, so an existing file is the right answer for this exact text and voice.
       if (existing) return hash
 
-      const fetched = yield* http
-        .execute(
-          HttpClientRequest.post(`${base}/v1/audio/speech`, {
-            headers: new Headers({ "content-type": "application/json" }),
-            body: HttpBody.jsonUnsafe({ input: input.text, voice }),
-          }),
-        )
-        .pipe(
-          Effect.timeout(RENDER_TIMEOUT),
-          Effect.catchCause((cause) => Effect.succeed(Cause.pretty(cause))),
-        )
+      rendering.add(hash)
+      const written = yield* Effect.gen(function* () {
+        const fetched = yield* http
+          .execute(
+            HttpClientRequest.post(`${base}/v1/audio/speech`, {
+              headers: new Headers({ "content-type": "application/json" }),
+              body: HttpBody.jsonUnsafe({ input: input.text, voice }),
+            }),
+          )
+          .pipe(
+            Effect.timeout(RENDER_TIMEOUT),
+            Effect.catchCause((cause) => Effect.succeed(Cause.pretty(cause))),
+          )
 
-      if (typeof fetched === "string") {
-        yield* Effect.logWarning("commentary audio render failed", { cause: fetched })
-        return undefined
-      }
-      if (fetched.status !== 200) {
-        yield* Effect.logWarning("commentary audio service refused", { status: fetched.status })
-        return undefined
-      }
-      const declared = Number(fetched.headers["content-length"] ?? "")
-      if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
-        yield* Effect.logWarning("commentary audio too large", { bytes: declared })
-        return undefined
-      }
-      const audio = yield* fetched.arrayBuffer.pipe(
-        Effect.map((buffer) => new Uint8Array(buffer)),
-        Effect.catchCause(() => Effect.succeed(new Uint8Array(0))),
-      )
-      if (audio.byteLength === 0 || audio.byteLength > MAX_RESPONSE_BYTES) {
-        yield* Effect.logWarning("commentary audio empty or oversized", { bytes: audio.byteLength })
-        return undefined
-      }
+        if (typeof fetched === "string") {
+          yield* Effect.logWarning("commentary audio render failed", { cause: fetched })
+          return false
+        }
+        if (fetched.status !== 200) {
+          yield* Effect.logWarning("commentary audio service refused", { status: fetched.status })
+          return false
+        }
+        const declared = Number(fetched.headers["content-length"] ?? "")
+        if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
+          yield* Effect.logWarning("commentary audio too large", { bytes: declared })
+          return false
+        }
+        const audio = yield* fetched.arrayBuffer.pipe(
+          Effect.map((buffer) => new Uint8Array(buffer)),
+          Effect.catchCause(() => Effect.succeed(new Uint8Array(0))),
+        )
+        if (audio.byteLength === 0 || audio.byteLength > MAX_RESPONSE_BYTES) {
+          yield* Effect.logWarning("commentary audio empty or oversized", { bytes: audio.byteLength })
+          return false
+        }
 
-      yield* fs.makeDirectory(directory(), { recursive: true }).pipe(Effect.catchCause(() => Effect.void))
-      yield* fs
-        .writeFile(target, audio)
-        .pipe(Effect.catchCause((cause) => Effect.logWarning("commentary audio write failed", { cause: Cause.pretty(cause) })))
-      return hash
+        yield* fs.makeDirectory(directory(), { recursive: true }).pipe(Effect.catchCause(() => Effect.void))
+        yield* fs.writeFile(target, audio).pipe(
+          Effect.catchCause((cause) => Effect.logWarning("commentary audio write failed", { cause: Cause.pretty(cause) })),
+        )
+        return true
+      })
+      return written ? hash : undefined
     })
 
   const read: Interface["read"] = (hash) =>
@@ -144,9 +160,11 @@ export const make = Effect.gen(function* () {
       const present = yield* fs
         .readDirectory(directory())
         .pipe(Effect.catchCause(() => Effect.succeed([] as Array<string>)))
-      // Content addressing means two rows can share a file, so `keep` — the hashes surviving rows still point
-      // at — is what decides. Unlinking anything still in it would break playback for the row that has it.
-      const orphans = present.filter((name) => name.endsWith(".mp3") && !keep.has(name.slice(0, -".mp3".length)))
+      // Content addressing means two rows can share a file, so `keep` — plus whatever is still being rendered
+      // right now — is what decides. Unlinking anything in either set would break playback for the row that
+      // has it, or for the render that is a file-write away from committing it.
+      const protected_ = new Set<string>([...keep, ...rendering])
+      const orphans = present.filter((name) => name.endsWith(".mp3") && !protected_.has(name.slice(0, -".mp3".length)))
       let removed = 0
       for (const name of orphans) {
         const unlinked = yield* fs
@@ -158,7 +176,12 @@ export const make = Effect.gen(function* () {
       return removed
     })
 
-  return Service.of({ render, read, sweep })
+  const release: Interface["release"] = (hash) =>
+    Effect.sync(() => {
+      rendering.delete(hash)
+    })
+
+  return Service.of({ render, read, sweep, release })
 })
 
 export const layer = Layer.effect(Service, make)

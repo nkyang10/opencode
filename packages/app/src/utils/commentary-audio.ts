@@ -97,11 +97,16 @@ export class CommentaryAudio {
   /**
    * Offer a line. Returns whether it was accepted, which is what lets a caller assert "only new" without
    * reaching into the queue.
+   *
+   * The high-water mark is advanced only when a line actually has audio. A line arrives as text first and is
+   * republished with its audio hash a moment later; if the text-only pass consumed the seq, the audio pass
+   * would be refused as "history" and the line would never be spoken. A text-only line still gets enqueued
+   * (and skipped in `pump`), but it must not eat the slot its own audio is about to fill.
    */
   enqueue(clip: CommentaryClip) {
     if (!clip.text.trim()) return false
     if (!this.isNew(clip)) return false
-    this.spoken.set(clip.sessionID, clip.seq)
+    if (clip.audio) this.spoken.set(clip.sessionID, clip.seq)
     this.queue.push(clip)
     void this.pump()
     return true
