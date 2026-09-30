@@ -28,7 +28,7 @@ export const DEFAULT_GAP_MS = 400
 
 export type SpeechOptions = {
   gapMs?: number
-  fetch?: typeof globalThis.fetch
+  fetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
   /** The session whose stored audio is being played. */
   sessionID?: () => string | undefined
   /**
@@ -65,7 +65,7 @@ export class CommentaryAudio {
   private lastEndedAt = 0
   private gapTimer: ReturnType<typeof setTimeout> | undefined
   private readonly gapMs: number
-  private readonly doFetch: typeof globalThis.fetch
+  private readonly doFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
   private readonly createAudio: () => HTMLAudioElement
   private readonly now: () => number
   private readonly onError: ((message: string) => void) | undefined
@@ -74,7 +74,12 @@ export class CommentaryAudio {
 
   constructor(options: SpeechOptions = {}) {
     this.gapMs = options.gapMs ?? DEFAULT_GAP_MS
-    this.doFetch = options.fetch ?? globalThis.fetch
+    // Called as a free function, never as `this.doFetch(...)`. Storing `globalThis.fetch` in a field and
+    // invoking it as a method makes `this` the player, and Chrome rejects that with
+    // "TypeError: Failed to execute 'fetch' on 'Window': Illegal invocation" — the request never leaves the
+    // page, and every test that injects a fake fetch is blind to it because a plain function does not care
+    // what `this` is. Wrapping keeps the injectable seam for tests and a correct call in production.
+    this.doFetch = options.fetch ?? ((input, init) => fetch(input, init))
     this.createAudio =
       options.createAudio ??
       (() => {

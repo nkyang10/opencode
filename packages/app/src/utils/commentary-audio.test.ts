@@ -244,6 +244,33 @@ describe("CommentaryAudio queue", () => {
     expect(audio.enqueue(clip(3, "s1", "no audio"))).toBe(true)
   })
 
+  // The bug this pins is the reason the feature was silent in every browser: `globalThis.fetch` was stored in
+  // a field and invoked as `this.doFetch(...)`, so `this` was the player rather than the window and Chrome threw
+  // "TypeError: Failed to execute 'fetch' on 'Window': Illegal invocation" before the request was sent. Every
+  // other case here injects a fake fetch, and a plain function does not care what `this` is — so the entire
+  // suite was blind to it. This case uses the REAL default path and a global stub that checks its receiver.
+  test("the default fetch is called as a free function, not as a method", async () => {
+    const real = globalThis.fetch
+    let receiver: unknown = "never-called"
+    globalThis.fetch = function (this: unknown) {
+      receiver = this
+      return Promise.resolve(okResponse())
+    } as unknown as typeof globalThis.fetch
+    try {
+      const audio = new CommentaryAudio({
+        sessionID: () => "s1",
+        createAudio: () => new FakeAudio() as unknown as HTMLAudioElement,
+      })
+      audio.enqueue(clip(1))
+      await settleChain()
+      // `globalThis` (or undefined in a module context) — anything else is the Illegal invocation.
+      expect(receiver === globalThis || receiver === undefined).toBe(true)
+      expect(receiver).not.toBe(audio)
+    } finally {
+      globalThis.fetch = real
+    }
+  })
+
   test("fetches the audio the server rendered for that line, addressed by its hash", async () => {
     const seen: Array<{ url: string; cache?: string; method?: string }> = []
     const fetchMock = asFetch((input, init) => {
