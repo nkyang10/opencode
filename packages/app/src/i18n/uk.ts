@@ -1119,6 +1119,12 @@ export const dict = {
     "How the narration should be written: tone, technical level, point of view. Added to the prompt that writes each line.",
   "settings.general.commentary.row.instructions.placeholder":
     "For example: explain like a senior engineer pairing with me. Be concrete and skip the basics.",
+  "settings.general.commentary.row.audioEnabled.title": "Read the commentary aloud",
+  "settings.general.commentary.row.audioEnabled.description": "Speak each new commentary line as it appears, for the agent tab you are looking at.",
+  "settings.general.commentary.row.audioHost.title": "Speech API",
+  "settings.general.commentary.row.audioHost.description": "Host and port of the text-to-speech service, for example 192.168.1.162:8880.",
+  "settings.general.commentary.row.audioVoice.title": "Voice",
+  "settings.general.commentary.row.audioVoice.description": "Voice name or alias understood by the speech service, for example cantonese.",
   "settings.general.commentary.row.instructions.saved.title": "Narration preferences saved",
   "settings.general.row.newInterface.badge": "Нове",
   "settings.general.row.newInterface.description":

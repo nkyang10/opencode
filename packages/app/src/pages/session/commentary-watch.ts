@@ -19,6 +19,12 @@ import type { ServerConnection } from "@/context/server"
  * while the panel is open. It is a real off switch rather than a hidden button: the server narrates only
  * while some client holds a lease, so never asking is the same as not spending anything.
  *
+ * `foregrounded` is FU-122's addition, and it is the one that changes what the lease MEANS. Audio is only
+ * wanted from the tab you are actually looking at, and a backgrounded tab that kept its lease would go on
+ * paying to narrate into the void — and, with two tabs open, their audio would interleave. So the same
+ * predicate now governs both spending and speaking, which is the only way to stop those two drifting apart:
+ * there is exactly one answer to "should this session be narrating right now".
+ *
  * The latch is deliberately NOT persisted (it lives in the non-persisted `sessionViewState`), otherwise
  * every session you ever opened would narrate forever — the cost that the latch exists to avoid.
  *
@@ -29,8 +35,11 @@ export function commentaryShouldWatch(input: {
   panelOpened: boolean
   latched: boolean
   enabled: boolean
+  foregrounded: boolean
 }): boolean {
   if (!input.enabled) return false
+  // A hidden window gets no lease: it cannot be read, and with audio on it must not be heard either.
+  if (!input.foregrounded) return false
   return input.isDesktop ? input.panelOpened : input.latched
 }
 
@@ -48,6 +57,8 @@ export function createCommentaryWatch(input: {
   watching: Accessor<boolean>
   /** The Settings switch. False means this device never holds a lease. */
   enabled: Accessor<boolean>
+  /** Whether this document is visible. A hidden tab holds no lease (FU-122). */
+  foregrounded: Accessor<boolean>
   /** The reader's narration preferences, re-sent on every heartbeat so an edit applies on the next tick. */
   instructions: Accessor<string>
 }) {
@@ -66,7 +77,7 @@ export function createCommentaryWatch(input: {
     // session and per server, and the instructions travel with it, so changing any of them re-takes it.
     const id = input.sessionID()
     const base = input.http()
-    const watching = !!id && !!base && input.enabled() && input.watching()
+    const watching = !!id && !!base && input.enabled() && input.foregrounded() && input.watching()
     const instructions = input.instructions()
 
     // Hand the lease back rather than waiting for the TTL. Without this the heartbeat from the previous

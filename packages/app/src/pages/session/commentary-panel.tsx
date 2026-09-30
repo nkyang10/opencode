@@ -17,6 +17,9 @@ import { getRelativeTime } from "@/utils/time"
  * the panel is a tab: tapping back to the chat would have stopped the narration. The lease now belongs to
  * the session view via `createCommentaryWatch`, so the same component renders unchanged in both places.
  */
+/** Newest entries drawn. The store keeps everything the server sent; this only bounds the DOM. */
+const RENDERED_ENTRIES = 200
+
 export function CommentaryPanel(props: { sessionID: string | undefined }) {
   const language = useLanguage()
   const server = useServer()
@@ -30,19 +33,28 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
   const [initial, setInitial] = createSignal<SessionCommentaryEvent.Entry[]>([])
 
   const sessionID = createMemo(() => props.sessionID)
+  // The list is append-only, so an all-day session would otherwise put every line ever written into the DOM
+  // at once. Only the newest RENDERED entries are drawn — the server keeps a longer history, and the count in
+  // the header still reflects everything held, so a truncated scroll never looks like data loss.
   const entries = createMemo(() => {
     const id = sessionID()
     if (!id) return []
     const live = sync().data.commentary[id] ?? []
-    if (initial().length === 0) return live
+    if (initial().length === 0) return live.length > RENDERED_ENTRIES ? live.slice(-RENDERED_ENTRIES) : live
     const seen = new Set<number>()
-    return [...initial(), ...live]
+    const merged = [...initial(), ...live]
       .filter((entry) => {
         if (seen.has(entry.seq)) return false
         seen.add(entry.seq)
         return true
       })
       .sort((a, b) => a.seq - b.seq)
+    return merged.length > RENDERED_ENTRIES ? merged.slice(-RENDERED_ENTRIES) : merged
+  })
+  const total = createMemo(() => {
+    const id = sessionID()
+    if (!id) return 0
+    return Math.max(initial().length, sync().data.commentary[id]?.length ?? 0)
   })
   const working = createMemo(() => (sessionID() ? sync().data.session_working(sessionID()!) : false))
 
@@ -81,8 +93,8 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
       <div class="h-9 shrink-0 flex items-center gap-2 px-3 border-b border-border-weaker-base">
         <Icon size="small" name="commentary" class="text-icon-weak" />
         <div class="text-12-medium text-text-strong">{language.t("session.commentary.title")}</div>
-        <Show when={entries().length > 0}>
-          <div class="text-12-regular text-text-weak">{entries().length}</div>
+        <Show when={total() > 0}>
+          <div class="text-12-regular text-text-weak">{total()}</div>
         </Show>
       </div>
 

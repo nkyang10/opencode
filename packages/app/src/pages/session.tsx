@@ -2,23 +2,7 @@ import type { FilePart, Project, UserMessage, VcsFileDiff } from "@opencode-ai/s
 import { getFilename } from "@opencode-ai/core/util/path"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { createQuery, skipToken, useMutation, useQueryClient } from "@tanstack/solid-query"
-import {
-  batch,
-  ErrorBoundary,
-  onCleanup,
-  Suspense,
-  Show,
-  Match,
-  Switch,
-  createMemo,
-  createEffect,
-  createComputed,
-  createSignal,
-  on,
-  onMount,
-  type ParentProps,
-  untrack,
-} from "solid-js"
+import { ErrorBoundary, Match, Show, Suspense, Switch, batch, createComputed, createEffect, createMemo, createSignal, on, onCleanup, onMount, type ParentProps, untrack } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createMediaQuery } from "@solid-primitives/media"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
@@ -74,6 +58,7 @@ import {
 import { createOpenReviewFile, createSessionTabs, createSizing, shouldShowFileTree } from "@/pages/session/helpers"
 import { MessageTimeline } from "@/pages/session/timeline/message-timeline"
 import { createTimelineModel } from "@/pages/session/timeline/model"
+import { CommentaryAudioPlayer } from "@/pages/session/commentary-audio-player"
 import { CommentaryPanel } from "@/pages/session/commentary-panel"
 import { commentaryShouldWatch, createCommentaryWatch } from "@/pages/session/commentary-watch"
 import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/pages/session/review-tab"
@@ -454,6 +439,17 @@ export default function Page() {
   )
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
+  // FU-122: a hidden window holds no commentary lease — it cannot be read, and with audio on it must not
+  // be heard either. The same `visibilitychange` plumbing the rest of the app already uses, so the
+  // iOS-Safari unreliability documented in directory-layout.tsx is handled in one place rather than twice.
+  const [foregrounded, setForegrounded] = createSignal(
+    typeof document === "undefined" ? true : document.visibilityState !== "hidden",
+  )
+  onMount(() => {
+    const sync = () => setForegrounded(document.visibilityState !== "hidden")
+    makeEventListener(document, "visibilitychange", sync)
+    sync()
+  })
   const size = createSizing()
   const desktopReviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
   // FE-028: the narration column. Desktop-only for now, exactly like the review panel it sits beside.
@@ -468,11 +464,13 @@ export default function Page() {
     http: () => server.current?.http,
     enabled: () => view().commentaryPanel.enabled(),
     instructions: () => view().commentaryPanel.instructions(),
+    foregrounded: () => foregrounded(),
     watching: () => !!params.id && commentaryShouldWatch({
       isDesktop: isDesktop(),
       panelOpened: view().commentaryPanel.opened(),
       latched: store.commentaryLatched,
       enabled: view().commentaryPanel.enabled(),
+      foregrounded: foregrounded(),
     }),
   })
   const desktopV2ReviewOpen = createMemo(() => newSessionDesign() && desktopReviewOpen() && !!params.id)
@@ -1388,6 +1386,11 @@ export default function Page() {
 
   // FE-028 / FU-111: the narration itself, shared verbatim between the desktop column and the mobile tab.
   // The lease is owned by `createCommentaryWatch` above, not by this component.
+  // FU-122: speaks new lines for this session. Mounted beside the panel rather than inside it, because the
+  // panel unmounts when closed and the audio must not stop with it. Being a sibling of the lease
+  // controller, it inherits the same foreground rule: nothing arrives for a tab nobody is looking at.
+  const commentaryAudio = <CommentaryAudioPlayer sessionID={params.id} />
+
   const commentaryPanel = () => (
     <Show when={params.id}>
       <CommentaryPanel sessionID={params.id} />
@@ -2117,6 +2120,7 @@ export default function Page() {
   const sessionPanelContent = () => (
     <>
       {sessionSync() ?? ""}
+      {commentaryAudio}
       <Show when={!isDesktop() && !!params.id && settings.general.newLayoutDesigns() && !mobileTabsBottom()}>
         {mobileTabs(true)}
       </Show>
