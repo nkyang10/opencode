@@ -7,6 +7,7 @@ import { Permission } from "@/permission"
 import { SessionShare } from "@/share/session"
 import { Session } from "@/session/session"
 import { SessionCommentary } from "@/session/commentary"
+import { CommentaryAudio } from "@/session/commentary-audio"
 import { SessionCompaction } from "@/session/compaction"
 import { MessageV2 } from "@/session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
@@ -20,7 +21,7 @@ import { NamedError } from "@opencode-ai/core/util/error"
 import { Cause, Effect, Option, Schema, Scope } from "effect"
 import * as Stream from "effect/Stream"
 import { InstanceState } from "@/effect/instance-state"
-import { HttpBody, HttpClient, HttpClientRequest, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
+import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder, HttpApiError, HttpApiSchema } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import {
@@ -37,8 +38,7 @@ import {
   SummarizePayload,
   UpdatePayload,
 } from "../groups/session"
-import { PermissionNotFoundError } from "../errors"
-import { speechBaseUrl } from "./speech-target"
+import { PermissionNotFoundError, notFound } from "../errors"
 import * as SessionError from "./session-errors"
 
 // FU-122 speech proxy limits. The service is on the LAN and unauthenticated, so this route is the only
@@ -70,8 +70,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const todoSvc = yield* Todo.Service
     const summary = yield* SessionSummary.Service
     const commentary = yield* SessionCommentary.Service
-    // FU-122: the speech proxy is the only outbound call in this handler group.
-    const speechClient = yield* HttpClient.HttpClient
+    const audio = yield* CommentaryAudio.Service
     const events = yield* EventV2Bridge.Service
     const scope = yield* Scope.Scope
 
@@ -326,53 +325,16 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       return true
     })
 
-    // FU-122. The browser cannot reach the LAN speech service directly: it answers the CORS preflight with
-    // 405 and no allow-origin header, so the request is blocked before it leaves the page. Fetching it here,
-    // where CORS does not apply, is the entire reason this route exists.
-    //
-    // The service is unauthenticated and on the LAN, so this route is the only thing between it and
-    // arbitrary callers: the input is capped, the outbound request is bounded in time, and only a 200 is
-    // passed through — a failing speech service must not be able to make the web server proxy arbitrary
-    // responses back to a caller. Audio comes back base64 because a line is ~40KB and a typed JSON response
-    // keeps this on the ordinary handler path.
-    const commentarySpeech = Effect.fn("SessionHttpApi.commentarySpeech")(function* (ctx: {
-      params: { sessionID: SessionID }
-      payload: { input: string; host?: string; voice?: string }
+    // FU-122. The bytes were synthesized when the line was written and are addressed by content hash, so
+    // this route serves a file and does nothing else: it cannot make the server fetch anything, and a hash
+    // that is not a hash never reaches the filesystem.
+    const commentaryAudio = Effect.fn("SessionHttpApi.commentaryAudio")(function* (ctx: {
+      params: { sessionID: SessionID; hash: string }
     }) {
       yield* requireSession(ctx.params.sessionID)
-      const input = ctx.payload.input?.trim()
-      if (!input) return yield* new HttpApiError.BadRequest({})
-      if (input.length > MAX_SPEECH_INPUT_CHARS) return yield* new HttpApiError.BadRequest({})
-
-      const base = speechBaseUrl(ctx.payload.host)
-      if (!base) return yield* new HttpApiError.BadRequest({})
-
-      const fetched = yield* speechClient
-        .execute(
-          HttpClientRequest.post(`${base}/v1/audio/speech`, {
-            headers: new Headers({ "content-type": "application/json" }),
-            body: HttpBody.jsonUnsafe({
-              input,
-              voice: (ctx.payload.voice ?? "").trim() || DEFAULT_SPEECH_VOICE,
-            }),
-          }),
-        )
-        .pipe(Effect.timeout(SPEECH_TIMEOUT), Effect.catchCause((cause) => Effect.succeed(Cause.pretty(cause))))
-
-      if (typeof fetched === "string") return yield* new HttpApiError.InternalServerError({})
-      if (fetched.status !== 200) return yield* new HttpApiError.InternalServerError({})
-      // `arrayBuffer` reads whatever the service sends, so the cap has to be applied to what actually
-      // arrived rather than trusted from a header it does not have to set.
-      const declared = Number(fetched.headers["content-length"] ?? "")
-      if (Number.isFinite(declared) && declared > MAX_SPEECH_RESPONSE_BYTES)
-        return yield* new HttpApiError.InternalServerError({})
-      const audio = yield* fetched.arrayBuffer.pipe(
-        Effect.map((buffer) => Buffer.from(new Uint8Array(buffer))),
-        Effect.catchCause(() => Effect.succeed(Buffer.alloc(0))),
-      )
-      if (audio.byteLength === 0 || audio.byteLength > MAX_SPEECH_RESPONSE_BYTES)
-        return yield* new HttpApiError.InternalServerError({})
-      return audio.toString("base64")
+      const bytes = yield* audio.read(ctx.params.hash)
+      if (!bytes || bytes.byteLength === 0) return yield* notFound("no stored audio for that hash")
+      return Buffer.from(bytes).toString("base64")
     })
 
     const commentaryUnwatch = Effect.fn("SessionHttpApi.commentaryUnwatch")(function* (ctx: {
@@ -522,9 +484,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("commentaryList", commentaryList)
       .handle("commentaryWatch", commentaryWatch)
       .handle("commentaryUnwatch", commentaryUnwatch)
-      // `handleRaw` needs every service named in the handler's signature provided here; the HTTP client is
-      // the one this route actually needs, to reach the LAN speech service.
-      .handle("commentarySpeech", commentarySpeech)
+      .handle("commentaryAudio", commentaryAudio)
       .handle("prompt", prompt)
       .handle("promptAsync", promptAsync)
       .handle("command", command)

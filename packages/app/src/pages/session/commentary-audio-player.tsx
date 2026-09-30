@@ -26,13 +26,11 @@ export function CommentaryAudioPlayer(props: { sessionID: string | undefined }) 
   const settings = () => layout.commentary
   const audioOn = createMemo(() => settings().enabled() && settings().audioEnabled())
 
-  // Read lazily so editing the host or voice in Settings applies to the next line, without rebuilding the
-  // player and losing its queue and its high-water mark.
   const player = new CommentaryAudio({
-    // The speech proxy is per-session, so the player has to know which one it is speaking for.
+    // The audio route is per-session, so the player has to know which one it is speaking for.
     sessionID: () => props.sessionID,
-    // The proxy is an authenticated route like any other: without these it answers 401 and the line is
-    // never spoken. The token is read lazily so a server switch is picked up.
+    // The route is authenticated like any other: without these it answers 401 and the line is never spoken.
+    // The token is read lazily so a server switch is picked up.
     headers: (): Record<string, string> => {
       const http = server.current?.http
       if (!http?.password) return {}
@@ -40,8 +38,6 @@ export function CommentaryAudioPlayer(props: { sessionID: string | undefined }) 
         Authorization: `Basic ${authTokenFromCredentials({ username: http.username, password: http.password })}`,
       }
     },
-    host: () => settings().audioHost(),
-    voice: () => settings().audioVoice(),
     onError: (message) => showToast({ variant: "error", title: message }),
   })
 
@@ -66,7 +62,7 @@ export function CommentaryAudioPlayer(props: { sessionID: string | undefined }) 
     if (!id || !on) return
     const newest = (sync().data.commentary[id] ?? []).at(-1)
     if (!newest) return
-    player.enqueue({ sessionID: id, seq: newest.seq, text: newest.text })
+    player.enqueue({ sessionID: id, seq: newest.seq, text: newest.text, audio: newest.audio })
   })
 
   // Turning audio off, or losing the foreground, must silence an in-flight clip rather than let it finish in

@@ -19,7 +19,6 @@ import type { ProjectAvatarVariant } from "@opencode-ai/ui/v2/project-avatar-v2"
 import { migrateLegacySessionStateKeys, ServerScope, SessionStateKey } from "@/utils/server-scope"
 import { createSessionKeyReader, ensureSessionKey, pruneSessionKeys } from "./layout-helpers"
 import { requireServerKey } from "@/utils/session-route"
-import { DEFAULT_TTS_HOST, DEFAULT_TTS_VOICE } from "@/utils/commentary-audio"
 import { type DraftTab, useTabs } from "./tabs"
 import { closeSessionTab, openSessionTab, previewSessionTab, type SessionTabs } from "./layout-tabs"
 
@@ -299,8 +298,6 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           // FU-122: audio is opt-in and off by default — it is intrusive, and browsers gate playback until
           // the user has interacted with the page, which the settings toggle conveniently provides.
           audioEnabled: false,
-          audioHost: DEFAULT_TTS_HOST,
-          audioVoice: DEFAULT_TTS_VOICE,
         },
         fileTree: {
           opened: false,
@@ -619,12 +616,8 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
     const commentaryEnabled = createMemo(() => store.commentary?.enabled ?? true)
     const commentaryInstructions = createMemo(() => store.commentary?.instructions ?? "")
     const commentaryAudioEnabled = createMemo(() => store.commentary?.audioEnabled ?? false)
-    const commentaryAudioHost = createMemo(() => store.commentary?.audioHost ?? DEFAULT_TTS_HOST)
-    const commentaryAudioVoice = createMemo(() => store.commentary?.audioVoice ?? DEFAULT_TTS_VOICE)
     const setCommentaryEnabled = (enabled: boolean) => setStore("commentary", "enabled", enabled)
     const setCommentaryAudioEnabled = (audioEnabled: boolean) => setStore("commentary", "audioEnabled", audioEnabled)
-    const setCommentaryAudioHost = (audioHost: string) => setStore("commentary", "audioHost", audioHost)
-    const setCommentaryAudioVoice = (audioVoice: string) => setStore("commentary", "audioVoice", audioVoice)
     const setCommentaryInstructions = (instructions: string) =>
       setStore("commentary", "instructions", instructions)
 
@@ -786,11 +779,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         enabled: commentaryEnabled,
         instructions: commentaryInstructions,
         audioEnabled: commentaryAudioEnabled,
-        audioHost: commentaryAudioHost,
-        audioVoice: commentaryAudioVoice,
         setAudioEnabled: setCommentaryAudioEnabled,
-        setAudioHost: setCommentaryAudioHost,
-        setAudioVoice: setCommentaryAudioVoice,
         setEnabled: setCommentaryEnabled,
         setInstructions: setCommentaryInstructions,
       },

@@ -35,5 +35,24 @@ export const Commentary = Schema.Struct({
     description:
       "Minimum milliseconds between two commentary entries for one session. Measured from the newest stored entry, so it survives a restart. Defaults to 10000",
   }),
+  // Where the spoken narration is rendered. Server-side and config-file only: the client is told the content
+  // hash of a file that already exists and never chooses where it came from, so this cannot be steered by a
+  // request. An absent section means the shipped defaults, so the feature works with no configuration at all.
+  speech: Schema.optional(
+    Schema.Struct({
+      host: Schema.optional(Schema.String).annotate({
+        description: "host:port of the text-to-speech service. Defaults to 192.168.1.162:8880",
+      }),
+      voice: Schema.optional(Schema.String).annotate({
+        description: "Voice name or alias passed to the speech service. Defaults to cantonese",
+      }),
+      retention: Schema.optional(PositiveInt).annotate({
+        description: "Stored audio files to keep per session. Defaults to 100",
+      }),
+      maxBytes: Schema.optional(PositiveInt).annotate({
+        description: "Total bytes of stored narration to keep across all sessions. Defaults to 536870912",
+      }),
+    }),
+  ).annotate({ description: "Where and how the commentary narration is spoken" }),
 }).annotate({ identifier: "CommentaryConfig" })
 export type Commentary = Schema.Schema.Type<typeof Commentary>

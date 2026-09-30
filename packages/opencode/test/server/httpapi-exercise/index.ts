@@ -1370,6 +1370,220 @@ const scenarios: Scenario[] = [
       headers: ctx.headers(),
     }))
     .json(200, (body) => check(body === true, "unwatching should acknowledge the release")),
+  // FU-122. The success path needs a stored audio file, which a route-coverage harness must not depend on
+  // (and the hash is content-addressed, so there is no fixture to name). This scenario asserts the refusal
+  // instead: it proves the route exists, decodes the path parameter, and 404s on a hash with no file. The
+  // hash format itself is pinned in `session/commentary-audio.test.ts`.
+  http.protected
+    .get("/session/{sessionID}/commentary/audio/{hash}", "session.commentary.audio")
+    .seeded((ctx) => ctx.session({ title: "Commentary audio session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/commentary/audio/{hash}", {
+        sessionID: ctx.state.id,
+        hash: "0".repeat(32),
+      }),
+      headers: ctx.headers(),
+    }))
+    .json(404, object, "status"),
+  http.protected
+    .get("/api/session/{sessionID}/event", "v2.session.events.missing")
+    .at((ctx) => ({
+      path: `${route("/api/session/{sessionID}/event", { sessionID: "ses_httpapi_missing" })}?after=0`,
+      headers: ctx.headers(),
+    }))
+    .status(404, undefined, "status"),
+  http.protected
+    .post("/api/session/{sessionID}/interrupt", "v2.session.interrupt")
+    .seeded((ctx) => ctx.session({ title: "Interrupt session" }))
+    .at((ctx) => ({
+      path: route("/api/session/{sessionID}/interrupt", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .status(204, undefined, "none"),
+  http.protected
+    .get("/api/session/{sessionID}/message/{messageID}", "v2.session.message.missing")
+    .at((ctx) => ({
+      path: route("/api/session/{sessionID}/message/{messageID}", {
+        sessionID: "ses_httpapi_missing",
+        messageID: "msg_httpapi_missing",
+      }),
+      headers: ctx.headers(),
+    }))
+    .json(404, object, "status"),
+  http.protected
+    .post("/api/session/{sessionID}/prompt", "v2.session.prompt.invalid")
+    .seeded((ctx) => ctx.session({ title: "Invalid prompt owner" }))
+    .at((ctx) => ({
+      path: route("/api/session/{sessionID}/prompt", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: {},
+    }))
+    .status(400, undefined, "none"),
+  http.protected
+    .post("/api/session/{sessionID}/compact", "v2.session.compact")
+    .at((ctx) => ({
+      path: route("/api/session/{sessionID}/compact", { sessionID: "ses_httpapi_missing" }),
+      headers: ctx.headers(),
+    }))
+    .status(404, undefined, "status"),
+  http.protected
+    .post("/api/session/{sessionID}/wait", "v2.session.wait")
+    .at((ctx) => ({
+      path: route("/api/session/{sessionID}/wait", { sessionID: "ses_httpapi_missing" }),
+      headers: ctx.headers(),
+    }))
+    .status(404, undefined, "status"),
+  http.protected
+    .get("/session", "session.list")
+    .seeded((ctx) => ctx.session({ title: "List me" }))
+    .at((ctx) => ({ path: "/session?roots=true", headers: ctx.headers() }))
+    .json(200, (body, ctx) => {
+      array(body)
+      check(
+        body.some((item) => isRecord(item) && item.id === ctx.state.id && item.title === "List me"),
+        "seeded session should be listed",
+      )
+    }),
+  http.protected
+    .get("/session/status", "session.status")
+    .seeded((ctx) => ctx.session({ title: "Status session" }))
+    .json(200, object),
+  http.protected
+    .post("/session", "session.create")
+    .mutating()
+    .at((ctx) => ({ path: "/session", headers: ctx.headers(), body: { title: "Created session" } }))
+    .json(
+      200,
+      (body, ctx) => {
+        object(body)
+        check(body.title === "Created session", "created session should use requested title")
+        check(body.directory === ctx.directory, "created session should use scenario directory")
+      },
+      "status",
+    ),
+  http.protected
+    .get("/session/{sessionID}", "session.get")
+    .seeded((ctx) => ctx.session({ title: "Get me" }))
+    .at((ctx) => ({ path: route("/session/{sessionID}", { sessionID: ctx.state.id }), headers: ctx.headers() }))
+    .json(200, (body, ctx) => {
+      object(body)
+      check(body.id === ctx.state.id, "should return requested session")
+      check(body.title === "Get me", "should preserve seeded title")
+    }),
+  http.protected
+    .get("/session/{sessionID}", "session.get.missing")
+    .at((ctx) => ({
+      path: route("/session/{sessionID}", { sessionID: "ses_httpapi_missing" }),
+      headers: ctx.headers(),
+    }))
+    .status(404),
+  http.protected
+    .patch("/session/{sessionID}", "session.update")
+    .mutating()
+    .seeded((ctx) => ctx.session({ title: "Before rename" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: { title: "After rename" },
+    }))
+    .json(
+      200,
+      (body) => {
+        object(body)
+        check(body.title === "After rename", "updated session should use new title")
+      },
+      "status",
+    ),
+  http.protected
+    .patch("/session/{sessionID}", "session.update.invalid")
+    .mutating()
+    .at((ctx) => ({
+      path: route("/session/{sessionID}", { sessionID: "ses_httpapi_missing" }),
+      headers: ctx.headers(),
+      body: { title: 1 },
+    }))
+    .status(400),
+  http.protected
+    .delete("/session/{sessionID}", "session.delete")
+    .mutating()
+    .seeded((ctx) => ctx.session({ title: "Delete me" }))
+    .at((ctx) => ({ path: route("/session/{sessionID}", { sessionID: ctx.state.id }), headers: ctx.headers() }))
+    .jsonEffect(200, (body, ctx) =>
+      Effect.gen(function* () {
+        check(body === true, "delete should return true")
+        check((yield* ctx.sessionGet(ctx.state.id)) === undefined, "deleted session should not remain in storage")
+      }),
+    ),
+  http.protected
+    .get("/session/{sessionID}/children", "session.children")
+    .seeded((ctx) =>
+      Effect.gen(function* () {
+        const parent = yield* ctx.session({ title: "Parent" })
+        const child = yield* ctx.session({ title: "Child", parentID: parent.id })
+        return { parent, child }
+      }),
+    )
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/children", { sessionID: ctx.state.parent.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body, ctx) => {
+      array(body)
+      check(
+        body.some((item) => isRecord(item) && item.id === ctx.state.child.id && item.parentID === ctx.state.parent.id),
+        "children should include seeded child",
+      )
+    }),
+  http.protected
+    .get("/session/{sessionID}/todo", "session.todo")
+    .seeded((ctx) =>
+      Effect.gen(function* () {
+        const session = yield* ctx.session({ title: "Todo session" })
+        const todos = [{ content: "cover session todo", status: "pending" as const, priority: "high" as const }]
+        yield* ctx.todos(session.id, todos)
+        return { session, todos }
+      }),
+    )
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/todo", { sessionID: ctx.state.session.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body, ctx) => {
+      check(stable(body) === stable(ctx.state.todos), "todos should match seeded state")
+    }),
+  // FE-028. Asserted on a real session but with an empty commentary list: the point of the coverage entry
+  // is that the route exists, decodes, and is readable — seeding entries would depend on the narration
+  // service, and this harness must stay free of order-dependent setup (FU-094).
+  http.protected
+    .get("/session/{sessionID}/commentary", "session.commentary.list")
+    .seeded((ctx) => ctx.session({ title: "Commentary session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/commentary", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body) => {
+      array(body)
+      check(body.length === 0, "a session with no narration should list no entries")
+    }),
+  http.protected
+    .post("/session/{sessionID}/commentary/watch", "session.commentary.watch")
+    .seeded((ctx) => ctx.session({ title: "Commentary watch session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/commentary/watch", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      // The lease carries the reader's narration preferences (FE-029), so the body is not optional on the
+      // wire. Asserted with a value rather than `{}` so the field is actually decoded by this scenario.
+      body: { instructions: "Explain like a senior engineer." },
+    }))
+    .json(200, (body) => check(body === true, "watching should acknowledge the lease")),
+  http.protected
+    .post("/session/{sessionID}/commentary/unwatch", "session.commentary.unwatch")
+    .seeded((ctx) => ctx.session({ title: "Commentary unwatch session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/commentary/unwatch", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body) => check(body === true, "unwatching should acknowledge the release")),
   // FU-122. The success path needs the real LAN speech box, which a route-coverage harness must not depend
   // on, so this scenario asserts the refusal instead: it proves the route exists, decodes the body, and
   // reaches the host guard. The guard itself is pinned in `httpapi-speech-target.test.ts`.

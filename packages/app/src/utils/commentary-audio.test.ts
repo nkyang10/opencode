@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from "bun:test"
-import { CommentaryAudio, DEFAULT_TTS_HOST, DEFAULT_TTS_VOICE, audioBlobFromBase64 } from "./commentary-audio"
+import { CommentaryAudio, audioBlobFromBase64 } from "./commentary-audio"
 
 /** A fake Audio whose playback is driven by the test, so `ended` and rejections are deterministic. */
 class FakeAudio {
@@ -34,13 +34,21 @@ class FakeAudio {
 type FetchStub = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 const asFetch = (fn: FetchStub) => fn as unknown as typeof globalThis.fetch
 
-const okResponse = () => new Response(JSON.stringify(btoa("fake-mp3-bytes")), {
-  status: 200,
-  headers: { "content-type": "application/json" },
-})
+const okResponse = () =>
+  new Response(JSON.stringify(btoa("fake-mp3-bytes")), { status: 200, headers: { "content-type": "application/json" } })
 const errorResponse = (status: number, body: string) => new Response(body, { status })
 
-const clip = (seq: number, sessionID = "s1", text = `line ${seq}`) => ({ sessionID, seq, text })
+/** Every clip carries the hash the server pre-rendered for it; `noAudio` models a line the server could not speak. */
+const hash = (seq: number) => seq.toString(16).padStart(32, "0")
+/** A line the server rendered audio for. */
+const clip = (seq: number, sessionID = "s1", text = `line ${seq}`, audio: string | undefined = hash(seq)) => ({
+  sessionID,
+  seq,
+  text,
+  ...(audio === undefined ? {} : { audio }),
+})
+/** A line the server could not synthesize: same shape the event carries, with no hash at all. */
+const textOnly = (seq: number, sessionID = "s1", text = `line ${seq}`) => ({ sessionID, seq, text })
 
 function setup(options: { fetch?: typeof globalThis.fetch; onError?: (m: string) => void; gapMs?: number } = {}) {
   FakeAudio.instances = []
@@ -146,9 +154,9 @@ describe("CommentaryAudio queue", () => {
     expect(audio.isPlaying).toBe(true)
   })
 
-  test("reports a bad voice once, not on every line", async () => {
+  test("reports a missing audio file once, not on every line", async () => {
     const onError = mock((_message: string) => {})
-    const { audio } = setup({ onError, fetch: asFetch(() => Promise.resolve(errorResponse(400, "unknown voice"))) })
+    const { audio } = setup({ onError, fetch: asFetch(() => Promise.resolve(errorResponse(404, "no stored audio"))) })
     audio.enqueue(clip(1))
     await settle()
     audio.enqueue(clip(2))
@@ -156,7 +164,8 @@ describe("CommentaryAudio queue", () => {
     audio.enqueue(clip(3))
     await settle()
     expect(onError).toHaveBeenCalledTimes(1)
-    expect(onError.mock.calls[0]![0]).toContain("unknown voice")
+    // Three different files, one condition: still one toast, because three toasts is not information.
+    expect(onError.mock.calls[0]![0]).toContain("no stored audio")
   })
 
   test("an autoplay rejection releases the lock instead of wedging forever", async () => {
@@ -202,47 +211,62 @@ describe("CommentaryAudio queue", () => {
     expect(audio.enqueue(clip(1, "a"))).toBe(false)
   })
 
-  test("asks the opencode speech proxy, carrying the host and voice, with no-store", async () => {
-    const seen: Array<{ url: string; body: string; cache?: string }> = []
+  test("fetches the audio the server rendered for that line, addressed by its hash", async () => {
+    const seen: Array<{ url: string; cache?: string; method?: string }> = []
     const fetchMock = asFetch((input, init) => {
-      seen.push({ url: String(input), body: String(init?.body), cache: init?.cache })
+      seen.push({ url: String(input), cache: init?.cache, method: init?.method })
       return Promise.resolve(okResponse())
     })
     const audio = new CommentaryAudio({
       sessionID: () => "s9",
-      host: "10.0.0.5:9999",
-      voice: "en-male",
       fetch: fetchMock,
       createAudio: () => new FakeAudio() as unknown as HTMLAudioElement,
     })
     audio.enqueue(clip(1, "s9", "hello there"))
     await settleChain()
-    // The LAN service is NOT called from the browser: it has no CORS, so the request goes through opencode.
-    expect(seen[0]!.url).toBe("/session/s9/commentary/speech")
-    const body = JSON.parse(seen[0]!.body)
-    expect(body.input).toBe("hello there")
-    expect(body.voice).toBe("en-male")
-    expect(body.host).toBe("10.0.0.5:9999")
+    // The server synthesized this when the line was written, so the browser only fetches the file. There is
+    // no request body and nowhere for a speech host to be smuggled in.
+    expect(seen[0]!.url).toBe(`/session/s9/commentary/audio/${hash(1)}`)
+    expect(seen[0]!.method).toBeUndefined()
     expect(seen[0]!.cache).toBe("no-store")
   })
 
-  test("an unconfigured player still sends the documented defaults to the proxy", async () => {
-    expect(DEFAULT_TTS_HOST).toBe("192.168.1.162:8880")
-    expect(DEFAULT_TTS_VOICE).toBe("cantonese")
-    const seen: Array<{ url: string; body: string }> = []
+  test("a line the server could not speak is skipped silently, not reported", async () => {
+    let calls = 0
+    const errors: string[] = []
     const audio = new CommentaryAudio({
       sessionID: () => "s1",
-      fetch: asFetch((input, init) => {
-        seen.push({ url: String(input), body: String(init?.body) })
+      fetch: asFetch(() => {
+        calls++
         return Promise.resolve(okResponse())
       }),
       createAudio: () => new FakeAudio() as unknown as HTMLAudioElement,
+      onError: (message) => errors.push(message),
     })
-    audio.enqueue(clip(1, "s1", "hi"))
+    // `audio: undefined` is the shape the server sends for text it could not synthesize. The text is already
+    // on screen, so a toast would be noise about something the reader did not ask for.
+    expect(audio.enqueue(textOnly(1))).toBe(true)
     await settleChain()
-    const body = JSON.parse(seen[0]!.body)
-    expect(body.voice).toBe("cantonese")
-    expect(body.host).toBe(DEFAULT_TTS_HOST)
+    expect(calls).toBe(0)
+    expect(errors).toEqual([])
+  })
+
+  test("a text-only line does not block the next line's audio", async () => {
+    const seen: string[] = []
+    const { audio, tick } = setup({
+      gapMs: 400,
+      fetch: asFetch((input) => {
+        seen.push(String(input))
+        return Promise.resolve(okResponse())
+      }),
+    })
+    audio.enqueue(textOnly(1))
+    audio.enqueue(clip(2, "s1", "has audio"))
+    // Skipping a line still counts as occupying the slot, so the normal gap applies — the queue has to move
+    // past it rather than stopping on it.
+    tick(400)
+    await new Promise((r) => setTimeout(r, 450))
+    expect(seen).toEqual([`/session/s1/commentary/audio/${hash(2)}`])
   })
 
   test("no session means no request at all", async () => {
@@ -261,11 +285,11 @@ describe("CommentaryAudio queue", () => {
   })
 })
 
-  // The proxy is an ordinary authenticated route: a browser call without the credential comes back 401 and
+  // The audio route is an ordinary authenticated route: a browser call without the credential comes back 401 and
   // the line is silently never spoken. This is the exact failure a user hit, so it is pinned.
 
 describe("auth", () => {
-  test("sends the auth header the speech proxy requires", async () => {
+  test("sends the auth header the audio route requires", async () => {
     const seen: Array<{ headers: Record<string, string> }> = []
     const audio = new CommentaryAudio({
       sessionID: () => "s1",
@@ -279,7 +303,6 @@ describe("auth", () => {
     audio.enqueue(clip(1, "s1", "hello"))
     await settleChain()
     expect(seen[0]!.headers.Authorization).toBe("Basic dGVzdA==")
-    expect(seen[0]!.headers["Content-Type"]).toBe("application/json")
   })
 
   // The browser's own login (/login, `#username` / `#password`) hands out a session cookie, not Basic

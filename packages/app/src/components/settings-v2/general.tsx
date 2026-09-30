@@ -13,7 +13,6 @@ import { showToast } from "@/utils/toast"
 import { useUpdaterAction } from "../updater-action"
 import { useSettings } from "@/context/settings"
 import { ExternalLink } from "../external-link"
-import { DEFAULT_TTS_HOST, DEFAULT_TTS_VOICE } from "@/utils/commentary-audio"
 import { SettingsListV2 } from "./parts/list"
 import { SettingsRowV2 } from "./parts/row"
 import { DialogRssV2 } from "./dialog-rss-v2"
@@ -261,21 +260,6 @@ const CommentarySection: Component = () => {
   // remounted each time it opens, so seeding from the store here cannot miss a later change.
   const [draft, setDraft] = createSignal(commentary().instructions())
   const dirty = createMemo(() => draft() !== commentary().instructions())
-  // Host and voice commit on blur rather than a Save button: they are short values, and blurring is the
-  // natural end of typing one. The draft still keeps a half-typed host from ever being used.
-  const audioOn = createMemo(() => commentary().enabled() && commentary().audioEnabled())
-  const [hostDraft, setHostDraft] = createSignal(commentary().audioHost())
-  const [voiceDraft, setVoiceDraft] = createSignal(commentary().audioVoice())
-  const commitHost = () => {
-    const value = hostDraft().trim() || DEFAULT_TTS_HOST
-    setHostDraft(value)
-    commentary().setAudioHost(value)
-  }
-  const commitVoice = () => {
-    const value = voiceDraft().trim() || DEFAULT_TTS_VOICE
-    setVoiceDraft(value)
-    commentary().setAudioVoice(value)
-  }
 
   const save = () => {
     commentary().setInstructions(draft())
@@ -341,43 +325,6 @@ const CommentarySection: Component = () => {
           </div>
         </SettingsRowV2>
 
-        <SettingsRowV2
-          title={language.t("settings.general.commentary.row.audioHost.title")}
-          description={language.t("settings.general.commentary.row.audioHost.description")}
-        >
-          <div class="w-full" data-action="settings-commentary-audio-host">
-            <TextInputV2
-              value={hostDraft()}
-              disabled={!audioOn()}
-              placeholder={DEFAULT_TTS_HOST}
-              spellcheck={false}
-              autocorrect="off"
-              autocapitalize="off"
-              aria-label={language.t("settings.general.commentary.row.audioHost.title")}
-              onInput={(event) => setHostDraft(event.currentTarget.value)}
-              onBlur={commitHost}
-            />
-          </div>
-        </SettingsRowV2>
-
-        <SettingsRowV2
-          title={language.t("settings.general.commentary.row.audioVoice.title")}
-          description={language.t("settings.general.commentary.row.audioVoice.description")}
-        >
-          <div class="w-full" data-action="settings-commentary-audio-voice">
-            <TextInputV2
-              value={voiceDraft()}
-              disabled={!audioOn()}
-              placeholder={DEFAULT_TTS_VOICE}
-              spellcheck={false}
-              autocorrect="off"
-              autocapitalize="off"
-              aria-label={language.t("settings.general.commentary.row.audioVoice.title")}
-              onInput={(event) => setVoiceDraft(event.currentTarget.value)}
-              onBlur={commitVoice}
-            />
-          </div>
-        </SettingsRowV2>
       </SettingsListV2>
     </div>
   )

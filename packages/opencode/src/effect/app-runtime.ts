@@ -28,6 +28,7 @@ import { SessionProcessor } from "@/session/processor"
 import { SessionCompaction } from "@/session/compaction"
 import { SessionRevert } from "@/session/revert"
 import { SessionCommentary } from "@/session/commentary"
+import { CommentaryAudio } from "@/session/commentary-audio"
 import { SessionSummary } from "@/session/summary"
 import { SessionPrompt } from "@/session/prompt"
 import { Instruction } from "@/session/instruction"
@@ -89,6 +90,7 @@ export const AppLayer = AppNodeBuilderV1.build(
     SessionRevert.node,
     SessionSummary.node,
     SessionCommentary.node,
+  CommentaryAudio.node,
     SessionPrompt.node,
     Instruction.node,
     LLM.node,

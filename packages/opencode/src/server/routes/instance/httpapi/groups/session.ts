@@ -60,6 +60,14 @@ export const CommentaryQuery = Schema.Struct({
 export const CommentaryWatchPayload = Schema.Struct({
   instructions: Schema.optional(Schema.String),
 })
+/**
+ * The audio hash arrives in a URL path segment. Constraining it in the schema means a malformed one is a
+ * routing/validation failure rather than a string the handler has to distrust — the handler still checks it,
+ * because that is what stands between a request and a path join.
+ */
+export const HashParam = Schema.String.check(Schema.isPattern(/^[0-9a-f]{32}$/)).annotate({
+  description: "Content hash of a stored narration audio file",
+})
 export const UpdatePayload = Schema.Struct({
   title: Schema.optional(Schema.String),
   metadata: Schema.optional(Session.Metadata),
@@ -98,7 +106,7 @@ export const SessionPaths = {
   commentary: `${root}/:sessionID/commentary`,
   commentaryWatch: `${root}/:sessionID/commentary/watch`,
   commentaryUnwatch: `${root}/:sessionID/commentary/unwatch`,
-  speech: `${root}/:sessionID/commentary/speech`,
+  commentaryAudio: `${root}/:sessionID/commentary/audio/:hash`,
   diff: `${root}/:sessionID/diff`,
   messages: `${root}/:sessionID/message`,
   message: `${root}/:sessionID/message/:messageID`,
@@ -212,24 +220,19 @@ export const SessionApi = HttpApi.make("session")
               "Start or refresh the lease that keeps the commentary narration running, optionally carrying the reader's narration preferences. Call again before the lease expires to keep it alive.",
           }),
         ),
-        // FU-122: the browser cannot call the LAN speech service directly — it answers a CORS preflight
-        // with 405 and no allow-origin header, so the request is blocked before it is sent. This route
-        // fetches the audio server-side, where CORS does not apply, and streams the bytes back.
-        HttpApiEndpoint.post("commentarySpeech", SessionPaths.speech, {
-          params: { sessionID: SessionID },
-          payload: Schema.Struct({ input: Schema.String, host: Schema.optional(Schema.String), voice: Schema.optional(Schema.String) }),
-          // Base64 rather than a raw audio stream: a line is ~40KB, and a typed JSON response keeps this
-          // on the ordinary handler path instead of the raw-handler one. The client decodes it to a Blob.
+        // FU-122: the pre-rendered audio for a narration line. The server synthesized it when the line was
+        // written and addressed it by content hash, so this only ever serves bytes that already exist — it
+        // cannot be used to make the server fetch anything.
+        HttpApiEndpoint.get("commentaryAudio", SessionPaths.commentaryAudio, {
+          params: { sessionID: SessionID, hash: HashParam },
           success: described(Schema.String, "Base64-encoded audio"),
-          // InternalServerError covers "the speech service is down or refused" — deliberately collapsed, so
-          // a failure upstream is not confused with a bad request from the reader.
-          error: [HttpApiError.BadRequest, HttpApiError.InternalServerError, ApiNotFoundError],
+          error: [ApiNotFoundError],
         }).annotateMerge(
           OpenApi.annotations({
-            identifier: "session.commentary.speech",
-            summary: "Speak text",
+            identifier: "session.commentary.audio",
+            summary: "Get a narration line's audio",
             description:
-              "Fetch audio for the given text from the configured text-to-speech service and return it. Proxied because the speech service does not allow cross-origin browser requests.",
+              "Return the pre-rendered speech for a commentary entry, addressed by the content hash carried on that entry.",
           }),
         ),
         HttpApiEndpoint.post("commentaryUnwatch", SessionPaths.commentaryUnwatch, {

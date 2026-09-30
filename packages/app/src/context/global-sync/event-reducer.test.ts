@@ -645,6 +645,38 @@ describe("applyDirectoryEvent commentary", () => {
     expect(store.commentary.session).toHaveLength(1)
   })
 
+  // The server publishes each line twice: as text, then again once its pre-rendered audio exists. Dropping
+  // the second publish — which is what a reconnect replay deserves — would mean the client never learns the
+  // hash and every line stays silent. This is the single event that makes the whole feature work.
+  test("a line republished with its audio hash replaces the entry in place", () => {
+    const [store, setStore] = createStore(baseState())
+    const audio = "a".repeat(32)
+    send(store, setStore, { sessionID: "session", entry: entry(1, "first") })
+    send(store, setStore, { sessionID: "session", entry: { ...entry(1, "first"), audio } })
+    expect(store.commentary.session).toHaveLength(1)
+    expect(store.commentary.session?.[0]?.audio).toBe(audio)
+    expect(store.commentary.session?.[0]?.text).toBe("first")
+  })
+
+  test("a republished line does not reorder or duplicate the list", () => {
+    const [store, setStore] = createStore(baseState())
+    const audio = "b".repeat(32)
+    send(store, setStore, { sessionID: "session", entry: entry(1, "first") })
+    send(store, setStore, { sessionID: "session", entry: entry(2, "second") })
+    send(store, setStore, { sessionID: "session", entry: { ...entry(1, "first"), audio } })
+    expect(store.commentary.session?.map((item) => item.seq)).toEqual([1, 2])
+    expect(store.commentary.session?.[0]?.audio).toBe(audio)
+  })
+
+  // Republishing the same entry with the same fields is a reconnect replay, and must stay a no-op.
+  test("a replay carrying identical fields still changes nothing", () => {
+    const [store, setStore] = createStore(baseState())
+    const audio = "c".repeat(32)
+    send(store, setStore, { sessionID: "session", entry: { ...entry(1, "first"), audio } })
+    send(store, setStore, { sessionID: "session", entry: { ...entry(1, "first"), audio } })
+    expect(store.commentary.session).toHaveLength(1)
+  })
+
   test("a line does not touch the message store", () => {
     const [store, setStore] = createStore(baseState())
     send(store, setStore, { sessionID: "session", entry: entry(1, "first") })

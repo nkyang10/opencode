@@ -182,6 +182,12 @@ export const SessionContextEpochTable = sqliteTable("session_context_epoch", {
 // separately (a stored cursor would have to live in `session.metadata`, whose every write publishes a full
 // `session.updated`, i.e. a whole-session broadcast per tick). The (session_id, seq) primary key is also
 // the read path: the panel lists one session's entries in seq order and the cursor is a `seq DESC LIMIT 1`.
+//
+// `audio` is the content hash of the pre-rendered MP3 of this line, nullable because there may not be one:
+// the text is stored and published first, and the file is synthesized afterwards, so a line can legitimately
+// be text-only (speech box down, feature off, host rejected). The file itself lives beside the database and
+// is addressed by this hash, which is also why the hash is part of the wire contract rather than derived on
+// the client — a client must be able to tell "no audio" from "not ready yet".
 export const SessionCommentaryTable = sqliteTable(
   "session_commentary",
   {
@@ -193,6 +199,7 @@ export const SessionCommentaryTable = sqliteTable(
     time: integer().notNull(),
     text: text().notNull(),
     anchor: text().$type<MessageID>().notNull(),
+    audio: text(),
   },
   (table) => [primaryKey({ columns: [table.session_id, table.seq] })],
 )

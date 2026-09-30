@@ -6,13 +6,15 @@ import { SessionCommentaryEvent } from "@opencode-ai/schema/session-commentary-e
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { LLMEvent } from "@opencode-ai/llm"
-import { desc, eq } from "drizzle-orm"
+import { and, desc, eq, lte, sql } from "drizzle-orm"
 import { Cause, Clock, Context, Effect, Layer, Schedule } from "effect"
+import * as Scope from "effect/Scope"
 import * as Stream from "effect/Stream"
 import { Agent } from "@/agent/agent"
 import { Config } from "@/config/config"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { InstanceState } from "@/effect/instance-state"
+import { CommentaryAudio } from "@/session/commentary-audio"
 import { LLM } from "@/session/llm"
 import { MessageID, SessionID } from "@/session/schema"
 import { Provider } from "@/provider/provider"
@@ -60,6 +62,13 @@ export const DEFAULT_INTERVAL = 10_000
 export const DEFAULT_MAX_ENTRIES_PER_TURN = 20
 export const DEFAULT_MIN_ACTIVITY_CHARS = 120
 export const DEFAULT_NARRATION_HISTORY = 100
+/**
+ * Rows kept per session. The narration is append-only, so without a bound a server left running grows this
+ * table forever — a few hundred bytes a line, silently. Retained well above `narrationHistory` (the cap on
+ * what the prompt sees) so pruning can never remove a line the model would have used for continuity, and
+ * never touches the cursor, which is the anchor of the NEWEST row.
+ */
+export const MAX_RETAINED_ENTRIES = 400
 /** With no stored entry there is no cursor, so the first narration is seeded from the tail of the session. */
 export const SEED_MESSAGES = 6
 
@@ -71,6 +80,29 @@ export interface Settings {
   readonly minActivityChars: number
   readonly narrationHistory: number
   readonly minGap: number
+  readonly speech: SpeechSettings
+}
+
+/**
+ * Where the spoken narration is rendered. Server-side and config-file only: the client is told the hash of a
+ * file that already exists, so it never chooses a host and there is no request field to abuse. The defaults
+ * mean the feature works with no `commentary.speech` section at all.
+ */
+export interface SpeechSettings {
+  readonly host: string
+  readonly voice: string
+  readonly retention: number
+  readonly maxBytes: number
+}
+
+export function speech(commentary: ConfigV1.Info["commentary"]): SpeechSettings {
+  const spec = commentary?.speech
+  return {
+    host: spec?.host?.trim() || CommentaryAudio.DEFAULT_HOST,
+    voice: spec?.voice?.trim() || CommentaryAudio.DEFAULT_VOICE,
+    retention: spec?.retention ?? CommentaryAudio.DEFAULT_RETENTION,
+    maxBytes: spec?.maxBytes ?? CommentaryAudio.DEFAULT_MAX_BYTES,
+  }
 }
 
 export function settings(commentary: ConfigV1.Info["commentary"]): Settings {
@@ -82,6 +114,7 @@ export function settings(commentary: ConfigV1.Info["commentary"]): Settings {
     minActivityChars: commentary?.minActivityChars ?? DEFAULT_MIN_ACTIVITY_CHARS,
     narrationHistory: commentary?.narrationHistory ?? DEFAULT_NARRATION_HISTORY,
     minGap: commentary?.minGap ?? MIN_GAP_MS,
+    speech: speech(commentary),
   }
 }
 
@@ -248,9 +281,20 @@ export function parse(raw: string): { speak: boolean; text: string } {
       break
     }
   }
+  // A response that *looks* like the contract but does not parse is a contract that got cut off — a stream
+  // that ended mid-JSON. Falling through to the raw-text path would then store the partial JSON itself as the
+  // narration line, which is how `{"speak": true, "text": "commentary-watch` ended up in the panel. A line the
+  // model did not finish writing is not a line worth saying out loud either way, so it is silence.
+  if (looksLikeContract(cleaned)) return { speak: false, text: "" }
   const fallback = oneLine(cleaned)
   if (!fallback) return { speak: false, text: "" }
   return { speak: true, text: truncate(fallback, MAX_ENTRY_CHARS) }
+}
+
+/** Did the model start writing the JSON contract without finishing it? */
+export function looksLikeContract(value: string) {
+  const start = value.indexOf("{")
+  return start !== -1 && /"speak"\s*:/.test(value.slice(start))
 }
 
 export const INSTRUCTIONS = `Write the next line of the narration for the <new-activity> above.
@@ -341,14 +385,72 @@ type Deps = {
   readonly agents: Agent.Interface
   readonly models: Provider.Interface
   readonly llm: LLM.Interface
+  readonly audio: CommentaryAudio.Interface
+  /** The instance scope: the audio render is forked into it so it dies with the instance. */
+  readonly scope: Scope.Scope
 }
 
 const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
-  const { db, events, sessions, config, status, agents, models, llm } = deps
+  const { db, events, sessions, config, status, agents, models, llm, audio } = deps
 
   const state: State = { leases: new Map(), inFlight: new Set() }
 
   const current = Effect.map(config.get(), (cfg) => settings(cfg.commentary))
+
+  /**
+   * Synthesize one line's audio, record the hash on the row, publish the line again, and sweep what nothing
+   * points at any more.
+   *
+   * The sweep runs on the global hash set rather than per session: the files are content-addressed and shared
+   * between sessions, so "the oldest 100 for this session" and "every hash a surviving row still references"
+   * are the same question only if you ask it across all of them.
+   */
+  const renderAudio = Effect.fn("SessionCommentary.renderAudio")(function* (sessionID: SessionID, entry: Entry) {
+    const cfg = yield* current
+    const hash = yield* audio.render({ text: entry.text, voice: cfg.speech.voice, host: cfg.speech.host })
+    if (!hash) return
+
+    yield* db
+      .update(SessionCommentaryTable)
+      .set({ audio: hash })
+      .where(and(eq(SessionCommentaryTable.session_id, sessionID), eq(SessionCommentaryTable.seq, entry.seq)))
+      .run()
+      .pipe(Effect.orDie)
+    yield* events.publish(Event.Posted, { sessionID, entry: { ...entry, audio: hash } })
+
+    // Keep only the newest `retention` audio references for this session, then drop files nothing references.
+    const rows = yield* db
+      .select({ seq: SessionCommentaryTable.seq, audio: SessionCommentaryTable.audio })
+      .from(SessionCommentaryTable)
+      .where(eq(SessionCommentaryTable.session_id, sessionID))
+      .orderBy(desc(SessionCommentaryTable.seq))
+      .all()
+      .pipe(Effect.orDie)
+    // `overflow` is the oldest row that has fallen out of the window, and its seq is the cut-off. There is no
+    // cut-off until there IS an overflow row: defaulting it to MAX_SAFE_INTEGER here would null the audio of
+    // every row in the session, which is exactly what it did before this guard existed — files on disk, and
+    // every entry silently text-only.
+    const overflow = rows[cfg.speech.retention]
+    if (overflow) {
+      yield* db
+        .update(SessionCommentaryTable)
+        .set({ audio: null })
+        .where(and(eq(SessionCommentaryTable.session_id, sessionID), lte(SessionCommentaryTable.seq, overflow.seq)))
+        .run()
+        .pipe(Effect.orDie)
+    }
+
+    // Re-read after the write, so `keep` is what the database actually says rather than what it said a moment
+    // ago. Files are content-addressed and shared, so this is the only place that knows what is still needed.
+    const referenced = yield* db
+      .select({ audio: SessionCommentaryTable.audio })
+      .from(SessionCommentaryTable)
+      .where(and(sql`${SessionCommentaryTable.audio} IS NOT NULL`, sql`${SessionCommentaryTable.audio} <> ''`))
+      .all()
+      .pipe(Effect.orDie)
+    const keep = new Set(referenced.flatMap((row) => (row.audio ? [row.audio] : [])))
+    yield* audio.sweep(keep)
+  })
 
   const list = Effect.fn("SessionCommentary.list")(function* (input: { sessionID: SessionID; limit?: number }) {
     const rows = yield* db
@@ -360,7 +462,9 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
       .all()
       .pipe(Effect.orDie)
     return rows
-      .map((row) => ({ seq: row.seq, time: row.time, text: row.text, anchor: row.anchor }))
+      // `audio` is nullable on purpose: a line the server could not speak has none, and the client shows the
+      // text regardless rather than waiting for audio that will never arrive.
+      .map((row) => ({ seq: row.seq, time: row.time, text: row.text, anchor: row.anchor, audio: row.audio ?? undefined }))
       .reverse()
   })
 
@@ -396,7 +500,30 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
       ])
       .run()
       .pipe(Effect.orDie)
+    // Retention: `seq` is monotonic per session, so everything at or below the cut-off is exactly the oldest
+    // overflow. A no-op until the cap is passed.
+    if (entry.seq > MAX_RETAINED_ENTRIES) {
+      yield* db
+        .delete(SessionCommentaryTable)
+        .where(
+          and(
+            eq(SessionCommentaryTable.session_id, input.sessionID),
+            lte(SessionCommentaryTable.seq, entry.seq - MAX_RETAINED_ENTRIES),
+          ),
+        )
+        .run()
+        .pipe(Effect.orDie)
+    }
     yield* events.publish(Event.Posted, { sessionID: input.sessionID, entry })
+    // The audio is rendered *after* the line is published, in its own fiber, and the line is published a second
+    // time when the file exists. On the critical path a 30-second speech timeout would delay the text the user
+    // is trying to read, which is the one thing the commentary is for.
+    yield* renderAudio(input.sessionID, entry).pipe(
+      Effect.catchCause((cause) =>
+        Effect.logWarning("commentary audio render failed", { sessionID: input.sessionID, cause }),
+      ),
+      Effect.forkIn(deps.scope, { startImmediately: true }),
+    )
     return entry
   })
 
@@ -520,8 +647,9 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     // House pattern: resolve the services once here and close over the values, so the per-instance closure
-    // needs nothing but its own scope (which is what makes the loop interrupt on instance disposal).
-    const deps: Deps = {
+    // needs nothing but its own scope (which is what makes the loop interrupt on instance disposal). The scope
+    // is the one field that cannot be resolved here — it only exists inside `InstanceState.make`.
+    const deps: Omit<Deps, "scope"> = {
       db: (yield* Database.Service).db,
       events: yield* EventV2Bridge.Service,
       sessions: yield* Session.Service,
@@ -530,8 +658,14 @@ const layer = Layer.effect(
       agents: yield* Agent.Service,
       models: yield* Provider.Service,
       llm: yield* LLM.Service,
+      audio: yield* CommentaryAudio.Service,
     }
-    const state = yield* InstanceState.make(() => make(deps))
+    // The render fiber is forked into the instance scope, so it is interrupted when the instance is disposed.
+    const state = yield* InstanceState.make(() =>
+      Effect.gen(function* () {
+        return yield* make({ ...deps, scope: yield* Scope.Scope })
+      }),
+    )
     return Service.of({
       watch: (sessionID, instructions) =>
         InstanceState.useEffect(state, (svc) => svc.watch(sessionID, instructions)),
@@ -554,6 +688,7 @@ export const node = LayerNode.make({
     Agent.node,
     Provider.node,
     LLM.node,
+    CommentaryAudio.node,
   ],
 })
 

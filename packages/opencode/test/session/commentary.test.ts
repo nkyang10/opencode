@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
+import { CommentaryAudio } from "../../src/session/commentary-audio"
 import { MessageID, SessionID } from "../../src/session/schema"
 import {
   DEFAULT_INTERVAL,
@@ -11,6 +12,7 @@ import {
   MAX_ENTRY_CHARS,
   MAX_INSTRUCTIONS_CHARS,
   MAX_RESULT_CHARS,
+  MAX_RETAINED_ENTRIES,
   MIN_GAP_MS,
   SEED_MESSAGES,
   INSTRUCTIONS,
@@ -67,6 +69,13 @@ describe("settings", () => {
       minActivityChars: DEFAULT_MIN_ACTIVITY_CHARS,
       narrationHistory: DEFAULT_NARRATION_HISTORY,
       minGap: MIN_GAP_MS,
+      // Server-side TTS: no section at all still speaks, at the shipped defaults.
+      speech: {
+        host: CommentaryAudio.DEFAULT_HOST,
+        voice: CommentaryAudio.DEFAULT_VOICE,
+        retention: CommentaryAudio.DEFAULT_RETENTION,
+        maxBytes: CommentaryAudio.DEFAULT_MAX_BYTES,
+      },
     })
     expect(settings({})).toEqual(settings(undefined))
   })
@@ -273,8 +282,19 @@ describe("parse", () => {
     expect(parse(raw)).toEqual({ speak: true, text: "Reading the retry table." })
   })
 
-  test("a malformed object falls back to the raw text rather than dropping the line", () => {
-    expect(parse('{"speak": true, "text": ')).toEqual({ speak: true, text: '{"speak": true, "text":' })
+  // Observed live: a stream that ended mid-JSON stored `{"speak": true, "text": "commentary-watch` as the
+  // narration line, JSON and all. A line the model never finished writing is not a line to say out loud.
+  test("a truncated contract is silence, not the JSON itself", () => {
+    expect(parse('{"speak": true, "text": "commentary-watch')).toEqual({ speak: false, text: "" })
+    expect(parse('{"speak": true, "text": ')).toEqual({ speak: false, text: "" })
+    expect(parse('{"speak": true')).toEqual({ speak: false, text: "" })
+  })
+
+  test("prose that merely contains a brace is still narration", () => {
+    expect(parse("It fixed the brace in parser.ts and moved on.")).toEqual({
+      speak: true,
+      text: "It fixed the brace in parser.ts and moved on.",
+    })
   })
 
   test("a model that ignored the format entirely still gets shown", () => {
@@ -388,5 +408,28 @@ describe("the narration is told not to echo the reader (FU-116 follow-up)", () =
   test("the digest still carries the user text, because the model needs the context", () => {
     const rendered = digest([user("why does the retry cap allow a third attempt?")])
     expect(rendered.join("\n")).toContain("why does the retry cap allow a third attempt?")
+  })
+})
+
+// The narration is append-only, so without a bound a long-running server grows the table forever. Retention
+// has to be provably safe: the cursor is the anchor of the NEWEST row, and the prompt only ever sees the
+// newest `narrationHistory` entries, so pruning older rows can damage neither.
+describe("retention (FU-121)", () => {
+  test("keeps far more than the prompt ever reads", () => {
+    expect(MAX_RETAINED_ENTRIES).toBeGreaterThan(settings({}).narrationHistory)
+    expect(MAX_RETAINED_ENTRIES).toBeGreaterThan(MAX_RETAINED_ENTRIES / 2)
+  })
+
+  test("pruning oldest rows leaves the cursor intact", () => {
+    // The cursor is derived from the newest entry, which retention never removes.
+    const history = Array.from({ length: 10 }, (_, index) => entry(index + 1, `line ${index + 1}`, `msg_${index + 1}`))
+    const retained = history.slice(-MAX_RETAINED_ENTRIES / 10)
+    expect(cursorOf(retained)).toBe(`msg_${history.length}`)
+  })
+
+  test("the prompt still receives a full continuity window after pruning", () => {
+    const history = Array.from({ length: 50 }, (_, index) => entry(index + 1, `line ${index + 1}`, `msg_${index + 1}`))
+    // What survives retention is far more than narration() hands the model, so continuity is unaffected.
+    expect(narration(history).length).toBe(50)
   })
 })

@@ -152,6 +152,7 @@ export default {
           \`time\` integer NOT NULL,
           \`text\` text NOT NULL,
           \`anchor\` text NOT NULL,
+          \`audio\` text,
           CONSTRAINT \`session_commentary_pk\` PRIMARY KEY(\`session_id\`, \`seq\`),
           CONSTRAINT \`fk_session_commentary_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
         );

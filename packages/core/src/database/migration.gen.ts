@@ -42,5 +42,6 @@ export const migrations = (
     import("./migration/20260622202450_simplify_session_input"),
     import("./migration/20260928004444_useful_manta"),
     import("./migration/20260929034850_nice_micromax"),
+    import("./migration/20260930102128_commentary_audio_hash"),
   ])
 ).map((module) => module.default) satisfies DatabaseMigration.Migration[]

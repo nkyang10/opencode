@@ -271,8 +271,22 @@ export function applyDirectoryEvent(input: {
         input.setStore("commentary", props.sessionID, [props.entry])
         break
       }
-      // The server numbers entries per session, so a repeat is a reconnect replay, not a new line.
-      if (existing.some((item) => item.seq === props.entry.seq)) break
+      // The server publishes a line twice: once as text, then again once its pre-rendered audio exists. So a
+      // repeat is normally that second publish and must REPLACE the entry in place — dropping it, as a
+      // reconnect replay would be dropped, means the client never learns the audio hash and stays silent
+      // forever. A true replay carries the same fields and is idempotent either way.
+      const at = existing.findIndex((item) => item.seq === props.entry.seq)
+      if (at !== -1) {
+        if (existing[at]!.audio === props.entry.audio) break
+        input.setStore(
+          "commentary",
+          props.sessionID,
+          produce((draft) => {
+            draft[at] = props.entry
+          }),
+        )
+        break
+      }
       input.setStore(
         "commentary",
         props.sessionID,
