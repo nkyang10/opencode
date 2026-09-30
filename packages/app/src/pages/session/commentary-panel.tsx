@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, createSignal } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { Icon } from "@opencode-ai/ui/icon"
 import type { SessionCommentaryEvent } from "@opencode-ai/schema/session-commentary-event"
@@ -17,8 +17,14 @@ import { getRelativeTime } from "@/utils/time"
  * the panel is a tab: tapping back to the chat would have stopped the narration. The lease now belongs to
  * the session view via `createCommentaryWatch`, so the same component renders unchanged in both places.
  */
-/** Newest entries drawn. The store keeps everything the server sent; this only bounds the DOM. */
-const RENDERED_ENTRIES = 200
+/**
+ * Newest entries drawn. The store keeps everything the server sent; this only bounds the DOM.
+ *
+ * 15 rather than "everything": the narration is a running commentary, not a transcript, and its value is the
+ * last thing it said. 200 lines of scrollback is a wall nobody reads.
+ */
+const RENDERED_ENTRIES = 15
+
 
 export function CommentaryPanel(props: { sessionID: string | undefined }) {
   const language = useLanguage()
@@ -57,6 +63,15 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
     return Math.max(initial().length, sync().data.commentary[id]?.length ?? 0)
   })
   const working = createMemo(() => (sessionID() ? sync().data.session_working(sessionID()!) : false))
+
+  // `getRelativeTime` is pure, so "2 minutes ago" is computed once and then frozen for as long as the panel
+  // does not re-render — which, for a panel nobody is touching, is forever, and a stale timestamp is worse
+  // than an absolute one. One signal bumped once a minute re-renders the timestamps and nothing else. It has
+  // to live inside the component: at module scope `onCleanup` has no scope to bind to and the interval would
+  // outlive every panel.
+  const [clock, setClock] = createSignal(Date.now())
+  const ticker = setInterval(() => setClock(Date.now()), 60_000)
+  onCleanup(() => clearInterval(ticker))
 
   const http = createMemo(() => server.current?.http)
 
@@ -131,7 +146,11 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
             {(entry) => (
               <div data-slot="session-commentary-entry" class="flex flex-col gap-0.5">
                 <div class="text-10-regular text-text-weak">
-                  {getRelativeTime(new Date(entry.time).toISOString(), language.t)}
+                  {(() => {
+                    // Read the ticker so this row re-renders on the minute, and nothing else about it changes.
+                    void clock()
+                    return getRelativeTime(new Date(entry.time).toISOString(), language.t)
+                  })()}
                 </div>
                 <div class="text-12-regular text-text-strong">{entry.text}</div>
               </div>
