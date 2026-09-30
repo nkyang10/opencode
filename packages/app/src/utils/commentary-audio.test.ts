@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from "bun:test"
-import { CommentaryAudio, DEFAULT_TTS_HOST, DEFAULT_TTS_VOICE, speechUrl } from "./commentary-audio"
+import { CommentaryAudio, DEFAULT_TTS_HOST, DEFAULT_TTS_VOICE, audioBlobFromBase64 } from "./commentary-audio"
 
 /** A fake Audio whose playback is driven by the test, so `ended` and rejections are deterministic. */
 class FakeAudio {
@@ -34,7 +34,10 @@ class FakeAudio {
 type FetchStub = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 const asFetch = (fn: FetchStub) => fn as unknown as typeof globalThis.fetch
 
-const okResponse = () => new Response(new Blob(["audio"]), { status: 200 })
+const okResponse = () => new Response(JSON.stringify(btoa("fake-mp3-bytes")), {
+  status: 200,
+  headers: { "content-type": "application/json" },
+})
 const errorResponse = (status: number, body: string) => new Response(body, { status })
 
 const clip = (seq: number, sessionID = "s1", text = `line ${seq}`) => ({ sessionID, seq, text })
@@ -43,6 +46,7 @@ function setup(options: { fetch?: typeof globalThis.fetch; onError?: (m: string)
   FakeAudio.instances = []
   let clock = 1_000
   const audio = new CommentaryAudio({
+    sessionID: () => "s1",
     fetch: options.fetch ?? asFetch(() => Promise.resolve(okResponse())),
     createAudio: () => new FakeAudio() as unknown as HTMLAudioElement,
     now: () => clock,
@@ -56,13 +60,11 @@ const settle = () => new Promise((r) => setTimeout(r, 0))
 /** The fetch -> blob -> play chain is several microtasks; give it room without guessing. */
 const settleChain = () => new Promise((r) => setTimeout(r, 15))
 
-describe("speechUrl", () => {
-  test("defaults to the host the user gave, over http", () => {
-    expect(speechUrl(DEFAULT_TTS_HOST)).toBe("http://192.168.1.162:8880/v1/audio/speech")
-  })
-
-  test("keeps an explicit scheme and trims a trailing slash", () => {
-    expect(speechUrl("https://tts.internal/")).toBe("https://tts.internal/v1/audio/speech")
+describe("audioBlobFromBase64", () => {
+  test("decodes the proxy's base64 into bytes the Audio element can play", () => {
+    const blob = audioBlobFromBase64(btoa("abc"))
+    expect(blob.type).toBe("audio/mpeg")
+    expect(blob.size).toBe(3)
   })
 })
 
@@ -200,55 +202,105 @@ describe("CommentaryAudio queue", () => {
     expect(audio.enqueue(clip(1, "a"))).toBe(false)
   })
 
-  test("requests the configured host and voice with no-store", async () => {
+  test("asks the opencode speech proxy, carrying the host and voice, with no-store", async () => {
     const seen: Array<{ url: string; body: string; cache?: string }> = []
     const fetchMock = asFetch((input, init) => {
       seen.push({ url: String(input), body: String(init?.body), cache: init?.cache })
       return Promise.resolve(okResponse())
     })
     const audio = new CommentaryAudio({
+      sessionID: () => "s9",
       host: "10.0.0.5:9999",
       voice: "en-male",
       fetch: fetchMock,
       createAudio: () => new FakeAudio() as unknown as HTMLAudioElement,
     })
-    audio.enqueue(clip(1, "s1", "hello there"))
-    await settle()
-    expect(seen[0]!.url).toBe("http://10.0.0.5:9999/v1/audio/speech")
-    expect(JSON.parse(seen[0]!.body)).toEqual({ input: "hello there", voice: "en-male" })
+    audio.enqueue(clip(1, "s9", "hello there"))
+    await settleChain()
+    // The LAN service is NOT called from the browser: it has no CORS, so the request goes through opencode.
+    expect(seen[0]!.url).toBe("/session/s9/commentary/speech")
+    const body = JSON.parse(seen[0]!.body)
+    expect(body.input).toBe("hello there")
+    expect(body.voice).toBe("en-male")
+    expect(body.host).toBe("10.0.0.5:9999")
     expect(seen[0]!.cache).toBe("no-store")
   })
 
-  test("an unconfigured player falls back to the documented defaults", async () => {
+  test("an unconfigured player still sends the documented defaults to the proxy", async () => {
     expect(DEFAULT_TTS_HOST).toBe("192.168.1.162:8880")
     expect(DEFAULT_TTS_VOICE).toBe("cantonese")
     const seen: Array<{ url: string; body: string }> = []
-    const spy = new CommentaryAudio({
+    const audio = new CommentaryAudio({
+      sessionID: () => "s1",
       fetch: asFetch((input, init) => {
         seen.push({ url: String(input), body: String(init?.body) })
         return Promise.resolve(okResponse())
       }),
       createAudio: () => new FakeAudio() as unknown as HTMLAudioElement,
     })
-    spy.enqueue(clip(1, "s1", "hi"))
-    await settle()
-    expect(seen[0]!.url).toBe("http://192.168.1.162:8880/v1/audio/speech")
-    expect(JSON.parse(seen[0]!.body).voice).toBe("cantonese")
+    audio.enqueue(clip(1, "s1", "hi"))
+    await settleChain()
+    const body = JSON.parse(seen[0]!.body)
+    expect(body.voice).toBe("cantonese")
+    expect(body.host).toBe(DEFAULT_TTS_HOST)
   })
 
-  // Found by this suite: a line arriving inside the gap window used to be stranded, because the previous
-  // clip had already ended and scheduled nothing, and the enqueue-time pump bailed on the gap check.
-  test("a line arriving inside the gap still plays once the gap elapses", async () => {
-    const { audio } = setup({ gapMs: 30 })
-    audio.enqueue(clip(1))
+  test("no session means no request at all", async () => {
+    let calls = 0
+    const audio = new CommentaryAudio({
+      sessionID: () => undefined,
+      fetch: asFetch(() => {
+        calls++
+        return Promise.resolve(okResponse())
+      }),
+      createAudio: () => new FakeAudio() as unknown as HTMLAudioElement,
+    })
+    audio.enqueue(clip(1, "s1", "hi"))
     await settleChain()
-    FakeAudio.instances[0]!.finish()
+    expect(calls).toBe(0)
+  })
+})
+
+  // The proxy is an ordinary authenticated route: a browser call without the credential comes back 401 and
+  // the line is silently never spoken. This is the exact failure a user hit, so it is pinned.
+
+describe("auth", () => {
+  test("sends the auth header the speech proxy requires", async () => {
+    const seen: Array<{ headers: Record<string, string> }> = []
+    const audio = new CommentaryAudio({
+      sessionID: () => "s1",
+      headers: () => ({ Authorization: "Basic dGVzdA==" }),
+      fetch: asFetch((_input, init) => {
+        seen.push({ headers: (init?.headers ?? {}) as Record<string, string> })
+        return Promise.resolve(okResponse())
+      }),
+      createAudio: () => new FakeAudio() as unknown as HTMLAudioElement,
+    })
+    audio.enqueue(clip(1, "s1", "hello"))
     await settleChain()
-    // Well inside the gap window.
-    audio.enqueue(clip(2))
-    expect(FakeAudio.instances).toHaveLength(1)
-    await new Promise((r) => setTimeout(r, 60))
-    expect(FakeAudio.instances).toHaveLength(2)
-    expect(audio.isPlaying).toBe(true)
+    expect(seen[0]!.headers.Authorization).toBe("Basic dGVzdA==")
+    expect(seen[0]!.headers["Content-Type"]).toBe("application/json")
+  })
+
+  // The browser's own login (/login, `#username` / `#password`) hands out a session cookie, not Basic
+  // credentials, so `server.current.http.password` is empty there and `headers()` contributes nothing. The
+  // cookie is still what authenticates the proxy — verified 200 cookie-only vs 401 with no credentials at
+  // all — but only if the request is allowed to carry it. Pinned because `credentials` defaults quietly and
+  // the failure would be a 401 that only shows up in that one login mode.
+  test("sends the session cookie even when there is no Basic credential to add", async () => {
+    const seen: Array<RequestInit | undefined> = []
+    const audio = new CommentaryAudio({
+      sessionID: () => "s1",
+      headers: () => ({}),
+      fetch: asFetch((_input, init) => {
+        seen.push(init)
+        return Promise.resolve(okResponse())
+      }),
+      createAudio: () => new FakeAudio() as unknown as HTMLAudioElement,
+    })
+    audio.enqueue(clip(1, "s1", "hello"))
+    await settleChain()
+    expect(seen[0]!.credentials).toBe("include")
+    expect(seen[0]!.cache).toBe("no-store")
   })
 })

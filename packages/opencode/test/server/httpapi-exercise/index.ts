@@ -1357,6 +1357,9 @@ const scenarios: Scenario[] = [
     .at((ctx) => ({
       path: route("/session/{sessionID}/commentary/watch", { sessionID: ctx.state.id }),
       headers: ctx.headers(),
+      // The lease carries the reader's narration preferences (FE-029), so the body is not optional on the
+      // wire. Asserted with a value rather than `{}` so the field is actually decoded by this scenario.
+      body: { instructions: "Explain like a senior engineer." },
     }))
     .json(200, (body) => check(body === true, "watching should acknowledge the lease")),
   http.protected
@@ -1367,6 +1370,18 @@ const scenarios: Scenario[] = [
       headers: ctx.headers(),
     }))
     .json(200, (body) => check(body === true, "unwatching should acknowledge the release")),
+  // FU-122. The success path needs the real LAN speech box, which a route-coverage harness must not depend
+  // on, so this scenario asserts the refusal instead: it proves the route exists, decodes the body, and
+  // reaches the host guard. The guard itself is pinned in `httpapi-speech-target.test.ts`.
+  http.protected
+    .post("/session/{sessionID}/commentary/speech", "session.commentary.speech")
+    .seeded((ctx) => ctx.session({ title: "Commentary speech session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/commentary/speech", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: { input: "Reading the file now.", host: "169.254.169.254" },
+    }))
+    .json(400, object, "status"),
   http.protected
     .get("/session/{sessionID}/diff", "session.diff")
     .seeded((ctx) => ctx.session({ title: "Diff session" }))

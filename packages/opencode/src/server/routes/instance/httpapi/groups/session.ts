@@ -52,6 +52,14 @@ export const CommentaryQuery = Schema.Struct({
   ...WorkspaceRoutingQueryFields,
   limit: Schema.optional(Schema.NumberFromString.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1))),
 })
+/**
+ * `instructions` is the reader's own narration preferences (tone, technical level, perspective), kept with
+ * the lease rather than in the config file so they are per device. The service normalises and caps it, so
+ * this only has to carry the string.
+ */
+export const CommentaryWatchPayload = Schema.Struct({
+  instructions: Schema.optional(Schema.String),
+})
 export const UpdatePayload = Schema.Struct({
   title: Schema.optional(Schema.String),
   metadata: Schema.optional(Session.Metadata),
@@ -90,6 +98,7 @@ export const SessionPaths = {
   commentary: `${root}/:sessionID/commentary`,
   commentaryWatch: `${root}/:sessionID/commentary/watch`,
   commentaryUnwatch: `${root}/:sessionID/commentary/unwatch`,
+  speech: `${root}/:sessionID/commentary/speech`,
   diff: `${root}/:sessionID/diff`,
   messages: `${root}/:sessionID/message`,
   message: `${root}/:sessionID/message/:messageID`,
@@ -192,6 +201,7 @@ export const SessionApi = HttpApi.make("session")
         HttpApiEndpoint.post("commentaryWatch", SessionPaths.commentaryWatch, {
           params: { sessionID: SessionID },
           query: WorkspaceRoutingQuery,
+          payload: CommentaryWatchPayload,
           success: described(Schema.Boolean, "Watching"),
           error: [HttpApiError.BadRequest, ApiNotFoundError],
         }).annotateMerge(
@@ -199,7 +209,27 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.commentary.watch",
             summary: "Watch session commentary",
             description:
-              "Start or refresh the lease that keeps the commentary narration running. Call again before the lease expires to keep it alive.",
+              "Start or refresh the lease that keeps the commentary narration running, optionally carrying the reader's narration preferences. Call again before the lease expires to keep it alive.",
+          }),
+        ),
+        // FU-122: the browser cannot call the LAN speech service directly — it answers a CORS preflight
+        // with 405 and no allow-origin header, so the request is blocked before it is sent. This route
+        // fetches the audio server-side, where CORS does not apply, and streams the bytes back.
+        HttpApiEndpoint.post("commentarySpeech", SessionPaths.speech, {
+          params: { sessionID: SessionID },
+          payload: Schema.Struct({ input: Schema.String, host: Schema.optional(Schema.String), voice: Schema.optional(Schema.String) }),
+          // Base64 rather than a raw audio stream: a line is ~40KB, and a typed JSON response keeps this
+          // on the ordinary handler path instead of the raw-handler one. The client decodes it to a Blob.
+          success: described(Schema.String, "Base64-encoded audio"),
+          // InternalServerError covers "the speech service is down or refused" — deliberately collapsed, so
+          // a failure upstream is not confused with a bad request from the reader.
+          error: [HttpApiError.BadRequest, HttpApiError.InternalServerError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.commentary.speech",
+            summary: "Speak text",
+            description:
+              "Fetch audio for the given text from the configured text-to-speech service and return it. Proxied because the speech service does not allow cross-origin browser requests.",
           }),
         ),
         HttpApiEndpoint.post("commentaryUnwatch", SessionPaths.commentaryUnwatch, {

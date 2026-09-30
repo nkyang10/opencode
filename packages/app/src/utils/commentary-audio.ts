@@ -18,6 +18,10 @@
  *   single most likely first-run failure, so it is handled explicitly and tested.
  * - **No cache.** Every line is fetched fresh and the object URL is revoked, so a line is never replayed
  *   from disk and never re-spoken.
+ * - **The audio goes through opencode, not straight to the speech service.** That service answers a browser
+ *   CORS preflight with 405 and no allow-origin header, so a direct browser request is blocked before it is
+ *   sent — `curl` works only because it sends no `Origin`. `POST /session/{id}/commentary/speech` fetches
+ *   server-side, where CORS does not apply, and returns base64.
  */
 
 export const DEFAULT_TTS_HOST = "192.168.1.162:8880"
@@ -35,6 +39,13 @@ export type SpeechOptions = {
   voice?: string | (() => string)
   gapMs?: number
   fetch?: typeof globalThis.fetch
+  /** The session the speech proxy is called under. */
+  sessionID?: () => string | undefined
+  /**
+   * Auth headers for the speech proxy. The proxy is a normal authenticated route, so a browser call
+   * without them comes back 401 — the same credential every other fetch in the app already sends.
+   */
+  headers?: () => Record<string, string>
   /** Injected in tests; defaults to a real `Audio`. */
   createAudio?: () => HTMLAudioElement
   now?: () => number
@@ -43,12 +54,16 @@ export type SpeechOptions = {
 
 export type CommentaryClip = { sessionID: string; seq: number; text: string }
 
-export function speechUrl(host: string) {
-  const trimmed = host.trim().replace(/\/+$/, "")
-  // A bare host:port is what the user configures; adding a scheme here would be the single most likely
-  // misconfiguration, so it is defaulted rather than left to the user to type correctly.
-  const base = /^https?:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`
-  return `${base}/v1/audio/speech`
+/**
+ * Decode the proxy's base64 payload into a Blob the `Audio` element can play. Done by hand rather than via
+ * `atob` + `Uint8Array` gymnastics because a byte array is what the Blob needs and the base64 may carry
+ * characters `atob` would need padding for.
+ */
+export function audioBlobFromBase64(encoded: string) {
+  const binary = atob(encoded)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index)
+  return new Blob([bytes], { type: "audio/mpeg" })
 }
 
 export class CommentaryAudio {
@@ -66,6 +81,8 @@ export class CommentaryAudio {
   private readonly createAudio: () => HTMLAudioElement
   private readonly now: () => number
   private readonly onError: ((message: string) => void) | undefined
+  private readonly sessionID: () => string | undefined
+  private readonly extraHeaders: () => Record<string, string>
 
   constructor(options: SpeechOptions = {}) {
     const resolve = (input: string | (() => string) | undefined, fallback: string) =>
@@ -83,6 +100,8 @@ export class CommentaryAudio {
       })
     this.now = options.now ?? (() => Date.now())
     this.onError = options.onError
+    this.sessionID = options.sessionID ?? (() => undefined)
+    this.extraHeaders = options.headers ?? (() => ({}))
   }
 
   /** True when this session's history has never been seen, i.e. the next entry is genuinely new. */
@@ -139,6 +158,25 @@ export class CommentaryAudio {
     }
   }
 
+  /**
+   * Ask opencode to speak the line. The LAN speech service is reached server-side by the proxy, because it
+   * does not allow cross-origin browser requests.
+   */
+  private speak(text: string, voice: string) {
+    const id = this.sessionID()
+    if (!id) return Promise.resolve(new Response("no session", { status: 400 }))
+    return this.doFetch(`/session/${id}/commentary/speech`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...this.extraHeaders() },
+      body: JSON.stringify({ input: text, voice, host: this.readHost() }),
+      // The route is authenticated, and this app has two login modes: the SDK holds Basic credentials, or
+      // the browser holds a session cookie from /login. `same-origin` is the default and does send the
+      // cookie, but saying it keeps the credential story readable instead of accidental.
+      credentials: "include",
+      cache: "no-store",
+    })
+  }
+
   private async pump(ignoreGap = false): Promise<void> {
     if (this.playing) return
     if (this.queue.length === 0) return
@@ -155,13 +193,7 @@ export class CommentaryAudio {
     // Read once per clip so the request, the error message and the suppression key all name the same voice.
     const voice = this.readVoice()
     try {
-      const response = await this.doFetch(speechUrl(this.readHost()), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: clip.text, voice }),
-        // No cache, in the explicit sense the user asked for: a line is fetched once and played once.
-        cache: "no-store",
-      })
+      const response = await this.speak(clip.text, voice)
       if (!response.ok) {
         const detail = await response.text().catch(() => "")
         this.complain(response.status, detail, voice)
@@ -172,8 +204,15 @@ export class CommentaryAudio {
         this.scheduleNext()
         return
       }
-      const blob = await response.blob()
-      url = URL.createObjectURL(blob)
+      const encoded = await response.json().catch(() => "")
+      if (typeof encoded !== "string" || !encoded) {
+        this.complain(response.status, "speech proxy returned no audio", voice)
+        this.lastEndedAt = this.now()
+        this.playing = false
+        this.scheduleNext()
+        return
+      }
+      url = URL.createObjectURL(audioBlobFromBase64(encoded))
       await this.play(url, voice)
     } catch (error) {
       this.complain(0, error instanceof Error ? error.message : String(error), voice)
