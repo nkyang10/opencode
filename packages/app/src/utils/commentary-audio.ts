@@ -109,10 +109,22 @@ export class CommentaryAudio {
    * (and skipped in `pump`), but it must not eat the slot its own audio is about to fill.
    */
   enqueue(clip: CommentaryClip) {
-    if (!clip.text.trim()) return false
-    if (!this.isNew(clip)) return false
+    const mark = this.spoken.get(clip.sessionID)
+    const fresh = this.isNew(clip)
+    console.log(
+      `[audio] enqueue seq=${clip.seq} audio=${clip.audio ?? "none"} mark=${mark ?? "none"} fresh=${fresh}`,
+    )
+    if (!clip.text.trim()) {
+      console.log(`[audio] enqueue seq=${clip.seq} REJECTED: empty text`)
+      return false
+    }
+    if (!fresh) {
+      console.log(`[audio] enqueue seq=${clip.seq} REJECTED: not newer than the high-water mark`)
+      return false
+    }
     if (clip.audio) this.spoken.set(clip.sessionID, clip.seq)
     this.queue.push(clip)
+    console.log(`[audio] enqueue seq=${clip.seq} ACCEPTED, queue=${this.queue.length}`)
     void this.pump()
     return true
   }
@@ -160,10 +172,9 @@ export class CommentaryAudio {
   private fetchAudio(hash: string) {
     const id = this.sessionID()
     if (!id) return Promise.resolve(new Response("no session", { status: 400 }))
-    // The exact URL every clip is fetched from. Logged because "is the browser asking for it at all" was the
-    // question this feature kept failing to answer, and the answer is one line in the console.
-    console.log(`[commentary-audio] ${this.sessionID()}/${hash}`)
-    return this.doFetch(`/session/${id}/commentary/audio/${hash}`, {
+    const url = `/session/${id}/commentary/audio/${hash}`
+    console.log(`[audio] FETCH ${url}`)
+    return this.doFetch(url, {
       headers: this.extraHeaders(),
       // The route is authenticated, and this app has two login modes: the SDK holds Basic credentials, or
       // the browser holds a session cookie from /login. `same-origin` is the default and does send the
@@ -174,9 +185,15 @@ export class CommentaryAudio {
   }
 
   private async pump(ignoreGap = false): Promise<void> {
-    if (this.playing) return
+    if (this.playing) {
+      if (this.queue.length > 0) console.log(`[audio] pump: busy, ${this.queue.length} waiting`)
+      return
+    }
     if (this.queue.length === 0) return
     if (!ignoreGap && this.now() - this.lastEndedAt < this.gapMs) {
+      console.log(
+        `[audio] pump: inside the gap, ${this.gapMs - (this.now() - this.lastEndedAt)}ms left for ${this.queue.length} clip(s)`,
+      )
       // Arriving inside the gap must not strand the line: nothing else would re-pump it, because the
       // previous clip has already finished and scheduled nothing. Retry when the gap elapses.
       this.scheduleNext()
@@ -186,18 +203,25 @@ export class CommentaryAudio {
     const clip = this.queue.shift()!
     this.playing = true
     let url: string | undefined
+    console.log(`[audio] pump: taking seq=${clip.seq} audio=${clip.audio ?? "none"}`)
     try {
       // A line with no stored audio is a line the server could not speak. It is not an error to report —
       // the text is already on screen — so it is skipped silently and the queue moves on.
       if (!clip.audio) {
+        console.log(`[audio] seq=${clip.seq} SKIPPED: the server rendered no audio for this line`)
         this.lastEndedAt = this.now()
         this.playing = false
         this.scheduleNext()
         return
       }
       const response = await this.fetchAudio(clip.audio)
+      console.log(`[audio] FETCH returned ${response.status} for seq=${clip.seq}`)
       if (!response.ok) {
         const detail = await response.text().catch(() => "")
+        console.error(
+          `[audio] EXCEPTION: fetching audio for seq=${clip.seq} returned ${response.status}`,
+          new Error(`audio route ${response.status}: ${detail || "(empty body)"}`),
+        )
         this.complain(response.status, detail)
         // Returning from inside the try skips the code after the try/finally, so the queue has to be
         // released and rescheduled here or the next line is stranded forever behind a failed fetch.
@@ -208,15 +232,25 @@ export class CommentaryAudio {
       }
       const encoded = await response.json().catch(() => "")
       if (typeof encoded !== "string" || !encoded) {
+        console.error(
+          `[audio] EXCEPTION: seq=${clip.seq} route answered ${response.status} with no audio`,
+          new Error(`audio route ${response.status}: payload was ${typeof encoded}, not a base64 string`),
+        )
         this.complain(response.status, "audio route returned no audio")
         this.lastEndedAt = this.now()
         this.playing = false
         this.scheduleNext()
         return
       }
-      url = URL.createObjectURL(audioBlobFromBase64(encoded))
+      const blob = audioBlobFromBase64(encoded)
+      url = URL.createObjectURL(blob)
+      console.log(`[audio] seq=${clip.seq} blob ${blob.size} bytes -> ${url}`)
       await this.play(url)
     } catch (error) {
+      console.error(
+        `[audio] EXCEPTION: pump failed for seq=${clip.seq}`,
+        error instanceof Error ? error : new Error(String(error)),
+      )
       this.complain(0, error instanceof Error ? error.message : String(error))
       // Only a clip that never reached `done()` (a failed fetch) needs stamping here; `done()` already
       // stamped it, and overwriting it would restart the gap and stall a clock that has not moved on.
@@ -255,7 +289,12 @@ export class CommentaryAudio {
     return new Promise<void>((resolve) => {
       const element = this.createAudio()
       this.audio = element
+      // `play()` resolving only means the browser accepted the request. If the media never loads, that
+      // promise has already settled and nothing else will ever report a problem — which is exactly how a
+      // Content Security Policy block turned into a completely silent feature.
+      let watchdog: ReturnType<typeof setTimeout> | undefined
       const done = () => {
+        if (watchdog) clearTimeout(watchdog)
         this.lastEndedAt = this.now()
         this.release()
         // The gap is measured from the end, so the next clip cannot start yet. Without this timer the
@@ -263,16 +302,57 @@ export class CommentaryAudio {
         this.scheduleNext()
         resolve()
       }
-      element.onended = done
+      element.onended = () => {
+        console.log(`[audio] onended after ${element.duration?.toFixed(2)}s`)
+        done()
+      }
       element.onerror = () => {
+        const code = element.error?.code
+        const meaning =
+          code === 3
+            ? "MEDIA_ERR_DECODE — the bytes are not decodable audio"
+            : code === 4
+              ? "MEDIA_ERR_SRC_NOT_SUPPORTED — the browser refused the source (a CSP block on blob: looks like this)"
+              : `media error code ${code ?? "unknown"}`
+        console.error(`[audio] EXCEPTION: media element failed — ${meaning}`, element.error ?? "")
         this.complain(0, "playback failed")
         done()
       }
+      element.addEventListener("loadedmetadata", () =>
+        console.log(`[audio] loadedmetadata duration=${element.duration?.toFixed(2)}s`),
+      )
+      element.addEventListener("canplay", () => {
+        console.log(`[audio] canplay — the media actually loaded`)
+        clearTimeout(watchdog)
+      })
+      element.addEventListener("stalled", () => console.log(`[audio] stalled`))
+      // `play()` resolving only means the browser accepted the request. If the media never loads, the promise
+      // has already settled and nothing else will ever report a problem — which is exactly how a Content
+      // Security Policy block produced a completely silent feature.
+      watchdog = setTimeout(() => {
+        if (element.readyState < 2) {
+          console.error(
+            `[audio] EXCEPTION: play() was accepted but the media never loaded (readyState=${element.readyState}, networkState=${element.networkState})`,
+            new Error(
+              `audio never loaded: readyState ${element.readyState}, networkState ${element.networkState}. If the source is a blob: URL this is a Content Security Policy block on media-src.`,
+            ),
+          )
+        }
+      }, 8000)
       element.src = url
+      console.log(`[audio] play() called`)
       const started = element.play()
       // Autoplay rejection lands here. Releasing the lock is the whole point: leaving `playing` set would
       // wedge the queue with no visible symptom.
-      if (started && typeof started.catch === "function") {
+      if (started && typeof started.then === "function") {
+        started.then(
+          () =>
+            console.log(
+              `[audio] play() accepted — waiting for the media itself (this is where a blob: CSP block shows up)`,
+            ),
+          (error: unknown) =>
+            console.log(`[audio] play() REJECTED: ${error instanceof Error ? error.message : String(error)}`),
+        )
         started.catch(() => {
           this.complain(0, "autoplay blocked — click the page once to allow sound")
           done()

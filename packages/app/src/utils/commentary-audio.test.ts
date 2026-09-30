@@ -6,6 +6,27 @@ class FakeAudio {
   static instances: FakeAudio[] = []
   onended: (() => void) | undefined
   onerror: (() => void) | undefined
+  // The player registers media listeners and reads `readyState` in its watchdog, so the fake has to answer
+  // them the way a real element does — otherwise the setup throws before `src` is even assigned and every
+  // test fails for a reason that has nothing to do with the behaviour under test.
+  readyState = 4
+  networkState = 1
+  duration = 0
+  error: { code: number } | null = null
+  private listeners = new Map<string, Set<() => void>>()
+  addEventListener(type: string, fn: () => void) {
+    const set = this.listeners.get(type) ?? new Set<() => void>()
+    set.add(fn)
+    this.listeners.set(type, set)
+  }
+  removeEventListener(type: string, fn: () => void) {
+    this.listeners.get(type)?.delete(fn)
+  }
+  /** Simulate the media actually loading. */
+  load() {
+    for (const fn of this.listeners.get("loadedmetadata") ?? []) fn()
+    for (const fn of this.listeners.get("canplay") ?? []) fn()
+  }
   src = ""
   preload = ""
   paused = true
@@ -16,6 +37,8 @@ class FakeAudio {
   play() {
     if (this.result === "reject") return Promise.reject(new Error("autoplay blocked"))
     this.paused = false
+    // A real element fires these once the bytes are in; the tests drive them explicitly otherwise.
+    queueMicrotask(() => this.load())
     return Promise.resolve()
   }
   /** Simulate the clip finishing. */

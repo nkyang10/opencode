@@ -26,6 +26,7 @@ export function CommentaryAudioPlayer(props: { sessionID: string | undefined }) 
   const settings = () => layout.commentary
   const audioOn = createMemo(() => settings().enabled() && settings().audioEnabled())
 
+  console.log(`[audio] player created for session=${props.sessionID}`)
   const player = new CommentaryAudio({
     // The audio route is per-session, so the player has to know which one it is speaking for.
     sessionID: () => props.sessionID,
@@ -43,6 +44,8 @@ export function CommentaryAudioPlayer(props: { sessionID: string | undefined }) 
 
   const sessionID = createMemo(() => props.sessionID)
 
+  console.log(`[audio] player mounted session=${props.sessionID} enabled=${settings().enabled()} audioEnabled=${settings().audioEnabled()}`)
+
   // Adopt the history ONCE, when audio is switched on for this session. Doing this reactively swallowed
   // the first real line: the baseline effect re-ran on the same tick the line arrived, marked it seen, and
   // the enqueue effect then correctly refused it.
@@ -51,8 +54,13 @@ export function CommentaryAudioPlayer(props: { sessionID: string | undefined }) 
     if (!id) return
     if (!audioOn()) return
     untrack(() => {
-      const newest = (sync().data.commentary[id] ?? []).at(-1)
-      if (newest) player.markSeen(id, newest.seq)
+      const all = sync().data.commentary[id] ?? []
+      console.log(`[audio] baseline: ${all.length} stored line(s), marking newest as seen`)
+      const newest = all.at(-1)
+      if (newest) {
+        player.markSeen(id, newest.seq)
+        console.log(`[audio] baseline: marked seq=${newest.seq} seen (history, will not be spoken)`)
+      }
     })
   })
 
@@ -60,7 +68,9 @@ export function CommentaryAudioPlayer(props: { sessionID: string | undefined }) 
     const id = sessionID()
     const on = audioOn()
     if (!id || !on) return
-    const newest = (sync().data.commentary[id] ?? []).at(-1)
+    const all = sync().data.commentary[id] ?? []
+    const newest = all.at(-1)
+    console.log(`[audio] store changed: ${all.length} line(s), newest seq=${newest?.seq ?? "none"}`)
     if (!newest) return
     player.enqueue({ sessionID: id, seq: newest.seq, text: newest.text, audio: newest.audio })
   })
@@ -68,6 +78,7 @@ export function CommentaryAudioPlayer(props: { sessionID: string | undefined }) 
   // Turning audio off, or losing the foreground, must silence an in-flight clip rather than let it finish in
   // a tab nobody is looking at.
   createEffect(() => {
+    console.log(`[audio] audio toggle is now ${audioOn() ? "ON" : "OFF"}`)
     if (!audioOn()) player.stop()
   })
   onCleanup(() => player.stop())
