@@ -7,7 +7,11 @@ import { ProxyUtil } from "../proxy-util"
 let embeddedUIPromise: Promise<Record<string, string> | null> | undefined
 
 export const csp = (hash = "") =>
-  `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'${hash ? ` 'sha256-${hash}'` : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; media-src 'self' data:; connect-src * data: blob:`
+  // `media-src` needs `blob:` for the spoken commentary: the audio is decoded from base64 into a Blob and played
+  // from an object URL, and without it the browser refuses the media outright — the fetch succeeds, `play()` is
+  // called, and nothing comes out. `img-src` and `connect-src` already allow it, so this only brings `media-src`
+  // in line. A blob URL is same-origin and can only be made by script this page already runs.
+  `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'${hash ? ` 'sha256-${hash}'` : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src * data: blob:`
 export const DEFAULT_CSP = csp()
 
 export function themePreloadHash(body: string) {

@@ -160,6 +160,9 @@ export class CommentaryAudio {
   private fetchAudio(hash: string) {
     const id = this.sessionID()
     if (!id) return Promise.resolve(new Response("no session", { status: 400 }))
+    // The exact URL every clip is fetched from. Logged because "is the browser asking for it at all" was the
+    // question this feature kept failing to answer, and the answer is one line in the console.
+    console.log(`[commentary-audio] ${this.sessionID()}/${hash}`)
     return this.doFetch(`/session/${id}/commentary/audio/${hash}`, {
       headers: this.extraHeaders(),
       // The route is authenticated, and this app has two login modes: the SDK holds Basic credentials, or
