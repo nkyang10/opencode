@@ -95,12 +95,30 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
     })
   })
 
+  /**
+   * Auto-scroll to the newest line — including on a refresh, where fifteen lines arrive in one paint and the
+   * view would otherwise sit at the top showing the oldest of them.
+   *
+   * `requestAnimationFrame`, not `queueMicrotask`: a microtask runs before the browser has laid the new rows
+   * out, so `scrollHeight` can still be the pre-insert height and the scroll lands short. A frame runs after
+   * layout, and re-arming once catches content that grew between the two (a slow first paint of a hidden tab).
+   */
   createEffect(() => {
     entries().length
     if (!atBottom) return
-    queueMicrotask(() => {
-      if (scroller) scroller.scrollTop = scroller.scrollHeight
-    })
+    let again = 0
+    const scroll = () => {
+      const el = scroller
+      if (!el) return
+      const previous = el.scrollHeight
+      el.scrollTop = previous
+      // A second frame only if the content actually grew since we last measured it.
+      if (el.scrollHeight !== previous && again < 3) {
+        again++
+        requestAnimationFrame(scroll)
+      }
+    }
+    requestAnimationFrame(scroll)
   })
 
   return (
