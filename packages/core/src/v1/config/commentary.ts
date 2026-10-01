@@ -76,6 +76,10 @@ export const Commentary = Schema.Struct({
       minGap: Schema.optional(PositiveInt).annotate({
         description: "Minimum milliseconds between two special lines. Defaults to 30000",
       }),
+      closingGrace: Schema.optional(PositiveInt).annotate({
+        description:
+          "How long the session must have been idle before 'all done' is said. A reader who sends another prompt straight away never hears it. Defaults to 15000",
+      }),
     }),
   ).annotate({ description: "The non-narration commentary lines" }),
 }).annotate({ identifier: "CommentaryConfig" })

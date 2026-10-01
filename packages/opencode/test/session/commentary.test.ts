@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { CommentaryAudio } from "../../src/session/commentary-audio"
-import { SPECIAL_MIN_GAP_MS } from "../../src/session/commentary"
+import { CLOSING_GRACE_MS, SPECIAL_MIN_GAP_MS } from "../../src/session/commentary"
 import { MessageID, SessionID } from "../../src/session/schema"
 import {
   DEFAULT_INTERVAL,
@@ -83,6 +83,7 @@ describe("settings", () => {
       // The two special lines are on by default: a panel that just goes quiet reads as a crash.
       special: true,
       specialMinGap: SPECIAL_MIN_GAP_MS,
+      closingGrace: CLOSING_GRACE_MS,
     })
     expect(settings({})).toEqual(settings(undefined))
   })
@@ -467,33 +468,70 @@ describe("retention (FU-121)", () => {
   })
 })
 
-// The closing line's trigger is a pure predicate so it can be pinned. A turn that finishes inside one tick
-// interval is never observed busy, and requiring that observation meant a nine-second turn produced no
-// closing line at all — most turns, and the ones a reader most wants to hear about.
+// "All done" must mean done. `status.idle` alone does not mean that: a prompt already sent and not yet
+// answered is a follow-up, and the reader who is about to type again should never hear the line at all.
 describe("closing-line trigger", () => {
-  /** The rule, as the service applies it. */
-  const shouldClose = (input: { busy: boolean; wasBusy: boolean; unnarrated: boolean; blocked?: boolean }) =>
-    !input.blocked && !input.busy && (input.wasBusy || input.unnarrated)
+  /** The rule as the service applies it, in one place so it can be pinned. */
+  const shouldClose = (input: {
+    blocked?: boolean
+    busy: boolean
+    wasBusy: boolean
+    unnarrated: boolean
+    /** The newest message is a completed assistant reply — i.e. nothing is queued or awaiting a tool. */
+    answered: boolean
+    /** Milliseconds the session has been idle. */
+    idleFor: number
+    grace: number
+  }) =>
+    !input.blocked &&
+    !input.busy &&
+    (input.wasBusy || input.unnarrated) &&
+    input.answered &&
+    input.idleFor >= input.grace
 
-  test("a long turn: the tick saw it busy, so the idle tick closes it", () => {
-    expect(shouldClose({ busy: false, wasBusy: true, unnarrated: false })).toBe(true)
+  const base = { busy: false, wasBusy: false, unnarrated: true, answered: true, idleFor: 60_000, grace: 15_000 }
+
+  test("a short turn that finished between two ticks still closes", () => {
+    expect(shouldClose({ ...base, wasBusy: false, unnarrated: true })).toBe(true)
   })
 
-  test("a short turn: never seen busy, but there is work since the last line", () => {
-    // This is the case that produced nothing. Nine seconds is a typical turn; the tick is ten.
-    expect(shouldClose({ busy: false, wasBusy: false, unnarrated: true })).toBe(true)
+  test("a long turn carries the observed busy across to the idle tick", () => {
+    expect(shouldClose({ ...base, wasBusy: true, unnarrated: false })).toBe(true)
   })
 
-  test("a busy session never closes, however long it has been at it", () => {
-    expect(shouldClose({ busy: true, wasBusy: true, unnarrated: true })).toBe(false)
+  test("the reader who prompts again quickly never hears it", () => {
+    // The whole point of the grace period: inside it, no line — so a reader mid-thought is not interrupted
+    // by a claim that the work finished when they are about to add more.
+    expect(shouldClose({ ...base, idleFor: 3_000 })).toBe(false)
+    expect(shouldClose({ ...base, idleFor: 15_000 })).toBe(true)
   })
 
-  test("idle and quiet all along produces nothing — this is what stops it every 30 seconds", () => {
-    expect(shouldClose({ busy: false, wasBusy: false, unnarrated: false })).toBe(false)
+  test("a prompt already sent and not yet answered is not 'done'", () => {
+    // The newest message is a user message: a follow-up is queued and the turn is unfinished even though
+    // the status says idle.
+    expect(shouldClose({ ...base, answered: false })).toBe(false)
+  })
+
+  test("an unanswered tool call is not 'done' either", () => {
+    // An assistant message with no completed time means a tool is still running.
+    expect(shouldClose({ ...base, answered: false })).toBe(false)
+  })
+
+  test("a busy session never closes", () => {
+    expect(shouldClose({ ...base, busy: true })).toBe(false)
+  })
+
+  test("idle and quiet all along produces nothing", () => {
+    expect(shouldClose({ ...base, wasBusy: false, unnarrated: false })).toBe(false)
   })
 
   test("a blocking decision takes priority and is never reported as finished", () => {
-    // A session waiting on a permission is also technically idle, and "done" would be a lie about it.
-    expect(shouldClose({ busy: false, wasBusy: true, unnarrated: true, blocked: true })).toBe(false)
+    expect(shouldClose({ ...base, blocked: true })).toBe(false)
+  })
+})
+
+describe("closing grace", () => {
+  test("longer than one tick, so a single quiet tick is not treated as finished", () => {
+    expect(CLOSING_GRACE_MS).toBeGreaterThan(10_000)
   })
 })

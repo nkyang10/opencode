@@ -68,6 +68,13 @@ export const DEFAULT_INTERVAL = 10_000
 export const SPECIAL_MIN_GAP_MS = 30_000
 
 /**
+ * "All done" is said only after the session has sat idle this long. Ten seconds is the tick, so one tick of
+ * quiet is not evidence — and a reader who is about to send another prompt should never hear a line claiming
+ * the work finished.
+ */
+export const CLOSING_GRACE_MS = 15_000
+
+/**
  * Used when a client predates the closing phrase on the lease. English rather than silence, because a reader
  * who cannot hear that the work finished gets nothing at all.
  */
@@ -103,6 +110,12 @@ export interface Settings {
   readonly special: boolean
   /** Minimum gap between two special lines, so a flapping session cannot spam them. */
   readonly specialMinGap: number
+  /**
+   * How long the session must sit idle before "all done" is said. This is what makes the line honest about
+   * a reader who is about to type again: they never hear it, because the session is busy before the grace
+   * runs out.
+   */
+  readonly closingGrace: number
 }
 
 /**
@@ -167,6 +180,7 @@ export function settings(commentary: ConfigV1.Info["commentary"]): Settings {
     speech: speech(commentary),
     special: commentary?.special?.enabled ?? true,
     specialMinGap: commentary?.special?.minGap ?? SPECIAL_MIN_GAP_MS,
+    closingGrace: commentary?.special?.closingGrace ?? CLOSING_GRACE_MS,
   }
 }
 
@@ -541,6 +555,8 @@ type State = {
   announcedDecision: Map<SessionID, string>
   /** Whether each session was busy at the previous pass. The closing line fires on busy -> idle. */
   wasBusy: Map<SessionID, boolean>
+  /** When each session was first seen idle, so the closing line can wait out the grace period. */
+  idleSince: Map<SessionID, number>
 }
 
 type Deps = {
@@ -569,6 +585,7 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     lastSpecial: new Map(),
     announcedDecision: new Map(),
     wasBusy: new Map(),
+    idleSince: new Map(),
   }
 
   const current = Effect.map(config.get(), (cfg) => settings(cfg.commentary))
@@ -967,11 +984,28 @@ const decisionSignature = (digest: string) => Bun.hash(digest).toString(16)
     // narrating an empty room every 30 seconds.
     const wasBusy = state.wasBusy.get(sessionID) ?? false
     state.wasBusy.set(sessionID, busy)
-    if (!blocked && busy) return undefined
+    if (!blocked && busy) {
+      state.idleSince.delete(sessionID)
+      return undefined
+    }
     if (!blocked) {
       const history = yield* list({ sessionID, limit: config.narrationHistory })
-      const unnarrated = sliceFrom(yield* sessions.messages({ sessionID }), cursorOf(history)).length > 0
+      const messages = yield* sessions.messages({ sessionID })
+      const unnarrated = sliceFrom(messages, cursorOf(history)).length > 0
       if (!wasBusy && !unnarrated) return undefined
+
+      // "All done" has to mean *done*, not merely idle. A prompt the reader has already sent and the agent has
+      // not answered yet is a follow-up, and a tool call still running is not a finished turn — a session
+      // blocked on either is idle in the status sense but plainly unfinished.
+      const newest = messages.at(-1)
+      const answered = newest !== undefined && newest.info.role === "assistant" && newest.info.time?.completed !== undefined
+      if (!answered) return undefined
+
+      // The grace period is what makes the line honest about a reader who is about to type again. They never
+      // hear it: the session is busy again long before the grace runs out, and the timer is cleared.
+      const idleSince = state.idleSince.get(sessionID) ?? now
+      state.idleSince.set(sessionID, idleSince)
+      if (now - idleSince < config.closingGrace) return undefined
     }
     // A decision that has been announced and is still pending does not clear until it is answered, so the
     // signature is only forgotten when the blocking goes away.
@@ -1065,6 +1099,7 @@ const decisionSignature = (digest: string) => Bun.hash(digest).toString(16)
             state.wasBusy.delete(sessionID)
             state.lastSpecial.delete(sessionID)
             state.announcedDecision.delete(sessionID)
+            state.idleSince.delete(sessionID)
             continue
           }
           // Forked separately: the two calls are independent, and awaiting one before starting the other
