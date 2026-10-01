@@ -7,7 +7,14 @@ export interface IconButtonV2Props
   extends ComponentProps<typeof Kobalte>,
     Pick<ComponentProps<"button">, "class" | "classList"> {
   // temporary
-  icon?: JSX.Element
+  /**
+   * A static element, or a getter for one that changes with state.
+   *
+   * Passing `icon={<Icon name={someSignal() ? "a" : "b"} />}` looks reactive and is not: the element is built
+   * once, when the button is created, so the signal is read a single time and the glyph never changes. A mute
+   * button that does not flip its icon is exactly that bug. The getter form makes it re-evaluate.
+   */
+  icon?: JSX.Element | (() => JSX.Element)
   // icon: IconProps["name"]
   size?: "small" | "normal" | "large"
   // iconSize?: IconProps["size"]
@@ -16,7 +23,7 @@ export interface IconButtonV2Props
 }
 
 export function IconButtonV2(props: ComponentProps<"button"> & IconButtonV2Props) {
-  const [split, rest] = splitProps(props, ["variant", "size", "iconSize", "class", "classList", "state"])
+  const [split, rest] = splitProps(props, ["variant", "size", "iconSize", "class", "classList", "state", "icon"])
   return (
     <Kobalte
       {...rest}
@@ -30,7 +37,7 @@ export function IconButtonV2(props: ComponentProps<"button"> & IconButtonV2Props
         [split.class ?? ""]: !!split.class,
       }}
     >
-      {props.icon}
+      {typeof split.icon === "function" ? split.icon() : split.icon}
       {/*<Icon name={props.icon} size={split.iconSize ?? (split.size === "large" ? "normal" : "small")} />*/}
     </Kobalte>
   )

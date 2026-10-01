@@ -182,7 +182,8 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
           data-action="commentary-audio-enabled"
           aria-label={language.t("settings.general.commentary.row.audioEnabled.title")}
           title={language.t("settings.general.commentary.row.audioEnabled.title")}
-          icon={<Icon name={commentary.audioEnabled() ? "commentary-audio-on" : "commentary-audio-off"} />}
+          // A getter, not a value: an element built here once would read the flag once and never flip.
+          icon={() => <Icon name={commentary.audioEnabled() ? "commentary-audio-on" : "commentary-audio-off"} />}
           onClick={() => commentary.setAudioEnabled(!commentary.audioEnabled())}
         />
         {/* The voice, beside the switch rather than behind it. `groupBy` is the endpoint, because the same
