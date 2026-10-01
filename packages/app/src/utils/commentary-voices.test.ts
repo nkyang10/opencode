@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import {
   optionLabel,
   unavailableHosts,
+  voiceKey,
   voiceOptions,
   type CommentaryVoiceSource,
 } from "./commentary-voices"
@@ -103,5 +104,31 @@ describe("the label", () => {
     const option = { host: "192.168.1.162:8881", voice: "canto-tts-nano-v1", label: "canto-tts-nano-v1", aliases: [] }
     expect(optionLabel(option, 1)).toBe("canto-tts-nano-v1")
     expect(optionLabel(option, 2)).toBe("canto-tts-nano-v1 — 192.168.1.162:8881")
+  })
+})
+
+
+// Kobalte's list keyboard delegate builds `[data-key="${key}"]` with no escaping, so a key containing a
+// newline throws `SyntaxError: … is not a valid selector` the moment the picker is opened. This is the only
+// test that would have caught it, and it failed the feature completely rather than degrading.
+describe("voiceKey survives a CSS attribute selector", () => {
+  const validInQuotedAttribute = (value: string) => !/[\n\r"'\\]/.test(value)
+
+  test("a real endpoint and voice produce a selector Kobalte can use", () => {
+    // A newline anywhere inside the quoted value is what made querySelector throw.
+    expect(voiceKey("192.168.1.162:8880", "zh-HK-HiuMaanNeural")).not.toContain("\n")
+    expect(validInQuotedAttribute(voiceKey("192.168.1.162:8880", "zh-HK-HiuMaanNeural"))).toBe(true)
+  })
+
+  test("every generated key is selector-safe, whatever the endpoint answers", () => {
+    for (const host of ["192.168.1.162:8880", "speech.local:5000", "a:1"])
+      for (const voice of ["zh-HK-HiuMaanNeural", "canto-tts-nano-v1", "en-US-AvaNeural"])
+        expect(validInQuotedAttribute(voiceKey(host, voice))).toBe(true)
+  })
+
+  test("host and voice stay distinguishable, which is the whole point of the key", () => {
+    // DEC-061: the two builds answer to the same alias with different audio, so a key that could conflate
+    // them would render on one endpoint and serve the other's recording.
+    expect(voiceKey("a:1", "b")).not.toBe(voiceKey("a", "1b"))
   })
 })

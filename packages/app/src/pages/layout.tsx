@@ -500,7 +500,7 @@ export default function LegacyLayout(props: ParentProps) {
   function scrollToSession(sessionId: string, sessionKey: string) {
     if (!scrollContainerRef) return
     if (state.scrollSessionKey === sessionKey) return
-    const element = scrollContainerRef.querySelector(`[data-session-id="${sessionId}"]`)
+    const element = scrollContainerRef.querySelector(`[data-session-id="${CSS.escape(sessionId)}"]`)
     if (!element) return
     const containerRect = scrollContainerRef.getBoundingClientRect()
     const elementRect = element.getBoundingClientRect()

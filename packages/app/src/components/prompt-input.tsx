@@ -823,7 +823,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     if (!activeId || !slashPopoverRef) return
 
     requestAnimationFrame(() => {
-      const element = slashPopoverRef.querySelector(`[data-slash-id="${activeId}"]`)
+      const element = slashPopoverRef.querySelector(`[data-slash-id="${CSS.escape(activeId)}"]`)
       element?.scrollIntoView({ block: "nearest", behavior: "smooth" })
     })
   }

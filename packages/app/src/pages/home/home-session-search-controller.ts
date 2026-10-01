@@ -153,7 +153,7 @@ export function createHomeSessionSearchController(home: HomeController, sessions
         const index = records.findIndex((record) => homeSessionSearchKey(record) === active())
         const next = ((index === -1 ? 0 : index) + delta + records.length) % records.length
         setState("highlighted", homeSessionSearchKey(records[next]))
-        list?.querySelector<HTMLElement>(`[data-key="${state.highlighted}"]`)?.scrollIntoView({ block: "nearest" })
+        list?.querySelector<HTMLElement>(`[data-key="${CSS.escape(state.highlighted)}"]`)?.scrollIntoView({ block: "nearest" })
       },
       select,
       selectActive: () => {

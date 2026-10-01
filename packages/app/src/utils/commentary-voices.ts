@@ -55,6 +55,20 @@ export interface VoiceOption {
  * deleted from the config) is still listed, at the top and marked, because a picker that silently jumps to a
  * different voice is a picker that has changed the narration without saying so.
  */
+/**
+ * The DOM identity of one (endpoint, voice) pair.
+ *
+ * A newline was the obvious separator because neither part can contain one — and it is the one character
+ * guaranteed to be invalid inside a quoted CSS attribute value. Kobalte's list keyboard delegate builds
+ * `[data-key="${key}"]` **unescaped** (`@kobalte/core` `list-keyboard-delegate.ts`), so opening the picker
+ * threw `SyntaxError: Failed to execute 'querySelector'… is not a valid selector` and the picker was unusable.
+ * `|` cannot appear in a hostname (RFC 1035), a port, or a voice name, so it separates just as unambiguously
+ * and survives the selector.
+ */
+export function voiceKey(host: string, voice: string) {
+  return `${host}|${voice}`
+}
+
 export function voiceOptions(input: {
   sources: readonly CommentaryVoiceSource[]
   picked?: { host?: string; voice?: string }
@@ -67,7 +81,7 @@ export function voiceOptions(input: {
     if (source.error) continue
     const names = [...source.voices].sort((a, b) => a.name.localeCompare(b.name))
     for (const entry of names) {
-      const key = `${source.host}\n${entry.name}`
+      const key = voiceKey(source.host, entry.name)
       if (seen.has(key)) continue
       seen.add(key)
       options.push({
