@@ -66,6 +66,47 @@ export const CommentaryWatchPayload = Schema.Struct({
    * sends `instructions` still works.
    */
   closing: Schema.optional(Schema.String),
+  /**
+   * The voice the reader picked, and the endpoint that owns it. Both optional, and both absent means "the
+   * configured default" — which is what every client sent before the picker existed.
+   *
+   * They travel as a pair because a voice name is not a fact on its own: two builds of the same service both
+   * answer to `cantonese` with different audio (measured 2026-10-01 on 192.168.1.162), so a voice without its
+   * endpoint would be rendered by whichever host happens to be configured. The service caps the voice and the
+   * endpoint is validated by the same `speechBaseUrl` guard the render uses.
+   */
+  voice: Schema.optional(Schema.String),
+  host: Schema.optional(Schema.String),
+})
+/**
+ * The voice picker: one entry per configured endpoint, each with what that endpoint says it can speak. A
+ * failure is a field rather than an HTTP error, because one speech box being down must not empty the picker
+ * for the other — and the client needs to say *which* one is unavailable.
+ */
+export const CommentaryVoice = Schema.Struct({
+  name: Schema.String,
+  locale: Schema.optional(Schema.String),
+  friendly: Schema.optional(Schema.String),
+  aliases: Schema.Array(Schema.String),
+})
+export const CommentaryVoices = Schema.Struct({
+  host: Schema.String,
+  voices: Schema.Array(CommentaryVoice),
+  error: Schema.optional(Schema.String),
+})
+/**
+ * The whole answer: the pair the config resolves to when nothing has been picked, and one entry per endpoint.
+ * The default is part of the response because the client cannot know it — it is server config, and a picker
+ * that guessed would show a different voice from the one the server is about to use.
+ */
+export const CommentaryVoicesResponse = Schema.Struct({
+  default: Schema.Struct({ host: Schema.String, voice: Schema.String }),
+  sources: Schema.Array(CommentaryVoices),
+})
+export const CommentaryVoicesQuery = Schema.Struct({
+  ...WorkspaceRoutingQueryFields,
+  /** Skip the server-side catalogue cache. The picker sends it when the reader asks to reload. */
+  refresh: Schema.optional(QueryBoolean),
 })
 /**
  * The audio hash arrives in a URL path segment. Constraining it in the schema means a malformed one is a
@@ -114,6 +155,7 @@ export const SessionPaths = {
   commentaryWatch: `${root}/:sessionID/commentary/watch`,
   commentaryUnwatch: `${root}/:sessionID/commentary/unwatch`,
   commentaryAudio: `${root}/:sessionID/commentary/audio/:hash`,
+  commentaryVoices: `${root}/:sessionID/commentary/voices`,
   diff: `${root}/:sessionID/diff`,
   messages: `${root}/:sessionID/message`,
   message: `${root}/:sessionID/message/:messageID`,
@@ -240,6 +282,19 @@ export const SessionApi = HttpApi.make("session")
             summary: "Get a narration line's audio",
             description:
               "Return the pre-rendered speech for a commentary entry, addressed by the content hash carried on that entry.",
+          }),
+        ),
+        HttpApiEndpoint.get("commentaryVoices", SessionPaths.commentaryVoices, {
+          params: { sessionID: SessionID },
+          query: CommentaryVoicesQuery,
+          success: described(CommentaryVoicesResponse, "What each speech endpoint can speak, and the configured default"),
+          error: [ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.commentary.voices",
+            summary: "List the voices offered by the configured speech endpoints",
+            description:
+              "One entry per configured `commentary.speech.hosts` endpoint with the voices that endpoint reports. An endpoint that could not be reached comes back with `error` set and an empty list rather than failing the request.",
           }),
         ),
         HttpApiEndpoint.post("commentaryUnwatch", SessionPaths.commentaryUnwatch, {

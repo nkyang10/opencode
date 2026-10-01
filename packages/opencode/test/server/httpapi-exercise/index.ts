@@ -1374,6 +1374,27 @@ const scenarios: Scenario[] = [
   // (and the hash is content-addressed, so there is no fixture to name). This scenario asserts the refusal
   // instead: it proves the route exists, decodes the path parameter, and 404s on a hash with no file. The
   // hash format itself is pinned in `session/commentary-audio.test.ts`.
+  // s090: the voice picker. A real answer needs a reachable speech service, which a coverage harness must not
+  // depend on — and the design deliberately makes an unreachable endpoint part of the payload rather than an
+  // error, so the route still answers. Asserted on the shape: the configured default pair and a `sources`
+  // array, which is exactly what the client needs to render the picker truthfully.
+  http.protected
+    .get("/session/{sessionID}/commentary/voices", "session.commentary.voices")
+    .seeded((ctx) => ctx.session({ title: "Commentary voices session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/commentary/voices", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body) => {
+      object(body)
+      const catalogue = body as unknown as {
+        default?: { host?: unknown; voice?: unknown }
+        sources?: unknown
+      }
+      check(typeof catalogue.default?.host === "string", "the picker needs the configured default endpoint")
+      check(typeof catalogue.default?.voice === "string", "the picker needs the configured default voice")
+      array(catalogue.sources)
+    }),
   http.protected
     .get("/session/{sessionID}/commentary/audio/{hash}", "session.commentary.audio")
     .seeded((ctx) => ctx.session({ title: "Commentary audio session" }))

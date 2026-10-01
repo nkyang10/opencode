@@ -1,6 +1,15 @@
 import { describe, expect, test } from "bun:test"
-import { CommentaryAudio, DEFAULT_HOST, DEFAULT_MAX_BYTES, DEFAULT_RETENTION, DEFAULT_VOICE, HASH_PATTERN, hashFor } from "@/session/commentary-audio"
-import { settings, speech } from "@/session/commentary"
+import {
+  CommentaryAudio,
+  DEFAULT_HOST,
+  DEFAULT_MAX_BYTES,
+  DEFAULT_RETENTION,
+  DEFAULT_VOICE,
+  HASH_PATTERN,
+  hashFor,
+  parseVoices,
+} from "@/session/commentary-audio"
+import { hostsOf, settings, speech } from "@/session/commentary"
 
 describe("hashFor", () => {
   test("is 32 lowercase hex characters, which is what the route and the column both validate", () => {
@@ -26,6 +35,20 @@ describe("hashFor", () => {
   test("does not collide across the voice boundary", () => {
     // Concatenation without a separator would make ("ab", "c") and ("a", "bc") hash the same string.
     expect(hashFor("a", "bc")).not.toBe(hashFor("ab", "c"))
+  })
+
+  // Measured 2026-10-01 on 192.168.1.162: `:8880` and `:8881` both answer to `cantonese` and return different
+  // audio for the same words (untagged 48 kbps vs 64 kbps with an ID3 tag). Hashing the voice alone would let
+  // one endpoint's recording be served for a line the other endpoint was asked to speak.
+  test("differs for a different endpoint, because two services answer to one voice name", () => {
+    expect(hashFor("cantonese", "same words", "192.168.1.162:8880")).not.toBe(
+      hashFor("cantonese", "same words", "192.168.1.162:8881"),
+    )
+  })
+
+  test("does not collide across the endpoint boundary either", () => {
+    expect(hashFor("a", "bc", "h1")).not.toBe(hashFor("ab", "c", "h1"))
+    expect(hashFor("a", "b", "h1")).not.toBe(hashFor("a", "b", "h1:c"))
   })
 })
 
@@ -65,6 +88,8 @@ describe("speech settings", () => {
       voice: DEFAULT_VOICE,
       retention: DEFAULT_RETENTION,
       maxBytes: DEFAULT_MAX_BYTES,
+      // The picker needs somewhere to look even when nobody configured a second endpoint.
+      hosts: [DEFAULT_HOST],
     })
   })
 
@@ -90,5 +115,85 @@ describe("speech settings", () => {
 
   test("the retention caps can be raised from config", () => {
     expect(speech({ speech: { retention: 5, maxBytes: 1024 } })).toMatchObject({ retention: 5, maxBytes: 1024 })
+  })
+})
+describe("which endpoints the voice picker offers", () => {
+  test("the default host is always offered, because a client that never opened the picker still renders", () => {
+    expect(hostsOf(undefined)).toEqual([DEFAULT_HOST])
+    expect(hostsOf({})).toEqual([DEFAULT_HOST])
+  })
+
+  test("configured hosts follow the default, deduplicated case-insensitively", () => {
+    expect(
+      hostsOf({ host: "10.0.0.9:9000", hosts: ["10.0.0.10:9000", "10.0.0.9:9000", "  ", "10.0.0.9:9000 "] }),
+    ).toEqual(["10.0.0.9:9000", "10.0.0.10:9000"])
+  })
+
+  test("a host listed only in `hosts` is still offered", () => {
+    expect(hostsOf({ hosts: ["192.168.1.162:8881"] })).toEqual([DEFAULT_HOST, "192.168.1.162:8881"])
+  })
+
+  test("blank entries never become an endpoint", () => {
+    expect(hostsOf({ host: "   ", hosts: ["", "  "] })).toEqual([DEFAULT_HOST])
+  })
+})
+
+describe("folding a voice catalogue", () => {
+  // The two builds disagree on shape, and both are in the wild. Reading only one of these loses names.
+  const azure = {
+    data: [
+      { name: "zh-HK-HiuMaanNeural", locale: "zh-HK" },
+      { name: "en-US-AvaNeural", locale: "en-US", friendly_name: "Ava" },
+    ],
+    aliases: { cantonese: "zh-HK-HiuMaanNeural", "en-female": "en-US-AvaNeural" },
+  }
+  const baked = {
+    data: [
+      {
+        name: "canto-tts-nano-v1",
+        locale: "zh-HK",
+        friendly_name: "canto-tts baked default voice",
+        aliases: ["cantonese", "nova", "canto"],
+      },
+    ],
+    aliases: { cantonese: "canto-tts-nano-v1", nova: "canto-tts-nano-v1" },
+  }
+
+  test("reads the flat alias map the Azure-compatible build sends", () => {
+    const voices = parseVoices(azure)
+    expect(voices.map((voice) => voice.name)).toEqual(["zh-HK-HiuMaanNeural", "en-US-AvaNeural"])
+    expect(voices[0]!.aliases).toEqual(["cantonese"])
+    expect(voices[1]!.friendly).toBe("Ava")
+  })
+
+  test("reads the per-entry aliases the newer build sends, and does not duplicate the flat map", () => {
+    const voices = parseVoices(baked)
+    expect(voices).toHaveLength(1)
+    // `cantonese` and `nova` arrive twice — once on the entry, once in the flat map — and appear once.
+    expect(voices[0]!.aliases).toEqual(["canto", "cantonese", "nova"])
+    expect(voices[0]!.friendly).toBe("canto-tts baked default voice")
+  })
+
+  test("an alias that is also a real voice name is dropped, so the picker cannot list a voice twice", () => {
+    const voices = parseVoices({
+      data: [{ name: "cantonese" }, { name: "nova" }],
+      aliases: { cantonese: "nova" },
+    })
+    expect(voices.map((voice) => voice.name)).toEqual(["cantonese", "nova"])
+    expect(voices.find((voice) => voice.name === "nova")!.aliases).toEqual(["cantonese"])
+  })
+
+  test("an alias pointing at a voice the endpoint never listed is ignored, not invented", () => {
+    const voices = parseVoices({ data: [{ name: "a" }], aliases: { ghost: "not-listed" } })
+    expect(voices).toEqual([{ name: "a", aliases: [] }])
+  })
+
+  test("a shape it does not recognise yields nothing rather than throwing", () => {
+    expect(parseVoices(undefined)).toEqual([])
+    expect(parseVoices(null)).toEqual([])
+    expect(parseVoices("nope")).toEqual([])
+    expect(parseVoices({})).toEqual([])
+    expect(parseVoices({ data: "nope" })).toEqual([])
+    expect(parseVoices({ data: [{ locale: "zh-HK" }] })).toEqual([])
   })
 })

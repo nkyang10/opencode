@@ -717,6 +717,8 @@ export const dict = {
   "session.commentary.empty": "Nothing narrated yet",
   "session.commentary.empty.description": "Commentary appears here while the agent works.",
   "session.commentary.waiting": "Watching the agent",
+  "session.commentary.voice.unavailable": "{{host}} は応答していません",
+  "session.commentary.voice.unavailableMany": "{{hosts}} は応答していません",
   "session.tab.context": "コンテキスト",
   "session.tab.unknown": "不明なセッション",
   "session.panel.reviewAndFiles": "レビューとファイル",

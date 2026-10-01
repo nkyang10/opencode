@@ -467,6 +467,10 @@ export default function Page() {
     // The closing phrase follows the web UI's language, so the agent says "工作完成" or "All done." to match
     // what the reader is looking at.
     closing: () => language.t("session.commentary.closing"),
+    // s090: the voice picked in the panel header, and the endpoint that owns it. Read as inputs so choosing a
+    // voice re-takes the lease at once — the next line is spoken in it, with no heartbeat and no restart.
+    voice: () => view().commentaryPanel.voice(),
+    host: () => view().commentaryPanel.host(),
     foregrounded: () => foregrounded(),
     watching: () => !!params.id && commentaryShouldWatch({
       isDesktop: isDesktop(),

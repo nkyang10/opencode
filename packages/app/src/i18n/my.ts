@@ -738,6 +738,8 @@ export const dict = {
   "session.commentary.empty": "Nothing narrated yet",
   "session.commentary.empty.description": "Commentary appears here while the agent works.",
   "session.commentary.waiting": "Watching the agent",
+  "session.commentary.voice.unavailable": "{{host}} is not answering",
+  "session.commentary.voice.unavailableMany": "{{hosts}} are not answering",
   "session.tab.context": "ဆက်စပ်အကြောင်းအရာ",
   "session.tab.unknown": "အမည်မသိ ဆက်ရှင်",
   "session.panel.reviewAndFiles": "ပြန်လည်သုံးသပ်ခြင်းနှင့် ဖိုင်များ",

@@ -2,6 +2,7 @@ import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
 import { OpenCode, type OpenCodeClient } from "@opencode-ai/client/promise"
 import type { ServerConnection } from "@/context/server"
 import type { SessionCommentaryEvent } from "@opencode-ai/schema/session-commentary-event"
+import type { VoiceCatalogue } from "@/utils/commentary-voices"
 import { decode64 } from "@/utils/base64"
 
 export function authTokenFromCredentials(input: { username?: string; password: string }) {
@@ -161,6 +162,39 @@ export async function fetchCommentary(input: {
   return (await response.json()) as SessionCommentaryEvent.Entry[]
 }
 
+/**
+ * s090: what each configured speech endpoint says it can speak, for the voice picker.
+ *
+ * The browser cannot ask the speech box itself — it answers a preflight `OPTIONS` with `405` and no CORS
+ * header, the same reason the audio bytes go through this server. `refresh` skips the server's short cache,
+ * which is what the picker's reload uses after a speech service has been restarted.
+ */
+export async function fetchCommentaryVoices(input: {
+  server: ServerConnection.HttpBase
+  sessionID: string
+  refresh?: boolean
+  fetch?: typeof globalThis.fetch
+}): Promise<VoiceCatalogue> {
+  const query = input.refresh ? "?refresh=true" : ""
+  const response = await (input.fetch ?? globalThis.fetch)(
+    `${input.server.url}/session/${input.sessionID}/commentary/voices${query}`,
+    {
+      headers: input.server.password
+        ? {
+            Authorization: `Basic ${authTokenFromCredentials({
+              username: input.server.username,
+              password: input.server.password,
+            })}`,
+          }
+        : undefined,
+    },
+  )
+  // An unreachable or unauthorised route leaves the picker showing what it has, which is nothing: there is
+  // no voice to offer and no voice to be wrong about.
+  if (!response.ok) return { default: { host: "", voice: "" }, sources: [] }
+  return (await response.json()) as VoiceCatalogue
+}
+
 export async function setCommentaryWatch(input: {
   server: ServerConnection.HttpBase
   sessionID: string
@@ -176,6 +210,14 @@ export async function setCommentaryWatch(input: {
    * The server has no i18n of its own, so this is how the reader's language reaches it.
    */
   closing?: string
+  /**
+   * s090: the voice the reader picked, and the endpoint that owns it. Sent on every heartbeat and omitted
+   * entirely until a voice is chosen, because absent means "whatever the config says" — which is what every
+   * client sent before the picker existed. The two travel together for the same reason they are stored
+   * together: two services can answer to one voice name with different audio.
+   */
+  voice?: string
+  host?: string
   fetch?: typeof globalThis.fetch
 }): Promise<void> {
   const auth = input.server.password
@@ -192,6 +234,8 @@ export async function setCommentaryWatch(input: {
     ? JSON.stringify({
         ...(input.instructions === undefined ? {} : { instructions: input.instructions }),
         ...(input.closing === undefined ? {} : { closing: input.closing }),
+        ...(input.voice === undefined ? {} : { voice: input.voice }),
+        ...(input.host === undefined ? {} : { host: input.host }),
       })
     : undefined
   await (input.fetch ?? globalThis.fetch)(

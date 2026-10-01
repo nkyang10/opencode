@@ -732,6 +732,8 @@ export const dict = {
   "session.commentary.empty": "Nothing narrated yet",
   "session.commentary.empty.description": "Commentary appears here while the agent works.",
   "session.commentary.waiting": "Watching the agent",
+  "session.commentary.voice.unavailable": "{{host}} is not answering",
+  "session.commentary.voice.unavailableMany": "{{hosts}} are not answering",
   "session.tab.context": "Konteksts",
   "session.tab.unknown": "Nezināma sesija",
   "session.panel.reviewAndFiles": "Pārskats un faili",

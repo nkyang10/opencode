@@ -78,6 +78,7 @@ describe("settings", () => {
         voice: CommentaryAudio.DEFAULT_VOICE,
         retention: CommentaryAudio.DEFAULT_RETENTION,
         maxBytes: CommentaryAudio.DEFAULT_MAX_BYTES,
+        hosts: [CommentaryAudio.DEFAULT_HOST],
       },
       // The two special lines are on by default: a panel that just goes quiet reads as a crash.
       special: true,

@@ -2,12 +2,14 @@ import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "so
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Switch } from "@opencode-ai/ui/switch"
+import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
 import type { SessionCommentaryEvent } from "@opencode-ai/schema/session-commentary-event"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { useServer } from "@/context/server"
 import { useSync } from "@/context/sync"
-import { fetchCommentary } from "@/utils/server"
+import { fetchCommentary, fetchCommentaryVoices } from "@/utils/server"
+import { optionLabel, unavailableHosts, voiceOptions, type VoiceCatalogue } from "@/utils/commentary-voices"
 import { getRelativeTime } from "@/utils/time"
 
 /**
@@ -75,6 +77,36 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
 
   const http = createMemo(() => server.current?.http)
 
+  /**
+   * s090: the voice picker, in the title bar next to the on/off switch.
+   *
+   * The list is fetched, never hardcoded: 322 voices and 17 aliases are a translation and maintenance surface
+   * that would rot the moment a service changed, and the services are not even the same build. The fetch goes
+   * through the server because the speech box answers a browser preflight with `405`.
+   *
+   * `unavailable` is kept separately from "no voices" so a service that is restarting reads as a service that
+   * is restarting, rather than as one that has nothing to say.
+   */
+  const [catalogue, setCatalogue] = createSignal<VoiceCatalogue>({ default: { host: "", voice: "" }, sources: [] })
+  const [unavailable, setUnavailable] = createSignal<string[]>([])
+  createEffect(() => {
+    const id = sessionID()
+    const base = http()
+    if (!id || !base) return
+    void fetchCommentaryVoices({ server: base, sessionID: id }).then((next) => {
+      setCatalogue(next)
+      setUnavailable(unavailableHosts(next.sources))
+    })
+  })
+  const picked = createMemo(() => {
+    const host = commentary.host()
+    const voice = commentary.voice()
+    if (host === undefined || voice === undefined) return undefined
+    return { host, voice }
+  })
+  // With nothing picked the server's config decides, so the picker shows *that* rather than looking unset.
+  const choices = createMemo(() => voiceOptions({ sources: catalogue().sources, picked: picked(), fallback: catalogue().default }))
+
   const onScroll = () => {
     const el = scroller
     if (!el) return
@@ -141,6 +173,37 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
         >
           {language.t("settings.general.commentary.row.audioEnabled.title")}
         </Switch>
+        {/* The voice, beside the switch rather than behind it. `groupBy` is the endpoint, because the same
+            name on two services is two different recordings and a flat list of names would hide that. The
+            label is the audio row's own string, so a header control adds no locale work. */}
+        <Show when={choices().options.length > 0}>
+          <div class="min-w-0 max-w-[190px]" data-action="commentary-voice-picker">
+            <SelectV2
+              appearance="inline"
+              options={choices().options}
+              current={choices().selected}
+              value={(option) => `${option.host}\n${option.voice}`}
+              label={(option) => optionLabel(option, catalogue().sources.length)}
+              groupBy={(option) => option.host}
+              aria-label={language.t("settings.general.commentary.row.audioVoice.title")}
+              disabled={!commentary.enabled()}
+              onSelect={(option) => option && commentary.setSpeech({ host: option.host, voice: option.voice })}
+            />
+          </div>
+        </Show>
+        {/* One line, and only when an endpoint could not be asked. A service that is restarting is not the
+            same as a service with nothing to say, and a picker that quietly dropped half its list would look
+            like the second. */}
+        <Show when={unavailable().length > 0}>
+          <div class="text-10-regular text-text-weak truncate" title={unavailable().join(", ")}>
+            {(() => {
+              const hosts = unavailable()
+              return hosts.length === 1
+                ? language.t("session.commentary.voice.unavailable", { host: hosts[0] ?? "" })
+                : language.t("session.commentary.voice.unavailableMany", { hosts: hosts.join(", ") })
+            })()}
+          </div>
+        </Show>
       </div>
 
       <Show

@@ -318,11 +318,28 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
 
     const commentaryWatch = Effect.fn("SessionHttpApi.commentaryWatch")(function* (ctx: {
       params: { sessionID: SessionID }
-      payload: { instructions?: string; closing?: string }
+      payload: { instructions?: string; closing?: string; voice?: string; host?: string }
     }) {
       yield* requireSession(ctx.params.sessionID)
-      yield* commentary.watch(ctx.params.sessionID, ctx.payload.instructions, ctx.payload.closing)
+      yield* commentary.watch(ctx.params.sessionID, {
+        instructions: ctx.payload.instructions,
+        closing: ctx.payload.closing,
+        voice: ctx.payload.voice,
+        host: ctx.payload.host,
+      })
       return true
+    })
+
+    // FU-122/s090. The picker cannot ask the speech box itself: the service answers a browser preflight with
+    // `405` and no CORS header, which is the same reason the audio bytes go through this server. So the server
+    // asks, per configured endpoint, and reports a failure as data — one box restarting must not empty the
+    // list for the other.
+    const commentaryVoices = Effect.fn("SessionHttpApi.commentaryVoices")(function* (ctx: {
+      params: { sessionID: SessionID }
+      query: { refresh?: boolean }
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      return yield* commentary.voices({ refresh: ctx.query.refresh })
     })
 
     // FU-122. The bytes were synthesized when the line was written and are addressed by content hash, so
@@ -484,6 +501,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("commentaryList", commentaryList)
       .handle("commentaryWatch", commentaryWatch)
       .handle("commentaryUnwatch", commentaryUnwatch)
+      .handle("commentaryVoices", commentaryVoices)
       .handle("commentaryAudio", commentaryAudio)
       .handle("prompt", prompt)
       .handle("promptAsync", promptAsync)

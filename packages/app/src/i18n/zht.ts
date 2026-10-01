@@ -775,6 +775,8 @@ export const dict = {
   "session.commentary.empty": "Nothing narrated yet",
   "session.commentary.empty.description": "Commentary appears here while the agent works.",
   "session.commentary.waiting": "Watching the agent",
+  "session.commentary.voice.unavailable": "{{host}} 沒有回應",
+  "session.commentary.voice.unavailableMany": "{{hosts}} 都沒有回應",
   "session.tab.context": "上下文",
   "session.tab.unknown": "未知的工作階段",
   "session.panel.reviewAndFiles": "檢閱與檔案",

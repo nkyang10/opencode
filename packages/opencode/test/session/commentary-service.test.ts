@@ -15,6 +15,7 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { Provider } from "@/provider/provider"
 import { LLM } from "@/session/llm"
+import { CommentaryAudio } from "@/session/commentary-audio"
 import { CALL_TIMEOUT_MS, SessionCommentary, settings } from "@/session/commentary"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import { Session as SessionNs } from "@/session/session"
@@ -490,4 +491,111 @@ it.instance("a slow session does not block a concurrent fast session", () =>
       yield* Fiber.await(slowFiber).pipe(Effect.timeout("5 seconds"))
     }).pipe(Effect.provide(env(layer)))
   }),
+)
+
+/**
+ * The audio render is deliberately forked out of the critical path, so a test that asserts on it has to wait
+ * for the fork rather than assume it ran. Polling with a deadline keeps that honest without a fixed sleep that
+ * would be either flaky or slow.
+ */
+function untilSeen<T>(read: () => readonly T[], count: number) {
+  return Effect.gen(function* () {
+    const deadline = Date.now() + 3000
+    while (read().length < count && Date.now() < deadline) {
+      yield* Effect.sleep(20)
+    }
+    return read()
+  }).pipe(Effect.timeout("5 seconds"))
+}
+
+it.instance(
+  "a line is rendered with the voice and endpoint the reader picked, and with the config's when they did not",
+  () => {
+    const seen: LLM.StreamInput[] = []
+    const rendered: Array<{ text: string; voice?: string; host?: string }> = []
+    const audioLayer = Layer.mock(CommentaryAudio.Service, {
+      render: (input) =>
+        Effect.sync(() => {
+          rendered.push({ text: input.text, voice: input.voice, host: input.host })
+          return CommentaryAudio.hashFor(input.voice ?? "", input.text, input.host)
+        }),
+      sweep: () => Effect.succeed(0),
+      release: () => Effect.void,
+    })
+    return Effect.gen(function* () {
+      const sessionID = yield* seed()
+      const commentary = yield* SessionCommentary.Service
+
+      // No pick on the lease: the config decides, which is what every client sent before the picker existed.
+      yield* commentary.watch(sessionID)
+      yield* commentary.tick(sessionID)
+      // A pick: the reader's endpoint wins, because a voice name means nothing without the service that owns
+      // it — `:8880` and `:8881` both answer to `cantonese` with different audio.
+      yield* commentary.watch(sessionID, { voice: "canto-tts-nano-v1", host: "192.168.1.162:8881" })
+      yield* turn(sessionID, "and the closing state")
+      yield* commentary.tick(sessionID)
+
+      const done = yield* untilSeen(() => rendered, 2)
+      // The first line has no pick on its lease, so the *config's* voice is used verbatim — not the shipped
+      // default, which is the whole point of the fallback.
+      expect(done.map((row) => row.voice)).toEqual(["from-config", "canto-tts-nano-v1"])
+      expect(done.map((row) => row.host)).toEqual(["10.0.0.9:9000", "192.168.1.162:8881"])
+      expect(seen).toHaveLength(2)
+    }).pipe(
+      Effect.provide(
+        AppNodeBuilder.build(commentaryNode, [
+          [Provider.node, provider.layer],
+          [Agent.node, agentLayer],
+          [LLM.node, llmLayer(['{"speak": true, "text": "First line."}', '{"speak": true, "text": "Second line."}'], seen)],
+          [CommentaryAudio.node, audioLayer],
+          [RuntimeFlags.node, RuntimeFlags.layer({ experimentalEventSystem: true })],
+        ]),
+      ),
+    )
+  },
+  { config: () => ({ commentary: { ...commentaryConfig, speech: { host: "10.0.0.9:9000", voice: "from-config" } } }) },
+)
+
+it.instance(
+  "the picker is asked about every configured endpoint, and a refresh reaches the service",
+  () => {
+    const asked: Array<{ hosts: readonly string[]; refresh?: boolean }> = []
+    const audioLayer = Layer.mock(CommentaryAudio.Service, {
+      voices: (input) =>
+        Effect.sync(() => {
+          asked.push({ hosts: input.hosts, refresh: input.refresh })
+          return input.hosts.map((host) => ({ host, voices: [{ name: "cantonese", aliases: [] }] }))
+        }),
+    })
+    return Effect.gen(function* () {
+      const commentary = yield* SessionCommentary.Service
+      const catalogue = yield* commentary.voices({})
+      // The first host is the configured default, so a client that has never opened the picker still has one.
+      expect(catalogue.sources.map((source) => source.host)).toEqual(["10.0.0.9:9000", "10.0.0.10:9001"])
+      expect(catalogue.sources.every((source) => source.voices.length === 1)).toBe(true)
+      // The default is reported rather than left for the client to guess: it is server config, and a picker
+      // that guessed would show a different voice from the one about to be used.
+      expect(catalogue.default).toEqual({ host: "10.0.0.9:9000", voice: "from-config" })
+
+      yield* commentary.voices({ refresh: true })
+      expect(asked[1]!.refresh).toBe(true)
+    }).pipe(
+      Effect.provide(
+        AppNodeBuilder.build(commentaryNode, [
+          [Provider.node, provider.layer],
+          [Agent.node, agentLayer],
+          [LLM.node, llmLayer([], [])],
+          [CommentaryAudio.node, audioLayer],
+          [RuntimeFlags.node, RuntimeFlags.layer({ experimentalEventSystem: true })],
+        ]),
+      ),
+    )
+  },
+  {
+    config: () => ({
+      commentary: {
+        speech: { host: "10.0.0.9:9000", hosts: ["10.0.0.9:9000", "10.0.0.10:9001"], voice: "from-config" },
+      },
+    }),
+  },
 )

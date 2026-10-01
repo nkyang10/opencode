@@ -66,6 +66,12 @@ export function createCommentaryWatch(input: {
    * UI language changes what the agent says when it finishes without a restart.
    */
   closing: Accessor<string>
+  /**
+   * s090: the voice the reader picked and the endpoint that owns it. Both undefined until a voice is chosen,
+   * in which case the server's config decides — which is what every client sent before the picker existed.
+   */
+  voice: Accessor<string | undefined>
+  host: Accessor<string | undefined>
 }) {
   let heartbeat: number | undefined
   let held = false
@@ -74,7 +80,15 @@ export function createCommentaryWatch(input: {
     const id = input.sessionID()
     const base = input.http()
     if (!id || !base) return
-    void setCommentaryWatch({ server: base, sessionID: id, watching, instructions, closing: input.closing() })
+    void setCommentaryWatch({
+      server: base,
+      sessionID: id,
+      watching,
+      instructions,
+      closing: input.closing(),
+      voice: input.voice(),
+      host: input.host(),
+    })
   }
 
   createEffect(() => {
@@ -86,6 +100,11 @@ export function createCommentaryWatch(input: {
     const instructions = input.instructions()
     // Read here as well so a language change re-takes the lease with the new phrase.
     input.closing()
+    // And the voice, so picking one in the panel header takes effect on the very next line rather than at the
+    // next heartbeat. This is the whole of "active immediately": the lease is the only channel the server
+    // reads a preference from, so re-taking it is the update. Read as bare statements purely to depend on them.
+    input.voice()
+    input.host()
 
     // Hand the lease back rather than waiting for the TTL. Without this the heartbeat from the previous
     // run kept refreshing a lease nobody was watching, so closing the panel or switching commentary off

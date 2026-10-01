@@ -43,6 +43,18 @@ export const Commentary = Schema.Struct({
       host: Schema.optional(Schema.String).annotate({
         description: "host:port of the text-to-speech service. Defaults to 192.168.1.162:8880",
       }),
+      /**
+       * Every speech endpoint whose voices are offered in the client's voice picker, `host` first.
+       *
+       * Two builds of the same service can be listening side by side and answer the *same* voice name with
+       * different audio, so a voice is only meaningful together with the endpoint that owns it. The client
+       * therefore picks a `(host, voice)` pair and the lease carries both. `host` stays the default for a
+       * client that has never opened the picker, which is why this is additive rather than a replacement.
+       */
+      hosts: Schema.optional(Schema.Array(Schema.String)).annotate({
+        description:
+          "Additional text-to-speech endpoints whose voices the picker offers, e.g. ['192.168.1.162:8880', '192.168.1.162:8881']. Defaults to host alone",
+      }),
       voice: Schema.optional(Schema.String).annotate({
         description: "Voice name or alias passed to the speech service. Defaults to cantonese",
       }),

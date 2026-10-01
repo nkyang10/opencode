@@ -298,6 +298,12 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           // FU-122: audio is opt-in and off by default — it is intrusive, and browsers gate playback until
           // the user has interacted with the page, which the settings toggle conveniently provides.
           audioEnabled: false,
+          // s090: the reader's voice pick, as a (host, voice) pair. Deliberately NOT defaulted: an absent
+          // pair means "whatever the server config says", which is exactly what every client sent before the
+          // picker existed. Writing a default here would duplicate the server's default in a second file and
+          // let the two disagree.
+          host: undefined as string | undefined,
+          voice: undefined as string | undefined,
         },
         fileTree: {
           opened: false,
@@ -617,6 +623,12 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
     const commentaryInstructions = createMemo(() => store.commentary?.instructions ?? "")
     const commentaryAudioEnabled = createMemo(() => store.commentary?.audioEnabled ?? false)
     const setCommentaryEnabled = (enabled: boolean) => setStore("commentary", "enabled", enabled)
+    /**
+     * The picked voice and the endpoint that owns it, as one setter: they are one fact and a voice without its
+     * endpoint cannot be rendered correctly, so they must never be settable apart.
+     */
+    const setCommentarySpeech = (input: { host: string; voice: string }) =>
+      setStore("commentary", { host: input.host, voice: input.voice })
     const setCommentaryAudioEnabled = (audioEnabled: boolean) => setStore("commentary", "audioEnabled", audioEnabled)
     const setCommentaryInstructions = (instructions: string) =>
       setStore("commentary", "instructions", instructions)
@@ -779,6 +791,10 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         enabled: commentaryEnabled,
         instructions: commentaryInstructions,
         audioEnabled: commentaryAudioEnabled,
+        // s090: undefined until the reader picks, which the panel shows as the server's own default.
+        host: createMemo(() => store.commentary?.host),
+        voice: createMemo(() => store.commentary?.voice),
+        setSpeech: setCommentarySpeech,
         setAudioEnabled: setCommentaryAudioEnabled,
         setEnabled: setCommentaryEnabled,
         setInstructions: setCommentaryInstructions,
@@ -967,6 +983,10 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
              */
             enabled: commentaryEnabled,
             instructions: commentaryInstructions,
+            // s090: the voice pick, exposed here as well so the lease (which lives in the session view) reads
+            // the same pair the panel's picker writes.
+            host: createMemo(() => store.commentary?.host),
+            voice: createMemo(() => store.commentary?.voice),
             setEnabled: setCommentaryEnabled,
             setInstructions: setCommentaryInstructions,
             open() {

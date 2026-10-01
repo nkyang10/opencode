@@ -486,6 +486,8 @@ export const dict = {
   "session.commentary.empty": "Nothing narrated yet",
   "session.commentary.empty.description": "Commentary appears here while the agent works.",
   "session.commentary.waiting": "Watching the agent",
+  "session.commentary.voice.unavailable": "{{host}} is not answering",
+  "session.commentary.voice.unavailableMany": "{{hosts}} are not answering",
   "session.tab.context": "컨텍스트",
   "session.panel.reviewAndFiles": "검토 및 파일",
   "session.review.filesChanged": "{{count}}개 파일 변경됨",

@@ -115,6 +115,32 @@ export interface SpeechSettings {
   readonly voice: string
   readonly retention: number
   readonly maxBytes: number
+  /** Every endpoint the voice picker offers, `host` first. See `hostsOf`. */
+  readonly hosts: readonly string[]
+}
+
+/**
+ * The endpoints whose voices are offered, in a stable order: the default `host` first, then the configured
+ * `hosts`, deduplicated case-insensitively.
+ *
+ * Two builds of one service answer the same voice name with different audio (measured: 48 kbps untagged on
+ * :8880, 64 kbps + ID3 on :8881 for `cantonese`), so a voice is only meaningful with the endpoint that owns
+ * it and the pair is what travels on the lease. `host` is kept in the list deliberately — a client that has
+ * never opened the picker must still be able to render, and it has nothing but the default.
+ */
+export function hostsOf(speech: { readonly host?: string; readonly hosts?: readonly string[] } | undefined) {
+  const first = speech?.host?.trim() || CommentaryAudio.DEFAULT_HOST
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const candidate of [first, ...(speech?.hosts ?? [])]) {
+    const trimmed = candidate.trim()
+    if (!trimmed) continue
+    const key = trimmed.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(trimmed)
+  }
+  return out
 }
 
 export function speech(commentary: ConfigV1.Info["commentary"]): SpeechSettings {
@@ -124,7 +150,7 @@ export function speech(commentary: ConfigV1.Info["commentary"]): SpeechSettings 
     voice: spec?.voice?.trim() || CommentaryAudio.DEFAULT_VOICE,
     retention: spec?.retention ?? CommentaryAudio.DEFAULT_RETENTION,
     maxBytes: spec?.maxBytes ?? CommentaryAudio.DEFAULT_MAX_BYTES,
-  }
+    hosts: hostsOf(commentary?.speech),  }
 }
 
 export function settings(commentary: ConfigV1.Info["commentary"]): Settings {
@@ -176,6 +202,21 @@ export function normalizeInstructions(value: string | undefined) {
   const cleaned = trimmed.replace(/<\/narrator-preferences\s*>/gi, "").trim()
   if (!cleaned) return undefined
   return cleaned.length <= MAX_INSTRUCTIONS_CHARS ? cleaned : cleaned.slice(0, MAX_INSTRUCTIONS_CHARS).trimEnd()
+}
+
+/**
+ * The reader's voice choice, capped like every other string that arrives on a route.
+ *
+ * It goes into a JSON request body rather than a path, so the interesting limit is size, not shape: a voice
+ * name is an identifier, and 120 characters is far past any real one. The endpoint is the string
+ * `speechBaseUrl` already guards at render time — re-validating it here would duplicate the SSRF rule in a
+ * second place, which is how the two drift apart.
+ */
+export const MAX_VOICE_CHARS = 120
+export function normalizeVoice(value: string | undefined) {
+  const trimmed = (value ?? "").trim()
+  if (!trimmed) return undefined
+  return trimmed.length <= MAX_VOICE_CHARS ? trimmed : trimmed.slice(0, MAX_VOICE_CHARS).trimEnd()
 }
 
 function errorText(error: { readonly name: string; readonly data: unknown }) {
@@ -425,7 +466,7 @@ export function syntheticUser(session: Session.Info, now: number) {
 }
 
 export interface Interface {
-  readonly watch: (sessionID: SessionID, instructions?: string, closing?: string) => Effect.Effect<void>
+  readonly watch: (sessionID: SessionID, preferences?: WatchPreferences) => Effect.Effect<void>
   readonly unwatch: (sessionID: SessionID) => Effect.Effect<void>
   readonly list: (input: { sessionID: SessionID; limit?: number }) => Effect.Effect<Entry[]>
   readonly tick: (sessionID: SessionID) => Effect.Effect<Entry | undefined>
@@ -433,6 +474,25 @@ export interface Interface {
   readonly special: (sessionID: SessionID) => Effect.Effect<Entry | undefined>
   /** Repair rows whose stored audio no longer exists, and unlink files nothing references. Returns what it fixed. */
   readonly reconcileAudio: () => Effect.Effect<number>
+  /**
+   * What each configured endpoint can speak, for the client's voice picker, plus the pair the config resolves
+   * to when the reader has picked nothing. The default travels with the list because the client cannot know
+   * it: it is config, and a picker that guessed would disagree with the server the moment the config changed.
+   */
+  readonly voices: (input: { refresh?: boolean }) => Effect.Effect<VoiceCatalogue>
+}
+
+export interface VoiceCatalogue {
+  readonly default: { readonly host: string; readonly voice: string }
+  readonly sources: ReadonlyArray<CommentaryAudio.VoiceSource>
+}
+
+/** The per-device preferences that ride the lease rather than living in a shared config. */
+export interface WatchPreferences {
+  readonly instructions?: string
+  readonly closing?: string
+  readonly voice?: string
+  readonly host?: string
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionCommentary") {}
@@ -447,6 +507,17 @@ type Lease = {
   readonly instructions?: string
   /** The reader's own language for the fixed closing line, resolved by the client. */
   readonly closing?: string
+  /**
+   * The voice the reader picked, and the endpoint that owns it. Absent means "whatever the config says",
+   * which is what a client that has never opened the picker sends — the pair is optional so the feature
+   * behaves exactly as it did before the picker existed.
+   *
+   * The two travel together because a voice name is not a fact on its own: two builds of the same service
+   * both answer to `cantonese` with different audio, so a voice sent without its endpoint would be rendered
+   * by whichever host happens to be configured and silently be the wrong recording.
+   */
+  readonly voice?: string
+  readonly host?: string
 }
 
 type State = {
@@ -504,13 +575,22 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
    * Synthesize one line's audio, record the hash on the row, publish the line again, and sweep what nothing
    * points at any more.
    *
+   * The voice and endpoint are the **lease's**, falling back to the config: the reader picked them in this
+   * browser, and a line must be rendered by the endpoint whose voice the reader is about to hear named after.
+   *
    * The sweep runs on the global hash set rather than per session: the files are content-addressed and shared
    * between sessions, so "the oldest 100 for this session" and "every hash a surviving row still references"
    * are the same question only if you ask it across all of them.
    */
-  const renderAudio = Effect.fn("SessionCommentary.renderAudio")(function* (sessionID: SessionID, entry: Entry) {
+  const renderAudio = Effect.fn("SessionCommentary.renderAudio")(function* (
+    sessionID: SessionID,
+    entry: Entry,
+    picked?: Pick<Lease, "voice" | "host">,
+  ) {
     const cfg = yield* current
-    const hash = yield* audio.render({ text: entry.text, voice: cfg.speech.voice, host: cfg.speech.host })
+    const voice = picked?.voice ?? cfg.speech.voice
+    const host = picked?.host ?? cfg.speech.host
+    const hash = yield* audio.render({ text: entry.text, voice, host })
     if (!hash) return
 
     // `render` holds the new file in its in-flight guard. It must stay guarded until AFTER the sweep so a
@@ -639,6 +719,8 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     anchor: MessageID
     /** Absent for ordinary narration; set for the two special lines so the panel can mark them. */
     kind?: "closing" | "prompt"
+    /** Whose voice this line is spoken in, when the lease carries a choice. */
+    picked?: Pick<Lease, "voice" | "host">
   }) {
     const newest = yield* db
       .select({ seq: SessionCommentaryTable.seq })
@@ -687,7 +769,7 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     // The audio is rendered *after* the line is published, in its own fiber, and the line is published a second
     // time when the file exists. On the critical path a 30-second speech timeout would delay the text the user
     // is trying to read, which is the one thing the commentary is for.
-    yield* renderAudio(input.sessionID, entry).pipe(
+    yield* renderAudio(input.sessionID, entry, input.picked).pipe(
       Effect.catchCause((cause) =>
         Effect.logWarning("commentary audio render failed", { sessionID: input.sessionID, cause }),
       ),
@@ -700,21 +782,32 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
   // memory because session drains are process-local, so there is nothing to persist and nothing to clean up.
   // The instructions are re-sent on every heartbeat, so editing the preference in settings takes effect on
   // the next tick without a restart.
-  const watch = Effect.fn("SessionCommentary.watch")(function* (
-    sessionID: SessionID,
-    instructions?: string,
-    closing?: string,
-  ) {
+  const watch = Effect.fn("SessionCommentary.watch")(function* (sessionID: SessionID, preferences?: WatchPreferences) {
     state.leases.set(sessionID, {
       expires: (yield* Clock.currentTimeMillis) + LEASE_TTL_MS,
-      instructions: normalizeInstructions(instructions),
-      closing: normalizeClosing(closing),
+      instructions: normalizeInstructions(preferences?.instructions),
+      closing: normalizeClosing(preferences?.closing),
+      voice: normalizeVoice(preferences?.voice),
+      host: preferences?.host?.trim() || undefined,
     })
   })
 
   const unwatch = Effect.fn("SessionCommentary.unwatch")(function* (sessionID: SessionID) {
     state.leases.delete(sessionID)
   })
+
+  /**
+   * The picker is per *server*, not per session, but it is asked through a session route because that is where
+   * the panel already is and the lease guarantees somebody is watching. The endpoint list is the config's, so
+   * adding one is a config edit and needs no restart of the client.
+   */
+  const voices = (input: { refresh?: boolean }) =>
+    Effect.flatMap(current, (cfg) =>
+      Effect.map(
+        audio.voices({ hosts: cfg.speech.hosts, refresh: input.refresh }),
+        (sources) => ({ default: { host: cfg.speech.host, voice: cfg.speech.voice }, sources }),
+      ),
+    )
 
   const tick = Effect.fn("SessionCommentary.tick")(function* (sessionID: SessionID) {
     const config = yield* current
@@ -781,7 +874,7 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     if (!text) return undefined
     const parsed = parse(text)
     if (!parsed.speak) return undefined
-    return yield* append({ sessionID, text: parsed.text, anchor })
+    return yield* append({ sessionID, text: parsed.text, anchor, picked: lease })
   }, Effect.catchCause(() => Effect.succeed(undefined)))
 
   /**
@@ -880,7 +973,7 @@ const decisionSignature = (digest: string) => Bun.hash(digest).toString(16)
       const messages = yield* sessions.messages({ sessionID })
       const anchor = messages.at(-1)?.info.id
       if (!anchor) return undefined
-      return yield* append({ sessionID, text, anchor, kind })
+      return yield* append({ sessionID, text, anchor, kind, picked: lease })
     }
 
     const messages = yield* sessions.messages({ sessionID })
@@ -928,7 +1021,7 @@ const decisionSignature = (digest: string) => Bun.hash(digest).toString(16)
     if (!text) return undefined
     const parsed = parse(text)
     if (!parsed.speak) return undefined
-    return yield* append({ sessionID, text: parsed.text, anchor, kind })
+    return yield* append({ sessionID, text: parsed.text, anchor, kind, picked: lease })
   }, Effect.catchCause(() => Effect.succeed(undefined)))
 
   // The 10s loop: the only timer in the engine, so every per-session failure is swallowed and the lease is
@@ -969,7 +1062,7 @@ const decisionSignature = (digest: string) => Bun.hash(digest).toString(16)
     Effect.forkScoped,
   )
 
-  return Service.of({ watch, unwatch, list, tick, special, reconcileAudio })
+  return Service.of({ watch, unwatch, list, tick, special, reconcileAudio, voices })
 })
 
 const layer = Layer.effect(
@@ -1005,13 +1098,13 @@ const layer = Layer.effect(
       }),
     )
     return Service.of({
-      watch: (sessionID, instructions, closing) =>
-        InstanceState.useEffect(state, (svc) => svc.watch(sessionID, instructions, closing)),
+      watch: (sessionID, preferences) => InstanceState.useEffect(state, (svc) => svc.watch(sessionID, preferences)),
       unwatch: (sessionID) => InstanceState.useEffect(state, (svc) => svc.unwatch(sessionID)),
       list: (input) => InstanceState.useEffect(state, (svc) => svc.list(input)),
       tick: (sessionID) => InstanceState.useEffect(state, (svc) => svc.tick(sessionID)),
       special: (sessionID) => InstanceState.useEffect(state, (svc) => svc.special(sessionID)),
       reconcileAudio: () => InstanceState.useEffect(state, (svc) => svc.reconcileAudio()),
+      voices: (input) => InstanceState.useEffect(state, (svc) => svc.voices(input)),
     })
   }),
 )
