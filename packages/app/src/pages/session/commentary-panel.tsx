@@ -162,12 +162,14 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
             control you reach for while reading, and clicking it is also the user gesture that satisfies the
             browser's autoplay policy — a toggle nobody can see next to the lines is worth less. The label is
             the settings row's own string (visually hidden) so no locale gains a second English-only key.
-            Disabled while narration itself is off, which is the same rule the row it replaced had. */}
+
+            Narration itself has its own switch in Settings. This one is *not* disabled when that is off: they
+            are independent preferences, and greying this one because an unrelated switch is off makes the pair
+            look broken and implies a link that does not exist. */}
         <Switch
           hideLabel
           data-action="commentary-audio-enabled"
           checked={commentary.audioEnabled()}
-          disabled={!commentary.enabled()}
           title={language.t("settings.general.commentary.row.audioEnabled.title")}
           onChange={(checked) => commentary.setAudioEnabled(checked)}
         >
@@ -197,7 +199,6 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
               ]}
               groupBy={(option) => option.host}
               aria-label={language.t("settings.general.commentary.row.audioVoice.title")}
-              disabled={!commentary.enabled()}
               onSelect={(option) => option && commentary.setSpeech({ host: option.host, voice: option.voice })}
             />
           </div>

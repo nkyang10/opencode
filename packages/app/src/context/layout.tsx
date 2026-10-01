@@ -293,7 +293,11 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         commentary: {
           panelOpened: false,
           width: DEFAULT_COMMENTARY_PANEL_WIDTH,
-          enabled: true,
+          // Narration is opt-in and off by default. It is not free: a watched session runs a model call every
+          // ten seconds, and a reader who never asked for it should not be paying for that or reading it. The
+          // toggle and the panel column stay available either way, so turning it on is one click rather than a
+          // trip to Settings.
+          enabled: false,
           instructions: "",
           // FU-122: audio is opt-in and off by default — it is intrusive, and browsers gate playback until
           // the user has interacted with the page, which the settings toggle conveniently provides.
@@ -619,7 +623,9 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
      * panel it controls can never disagree. `store.commentary` is read through `?.` because a store
      * persisted before FE-029 has no `enabled` or `instructions` key, and absent means the defaults.
      */
-    const commentaryEnabled = createMemo(() => store.commentary?.enabled ?? true)
+    // Absent means off, matching the store's own default. The two had drifted once already: the store said
+    // one thing and this fallback the other, so which one a fresh browser got depended on which was consulted.
+    const commentaryEnabled = createMemo(() => store.commentary?.enabled ?? false)
     const commentaryInstructions = createMemo(() => store.commentary?.instructions ?? "")
     const commentaryAudioEnabled = createMemo(() => store.commentary?.audioEnabled ?? false)
     const setCommentaryEnabled = (enabled: boolean) => setStore("commentary", "enabled", enabled)
