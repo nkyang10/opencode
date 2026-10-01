@@ -954,11 +954,25 @@ const decisionSignature = (digest: string) => Bun.hash(digest).toString(16)
     const now = yield* Clock.currentTimeMillis
     const busy = (yield* status.get(sessionID)).type !== "idle"
 
-    // `closing` needs the busy -> idle transition, otherwise a session that was never busy produces a
-    // closing line about work that never happened.
+    // `closing` means "the agent has stopped after doing something". Observing the busy -> idle transition is
+    // one way to know that, but it is not reliable and was not sufficient: a turn that finishes inside one
+    // tick interval is never seen busy at all, so a nine-second turn produced **no closing line** — which is
+    // most turns, and exactly the ones a reader most wants told about. So the trigger is also unnarrated
+    // activity, and the two together cover both shapes:
+    //
+    // - a long turn: the tick saw it busy, and `wasBusy` carries that across to the idle tick;
+    // - a short turn: the tick only ever saw it idle, but there is work since the last line;
+    //
+    // and neither fires for a session that has been idle and quiet all along, which is what stops this
+    // narrating an empty room every 30 seconds.
     const wasBusy = state.wasBusy.get(sessionID) ?? false
     state.wasBusy.set(sessionID, busy)
-    if (!blocked && (busy || !wasBusy)) return undefined
+    if (!blocked && busy) return undefined
+    if (!blocked) {
+      const history = yield* list({ sessionID, limit: config.narrationHistory })
+      const unnarrated = sliceFrom(yield* sessions.messages({ sessionID }), cursorOf(history)).length > 0
+      if (!wasBusy && !unnarrated) return undefined
+    }
     // A decision that has been announced and is still pending does not clear until it is answered, so the
     // signature is only forgotten when the blocking goes away.
     if (decision === undefined) state.announcedDecision.delete(sessionID)

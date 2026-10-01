@@ -466,3 +466,34 @@ describe("retention (FU-121)", () => {
     expect(narration(history).length).toBe(50)
   })
 })
+
+// The closing line's trigger is a pure predicate so it can be pinned. A turn that finishes inside one tick
+// interval is never observed busy, and requiring that observation meant a nine-second turn produced no
+// closing line at all — most turns, and the ones a reader most wants to hear about.
+describe("closing-line trigger", () => {
+  /** The rule, as the service applies it. */
+  const shouldClose = (input: { busy: boolean; wasBusy: boolean; unnarrated: boolean; blocked?: boolean }) =>
+    !input.blocked && !input.busy && (input.wasBusy || input.unnarrated)
+
+  test("a long turn: the tick saw it busy, so the idle tick closes it", () => {
+    expect(shouldClose({ busy: false, wasBusy: true, unnarrated: false })).toBe(true)
+  })
+
+  test("a short turn: never seen busy, but there is work since the last line", () => {
+    // This is the case that produced nothing. Nine seconds is a typical turn; the tick is ten.
+    expect(shouldClose({ busy: false, wasBusy: false, unnarrated: true })).toBe(true)
+  })
+
+  test("a busy session never closes, however long it has been at it", () => {
+    expect(shouldClose({ busy: true, wasBusy: true, unnarrated: true })).toBe(false)
+  })
+
+  test("idle and quiet all along produces nothing — this is what stops it every 30 seconds", () => {
+    expect(shouldClose({ busy: false, wasBusy: false, unnarrated: false })).toBe(false)
+  })
+
+  test("a blocking decision takes priority and is never reported as finished", () => {
+    // A session waiting on a permission is also technically idle, and "done" would be a lie about it.
+    expect(shouldClose({ busy: false, wasBusy: true, unnarrated: true, blocked: true })).toBe(false)
+  })
+})
