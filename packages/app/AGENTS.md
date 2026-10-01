@@ -18,6 +18,31 @@
 
 - Always prefer `createStore` over multiple `createSignal` calls
 
+### A JSX prop that reads state does not react — pass a getter
+
+`icon={<Icon name={flag() ? "on" : "off"} />}` looks reactive and is not. The element
+is built once, when the parent renders, so **anything read inside it is frozen** —
+the button works and its glyph never moves. The same applies to any prop typed
+`JSX.Element` whose value is meant to vary with state.
+
+- If a component's prop allows it, pass a **getter**: `icon={() => <Icon … />}`.
+  `IconButtonV2` accepts `JSX.Element | (() => JSX.Element)` for exactly this.
+- Verify by reading the DOM after a real click, not by reading the code.
+
+### Icons are a sprite, not inline paths
+
+`Icon` renders `<svg><use href="#opencode-icon-NAME"></use></svg>` and injects the
+sprite at mount. So:
+
+- **`querySelectorAll("svg path")` finds nothing** — every icon has zero inline
+  paths, which reads as "the icon did not render" and is not true.
+- Assert on the `<use>` `href`, or on `data-component="icon"`.
+- The sprite is **not in the served HTML**, so `curl` finds no `<symbol>`; you need
+  a real browser.
+- A glyph that differs from its sibling only by a small mark is unreadable at 20px.
+  If two states must be told apart, change the whole silhouette, and give the
+  control a pressed state as well.
+
 ## Localization
 
 - NEVER hardcode user-visible English strings in production code. ALWAYS use an i18n key for visible copy, placeholders, accessible labels, tooltips, menus, dialogs, toasts, empty states, and displayed errors.
