@@ -44,6 +44,12 @@ export interface VoiceOption {
   readonly alias?: string
   /** Every name this endpoint accepts for it, so the picker can show the ones worth knowing. */
   readonly aliases: readonly string[]
+  /**
+   * The service's own human description — "Microsoft HiuMaan Online (Natural) - Chinese (Hong Kong SAR)".
+   * `zh-HK-HiuMaanNeural` tells a reader nothing; this tells them what they will actually hear, and it is
+   * also what makes the filter box worth having.
+   */
+  readonly description?: string
 }
 
 /**
@@ -88,6 +94,7 @@ export function voiceOptions(input: {
         host: source.host,
         voice: entry.name,
         label: entry.name,
+        description: entry.friendly,
         aliases: entry.aliases,
       })
     }
@@ -113,8 +120,16 @@ export function voiceOptions(input: {
 }
 
 /** The label to show: the name, plus the endpoint as soon as there is more than one to tell apart. */
+/**
+ * What the reader sees for one voice.
+ *
+ * The service's own description leads, because `zh-HK-HiuMaanNeural` tells a reader nothing about what they
+ * will hear while "Chinese (Hong Kong SAR)" is exactly the answer. The technical name stays attached: it is
+ * what the filter matches, and it is what someone pasting a voice into a config file needs.
+ */
 export function optionLabel(option: VoiceOption, hosts: number) {
-  return hosts > 1 ? `${option.label} — ${option.host}` : option.label
+  const name = option.description ? `${option.description} · ${option.label}` : option.label
+  return hosts > 1 ? `${name} — ${option.host}` : name
 }
 
 /** Which endpoints could not be asked, for the one line the picker shows instead of pretending they are empty. */

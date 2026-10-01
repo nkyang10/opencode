@@ -771,6 +771,7 @@ export const dict = {
   "session.commentary.title": "Commentary",
   "session.commentary.kind.closing": "完成",
   "session.commentary.closing": "工作完成",
+  "session.commentary.voiceFilter.placeholder": "搜尋語音…",
   "session.commentary.kind.prompt": "需要你決定",
   "session.commentary.empty": "Nothing narrated yet",
   "session.commentary.empty.description": "Commentary appears here while the agent works.",

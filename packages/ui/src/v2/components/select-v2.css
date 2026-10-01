@@ -295,3 +295,19 @@
   svg {
   visibility: hidden;
 }
+
+/* Type-to-filter field for `SelectV2 filterable`. Sits above the list, inside the same popover surface. */
+.select-v2-filter {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-strong-base);
+  font-size: 12px;
+  line-height: 20px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-weak-base);
+}
+.select-v2-filter::placeholder {
+  color: var(--text-weak-base);
+}

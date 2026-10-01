@@ -185,7 +185,16 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
               // `voiceKey`, not a local template: this is the string Kobalte puts in a
               // `[data-key="…"]` selector unescaped, and a newline in it throws.
               value={(option) => voiceKey(option.host, option.voice)}
+              // The human description first: "Chinese (Hong Kong SAR)" is findable and meaningful, while
+              // `zh-HK-HiuMaanNeural` is neither. The technical name is still shown underneath so it can be
+              // copied, and the filter matches both.
               label={(option) => optionLabel(option, catalogue().sources.length)}
+              filterable
+              filterPlaceholder={language.t("session.commentary.voiceFilter.placeholder")}
+              filterTerms={(option) => [
+                ...(option.description ? [option.description] : []),
+                ...option.aliases,
+              ]}
               groupBy={(option) => option.host}
               aria-label={language.t("settings.general.commentary.row.audioVoice.title")}
               disabled={!commentary.enabled()}
