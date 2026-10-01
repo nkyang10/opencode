@@ -156,10 +156,21 @@ export class CommentaryAudio {
     }
   }
 
+  /**
+   * Hand the element back, and do it in this order.
+   *
+   * Clearing `src` on an element that still has an `onerror` handler makes the browser fire
+   * `MEDIA_ELEMENT_ERROR: Empty src attribute`. So a clip that played perfectly to its end was followed by an
+   * error, and the reader was told the speech had failed — three times in three clips, all false. The handlers
+   * come off first so there is nothing left to be told.
+   */
   private release() {
     this.playing = false
     if (this.audio) {
-      this.audio.src = ""
+      this.audio.onended = null
+      this.audio.onerror = null
+      this.audio.removeAttribute("src")
+      this.audio.load()
       this.audio = undefined
     }
   }
@@ -293,7 +304,10 @@ export class CommentaryAudio {
       // promise has already settled and nothing else will ever report a problem — which is exactly how a
       // Content Security Policy block turned into a completely silent feature.
       let watchdog: ReturnType<typeof setTimeout> | undefined
+      let finished = false
       const done = () => {
+        if (finished) return
+        finished = true
         if (watchdog) clearTimeout(watchdog)
         this.lastEndedAt = this.now()
         this.release()
@@ -307,6 +321,8 @@ export class CommentaryAudio {
         done()
       }
       element.onerror = () => {
+        // A clip that already reached `ended` is not a failure, whatever the element says afterwards.
+        if (finished) return
         const code = element.error?.code
         const meaning =
           code === 3

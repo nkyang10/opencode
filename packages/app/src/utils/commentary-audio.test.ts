@@ -12,7 +12,7 @@ class FakeAudio {
   readyState = 4
   networkState = 1
   duration = 0
-  error: { code: number } | null = null
+  error: { code: number; message?: string } | null = null
   private listeners = new Map<string, Set<() => void>>()
   addEventListener(type: string, fn: () => void) {
     const set = this.listeners.get(type) ?? new Set<() => void>()
@@ -22,7 +22,10 @@ class FakeAudio {
   removeEventListener(type: string, fn: () => void) {
     this.listeners.get(type)?.delete(fn)
   }
-  /** Simulate the media actually loading. */
+  removeAttribute(name: string) {
+    if (name === "src") this.src = ""
+  }
+  /** Simulate the media actually loading, and the no-op `load()` the teardown calls. */
   load() {
     for (const fn of this.listeners.get("loadedmetadata") ?? []) fn()
     for (const fn of this.listeners.get("canplay") ?? []) fn()
@@ -48,6 +51,11 @@ class FakeAudio {
   }
   rejectPlayback() {
     this.result = "reject"
+  }
+  /** Simulate the browser raising a media error. */
+  fail(code: number, message: string) {
+    this.error = { code, message }
+    this.onerror?.()
   }
   constructor() {
     FakeAudio.instances.push(this)
@@ -106,6 +114,36 @@ describe("CommentaryAudio queue", () => {
     await settle()
     expect(FakeAudio.instances).toHaveLength(1)
     expect(FakeAudio.instances[0]!.src).toContain("blob:")
+  })
+
+  // Regression: `release()` used to clear `src` while `onerror` was still attached, so the browser fired
+  // MEDIA_ELEMENT_ERROR: Empty src attribute and the reader was told a clip that had played to its end had
+  // failed. The handlers now come off first, and an error after `ended` is ignored outright.
+  test("a clip that plays to the end reports no failure when the element is torn down", async () => {
+    const onError = mock((_message: string) => {})
+    const { audio } = setup({ onError, gapMs: 0 })
+    audio.enqueue(clip(1))
+    await settleChain()
+    FakeAudio.instances[0]!.finish()
+    await settle()
+    // Tearing down must detach the handlers: an error raised afterwards has nowhere to go.
+    FakeAudio.instances[0]!.fail(4, "MEDIA_ELEMENT_ERROR: Empty src attribute")
+    await settle()
+    expect(onError).not.toHaveBeenCalled()
+  })
+
+  test("an error after ended is ignored even if the handler is somehow still attached", async () => {
+    const onError = mock((_message: string) => {})
+    const { audio } = setup({ onError, gapMs: 0 })
+    audio.enqueue(clip(1))
+    await settleChain()
+    const element = FakeAudio.instances[0]!
+    element.finish()
+    await settle()
+    // Re-arm by hand, simulating a late event from a browser that queued one.
+    element.onerror?.()
+    await settle()
+    expect(onError).not.toHaveBeenCalled()
   })
 
   test("never speaks the same line twice", async () => {
