@@ -59,10 +59,13 @@ export const Commentary = Schema.Struct({
         description: "Voice name or alias passed to the speech service. Defaults to cantonese",
       }),
       retention: Schema.optional(PositiveInt).annotate({
-        description: "Stored audio files to keep per session. Defaults to 100",
+        // Was documented as 100 after the default moved to 15 to match the panel. A description that lies is
+        // worse than one that is missing: it is what an editor offers as autocomplete.
+        description:
+          "Stored audio files to keep per session, matched to the number of entries the panel shows. Defaults to 15",
       }),
       maxBytes: Schema.optional(PositiveInt).annotate({
-        description: "Total bytes of stored narration to keep across all sessions. Defaults to 536870912",
+        description: "Total bytes of stored narration to keep across all sessions. Defaults to 536870912 (512 MB)",
       }),
     }),
   ).annotate({ description: "Where and how the commentary narration is spoken" }),
