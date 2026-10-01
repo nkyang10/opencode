@@ -1,8 +1,10 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { Icon } from "@opencode-ai/ui/icon"
+import { Switch } from "@opencode-ai/ui/switch"
 import type { SessionCommentaryEvent } from "@opencode-ai/schema/session-commentary-event"
 import { useLanguage } from "@/context/language"
+import { useLayout } from "@/context/layout"
 import { useServer } from "@/context/server"
 import { useSync } from "@/context/sync"
 import { fetchCommentary } from "@/utils/server"
@@ -30,6 +32,9 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
   const language = useLanguage()
   const server = useServer()
   const sync = useSync()
+  // The spoken-narration toggle, moved here from Settings (FU-122). It reads the same store the audio player
+  // reads, so there is still one switch rather than two that can disagree.
+  const commentary = useLayout().commentary
   let scroller: HTMLDivElement | undefined
   let atBottom = true
 
@@ -40,8 +45,8 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
 
   const sessionID = createMemo(() => props.sessionID)
   // The list is append-only, so an all-day session would otherwise put every line ever written into the DOM
-  // at once. Only the newest RENDERED entries are drawn — the server keeps a longer history, and the count in
-  // the header still reflects everything held, so a truncated scroll never looks like data loss.
+  // at once. Only the newest RENDERED entries are drawn — the server keeps a longer history, and the scroll is
+  // never silently short: the newest line is always the one at the bottom.
   const entries = createMemo(() => {
     const id = sessionID()
     if (!id) return []
@@ -56,11 +61,6 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
       })
       .sort((a, b) => a.seq - b.seq)
     return merged.length > RENDERED_ENTRIES ? merged.slice(-RENDERED_ENTRIES) : merged
-  })
-  const total = createMemo(() => {
-    const id = sessionID()
-    if (!id) return 0
-    return Math.max(initial().length, sync().data.commentary[id]?.length ?? 0)
   })
   const working = createMemo(() => (sessionID() ? sync().data.session_working(sessionID()!) : false))
 
@@ -126,9 +126,21 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
       <div class="h-9 shrink-0 flex items-center gap-2 px-3 border-b border-border-weaker-base">
         <Icon size="small" name="commentary" class="text-icon-weak" />
         <div class="text-12-medium text-text-strong">{language.t("session.commentary.title")}</div>
-        <Show when={total() > 0}>
-          <div class="text-12-regular text-text-weak">{total()}</div>
-        </Show>
+        {/* FU-122. The spoken toggle sits beside the title rather than in Settings: it is the one commentary
+            control you reach for while reading, and clicking it is also the user gesture that satisfies the
+            browser's autoplay policy — a toggle nobody can see next to the lines is worth less. The label is
+            the settings row's own string (visually hidden) so no locale gains a second English-only key.
+            Disabled while narration itself is off, which is the same rule the row it replaced had. */}
+        <Switch
+          hideLabel
+          data-action="commentary-audio-enabled"
+          checked={commentary.audioEnabled()}
+          disabled={!commentary.enabled()}
+          title={language.t("settings.general.commentary.row.audioEnabled.title")}
+          onChange={(checked) => commentary.setAudioEnabled(checked)}
+        >
+          {language.t("settings.general.commentary.row.audioEnabled.title")}
+        </Switch>
       </div>
 
       <Show

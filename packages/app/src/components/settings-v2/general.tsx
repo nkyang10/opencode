@@ -308,23 +308,10 @@ const CommentarySection: Component = () => {
           </div>
         </SettingsRowV2>
 
-        {/* FU-122: spoken commentary. Off by default — it is intrusive, and the toggle doubles as the user
-            gesture that satisfies the browser's autoplay policy. Host and voice are free text rather than a
-            picker: the service resolves aliases (`cantonese`) and full names alike, and a stale 300-item
-            dropdown would be worse than a 400 the service explains itself. */}
-        <SettingsRowV2
-          title={language.t("settings.general.commentary.row.audioEnabled.title")}
-          description={language.t("settings.general.commentary.row.audioEnabled.description")}
-        >
-          <div data-action="settings-commentary-audio-enabled">
-            <Switch
-              checked={commentary().audioEnabled()}
-              disabled={!commentary().enabled()}
-              onChange={(checked) => commentary().setAudioEnabled(checked)}
-            />
-          </div>
-        </SettingsRowV2>
-
+        {/* FU-122: spoken commentary. The on/off switch is NOT here — it moved to the commentary panel's own
+            title bar (`commentary-panel.tsx`), beside the lines it narrates, where it is one click from being
+            read and doubles as the user gesture the browser's autoplay policy wants. Host and voice are server
+            config (`commentary.speech`), free text on the config file, so neither has a row either. */}
       </SettingsListV2>
     </div>
   )
