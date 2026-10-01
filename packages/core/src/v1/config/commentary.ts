@@ -54,5 +54,17 @@ export const Commentary = Schema.Struct({
       }),
     }),
   ).annotate({ description: "Where and how the commentary narration is spoken" }),
+  // The two lines that are not narration: one when the agent stops, one when it is blocked on a decision.
+  // Both are worth a model call because the alternative is a panel that simply stops, which reads as a crash.
+  special: Schema.optional(
+    Schema.Struct({
+      enabled: Schema.optional(Schema.Boolean).annotate({
+        description: "Produce a closing line when the agent stops and a prompt line when it needs a decision. Defaults to true",
+      }),
+      minGap: Schema.optional(PositiveInt).annotate({
+        description: "Minimum milliseconds between two special lines. Defaults to 30000",
+      }),
+    }),
+  ).annotate({ description: "The non-narration commentary lines" }),
 }).annotate({ identifier: "CommentaryConfig" })
 export type Commentary = Schema.Schema.Type<typeof Commentary>

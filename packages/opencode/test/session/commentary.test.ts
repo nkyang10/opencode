@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { CommentaryAudio } from "../../src/session/commentary-audio"
+import { SPECIAL_MIN_GAP_MS } from "../../src/session/commentary"
 import { MessageID, SessionID } from "../../src/session/schema"
 import {
   DEFAULT_INTERVAL,
@@ -76,6 +77,9 @@ describe("settings", () => {
         retention: CommentaryAudio.DEFAULT_RETENTION,
         maxBytes: CommentaryAudio.DEFAULT_MAX_BYTES,
       },
+      // The two special lines are on by default: a panel that just goes quiet reads as a crash.
+      special: true,
+      specialMinGap: SPECIAL_MIN_GAP_MS,
     })
     expect(settings({})).toEqual(settings(undefined))
   })

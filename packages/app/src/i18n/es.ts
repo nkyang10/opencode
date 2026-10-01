@@ -771,6 +771,8 @@ export const dict = {
   "session.tab.session": "Sesión",
   "session.tab.review": "Revisión",
   "session.commentary.title": "Commentary",
+  "session.commentary.kind.closing": "Done",
+  "session.commentary.kind.prompt": "Needs you",
   "session.commentary.empty": "Nothing narrated yet",
   "session.commentary.empty.description": "Commentary appears here while the agent works.",
   "session.commentary.waiting": "Watching the agent",

@@ -144,7 +144,11 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
         >
           <For each={entries()}>
             {(entry) => (
-              <div data-slot="session-commentary-entry" class="flex flex-col gap-0.5">
+              <div
+                data-slot="session-commentary-entry"
+                data-kind={entry.kind ?? "narration"}
+                class="flex flex-col gap-0.5"
+              >
                 <div class="text-10-regular text-text-weak">
                   {(() => {
                     // Read the ticker so this row re-renders on the minute, and nothing else about it changes.
@@ -152,6 +156,15 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
                     return getRelativeTime(new Date(entry.time).toISOString(), language.t)
                   })()}
                 </div>
+                {entry.kind && (
+                  // The two non-narration lines are told apart because one of them is a request to the reader,
+                  // not a statement about the work — "Done" and "Needs you" should not look alike.
+                  <div class="text-10-medium text-text-strong bg-surface-raised-base w-fit px-1.5 py-0.5 rounded">
+                    {entry.kind === "closing"
+                      ? language.t("session.commentary.kind.closing")
+                      : language.t("session.commentary.kind.prompt")}
+                  </div>
+                )}
                 <div class="text-12-regular text-text-strong">{entry.text}</div>
               </div>
             )}

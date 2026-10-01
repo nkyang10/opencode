@@ -17,7 +17,9 @@ import { InstanceState } from "@/effect/instance-state"
 import { CommentaryAudio } from "@/session/commentary-audio"
 import { LLM } from "@/session/llm"
 import { MessageID, SessionID } from "@/session/schema"
+import { Permission } from "@/permission"
 import { Provider } from "@/provider/provider"
+import { Question } from "@/question"
 import { Session } from "@/session/session"
 import { SessionStatus } from "@/session/status"
 
@@ -59,6 +61,12 @@ export const LEASE_TTL_MS = 45_000
 export const CALL_TIMEOUT_MS = 120_000
 
 export const DEFAULT_INTERVAL = 10_000
+/**
+ * The two special lines are not part of the 10s narration cadence, so they get their own floor. A session
+ * that alternates busy/idle would otherwise emit a closing line every few seconds.
+ */
+export const SPECIAL_MIN_GAP_MS = 30_000
+
 export const DEFAULT_MAX_ENTRIES_PER_TURN = 20
 export const DEFAULT_MIN_ACTIVITY_CHARS = 120
 export const DEFAULT_NARRATION_HISTORY = 100
@@ -81,6 +89,14 @@ export interface Settings {
   readonly narrationHistory: number
   readonly minGap: number
   readonly speech: SpeechSettings
+  /**
+   * Whether the two special lines are produced at all. `closing` fires once when the agent stops, `prompt`
+   * once when it is blocked on a decision, and both are worth a model call because the alternative is a
+   * silent panel that just stops — which reads as a crash rather than as the end of a turn.
+   */
+  readonly special: boolean
+  /** Minimum gap between two special lines, so a flapping session cannot spam them. */
+  readonly specialMinGap: number
 }
 
 /**
@@ -115,6 +131,8 @@ export function settings(commentary: ConfigV1.Info["commentary"]): Settings {
     narrationHistory: commentary?.narrationHistory ?? DEFAULT_NARRATION_HISTORY,
     minGap: commentary?.minGap ?? MIN_GAP_MS,
     speech: speech(commentary),
+    special: commentary?.special?.enabled ?? true,
+    specialMinGap: commentary?.special?.minGap ?? SPECIAL_MIN_GAP_MS,
   }
 }
 
@@ -297,6 +315,40 @@ export function looksLikeContract(value: string) {
   return start !== -1 && /"speak"\s*:/.test(value.slice(start))
 }
 
+
+/**
+ * The closing line. The agent has stopped and the panel would otherwise just go quiet, which reads as a
+ * crash rather than as the end of a turn — so this says what it finished and what it left.
+ */
+export const CLOSING_INSTRUCTIONS = `The agent has finished its work and is now idle.
+
+Write ONE closing line for the reader: what was accomplished, and anything they now need to do.
+
+Reply with one JSON object and nothing else: {"speak": true, "text": "…"} or {"speak": false}.
+
+- At most 30 words, past tense, plain.
+- Name the real outcome: the files changed, the command that ran, the value it produced.
+- If something is left undone, incomplete, or failed, say so plainly. Never present a partial result as finished.
+- If nothing of substance was accomplished, reply {"speak": false}. Silence is correct.
+- Use the same language as the user's messages.`
+
+/**
+ * The decision line. The agent is blocked, and the alternative is a panel that looks stuck. This has to do the
+ * job the blocking UI cannot do from a single line: say what is being asked, and name the choices.
+ */
+export const DECISION_INSTRUCTIONS = `The agent has stopped and is waiting for the reader to decide.
+
+Write ONE line that tells the reader what it is being asked to decide and what the options are.
+
+Reply with one JSON object and nothing else: {"speak": true, "text": "…"} or {"speak": false}.
+
+- At most 40 words. This is spoken aloud, so it must stand on its own with no screen.
+- Say what is being decided and why it matters, in one clause.
+- Then list the options by their own names, separated by " | ". Use the exact labels.
+- For a permission, include the tool and the pattern being matched, then the choices: once, always, reject.
+- Never answer for the reader and never recommend one over another.
+- Use the same language as the user's messages.`
+
 export const INSTRUCTIONS = `Write the next line of the narration for the <new-activity> above.
 
 Reply with one JSON object and nothing else: {"speak": true, "text": "…"} or {"speak": false}.
@@ -360,6 +412,10 @@ export interface Interface {
   readonly unwatch: (sessionID: SessionID) => Effect.Effect<void>
   readonly list: (input: { sessionID: SessionID; limit?: number }) => Effect.Effect<Entry[]>
   readonly tick: (sessionID: SessionID) => Effect.Effect<Entry | undefined>
+  /** The two non-narration lines: one when the agent stops, one when it is blocked on a decision. */
+  readonly special: (sessionID: SessionID) => Effect.Effect<Entry | undefined>
+  /** Repair rows whose stored audio no longer exists, and unlink files nothing references. Returns what it fixed. */
+  readonly reconcileAudio: () => Effect.Effect<number>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionCommentary") {}
@@ -374,6 +430,16 @@ type Lease = { readonly expires: number; readonly instructions?: string }
 type State = {
   leases: Map<SessionID, Lease>
   inFlight: Set<SessionID>
+  /**
+   * The special lines keep their own guard. They share `inFlight` with the narration, and a narration call is
+   * measured at 43-99s — so one shared guard meant a closing line could never fire while the commentator was
+   * thinking, which is exactly when it is most wanted.
+   */
+  specialInFlight: Set<SessionID>
+  /** When each session last got a special line, so `specialMinGap` can be enforced per session. */
+  lastSpecial: Map<SessionID, number>
+  /** Whether each session was busy at the previous pass. The closing line fires on busy -> idle. */
+  wasBusy: Map<SessionID, boolean>
 }
 
 type Deps = {
@@ -386,14 +452,22 @@ type Deps = {
   readonly models: Provider.Interface
   readonly llm: LLM.Interface
   readonly audio: CommentaryAudio.Interface
+  readonly questions: Question.Interface
+  readonly permissions: Permission.Interface
   /** The instance scope: the audio render is forked into it so it dies with the instance. */
   readonly scope: Scope.Scope
 }
 
 const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
-  const { db, events, sessions, config, status, agents, models, llm, audio } = deps
+  const { db, events, sessions, config, status, agents, models, llm, audio, questions, permissions } = deps
 
-  const state: State = { leases: new Map(), inFlight: new Set() }
+  const state: State = {
+    leases: new Map(),
+    inFlight: new Set(),
+    specialInFlight: new Set(),
+    lastSpecial: new Map(),
+    wasBusy: new Map(),
+  }
 
   const current = Effect.map(config.get(), (cfg) => settings(cfg.commentary))
 
@@ -458,6 +532,55 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     }).pipe(Effect.ensuring(audio.release(hash)))
   })
 
+  /**
+   * Clear the `audio` hash on any row whose file is gone, and unlink anything on disk nothing points at.
+   *
+   * The database and the file store are two separate things and nothing else keeps them honest: a sweep
+   * deletes files, a restore copies a database without its directory, and a hand `rm -rf` does both at once.
+   * The only visible symptom otherwise is a 404 turning into a toast much later, when a reader asks to hear a
+   * line they cannot see is missing. Running once per instance is cheap — one query plus one stat per hash.
+   */
+  const reconcileAudio = Effect.fn("SessionCommentary.reconcileAudio")(function* () {
+    const rows = yield* db
+      .select({
+        session_id: SessionCommentaryTable.session_id,
+        seq: SessionCommentaryTable.seq,
+        audio: SessionCommentaryTable.audio,
+      })
+      .from(SessionCommentaryTable)
+      .where(sql`${SessionCommentaryTable.audio} IS NOT NULL`)
+      .all()
+      .pipe(Effect.orDie)
+    if (rows.length === 0) return 0
+
+    const dangling: Array<typeof rows[number]> = []
+    const referenced = new Set<string>()
+    for (const row of rows) {
+      const hash = row.audio
+      if (!hash) continue
+      if (yield* audio.exists(hash)) referenced.add(hash)
+      else dangling.push(row)
+    }
+
+    for (const row of dangling) {
+      yield* db
+        .update(SessionCommentaryTable)
+        .set({ audio: null })
+        .where(and(eq(SessionCommentaryTable.session_id, row.session_id), eq(SessionCommentaryTable.seq, row.seq)))
+        .run()
+        .pipe(Effect.orDie)
+    }
+    const swept = yield* audio.sweep(referenced)
+    if (dangling.length || swept) {
+      yield* Effect.log("commentary audio reconciled", {
+        rows: rows.length,
+        cleared: dangling.length,
+        filesRemoved: swept,
+      })
+    }
+    return dangling.length + swept
+  })
+
   const list = Effect.fn("SessionCommentary.list")(function* (input: { sessionID: SessionID; limit?: number }) {
     const rows = yield* db
       .select()
@@ -470,7 +593,14 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     return rows
       // `audio` is nullable on purpose: a line the server could not speak has none, and the client shows the
       // text regardless rather than waiting for audio that will never arrive.
-      .map((row) => ({ seq: row.seq, time: row.time, text: row.text, anchor: row.anchor, audio: row.audio ?? undefined }))
+      .map((row) => ({
+        seq: row.seq,
+        time: row.time,
+        text: row.text,
+        anchor: row.anchor,
+        kind: row.kind ?? undefined,
+        audio: row.audio ?? undefined,
+      }))
       .reverse()
   })
 
@@ -478,6 +608,8 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     sessionID: SessionID
     text: string
     anchor: MessageID
+    /** Absent for ordinary narration; set for the two special lines so the panel can mark them. */
+    kind?: "closing" | "prompt"
   }) {
     const newest = yield* db
       .select({ seq: SessionCommentaryTable.seq })
@@ -492,6 +624,7 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
       time: yield* Clock.currentTimeMillis,
       text: input.text,
       anchor: input.anchor,
+      ...(input.kind ? { kind: input.kind } : {}),
     }
     yield* db
       .insert(SessionCommentaryTable)
@@ -502,6 +635,7 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
           time: entry.time,
           text: entry.text,
           anchor: input.anchor,
+          kind: input.kind ?? null,
         },
       ])
       .run()
@@ -616,6 +750,127 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     return yield* append({ sessionID, text: parsed.text, anchor })
   }, Effect.catchCause(() => Effect.succeed(undefined)))
 
+  /** What the agent is blocked on, rendered for the model. Empty when nothing is pending. */
+  const pendingDigest = Effect.fn("SessionCommentary.pendingDigest")(function* (sessionID: SessionID) {
+    // Typed against the schema rather than the service's own re-export: `Question.Request`'s alias there is
+    // `typeof Request.Type`, which resolves to nothing useful, so anything inferred through it is an `any`.
+    const pendingQuestions = (yield* questions.list()) as ReadonlyArray<{
+      sessionID: SessionID
+      questions: ReadonlyArray<{ question: string; header?: string; options?: ReadonlyArray<{ label: string; description: string }>; custom?: boolean }>
+    }>
+    const pendingPermissions = (yield* permissions.list()) as ReadonlyArray<{
+      sessionID: SessionID
+      permission: string
+      patterns: ReadonlyArray<string>
+      metadata: Record<string, unknown>
+    }>
+    // Named `blocked*`, not `questions`/`permissions`: those names are the services, and shadowing them here
+    // made `permissions.list()` a call on an array.
+    const blockedQuestions = pendingQuestions.filter((item) => item.sessionID === sessionID)
+    const blockedPermissions = pendingPermissions.filter((item) => item.sessionID === sessionID)
+    if (blockedQuestions.length === 0 && blockedPermissions.length === 0) return undefined
+
+    const parts: string[] = []
+    for (const request of blockedQuestions) {
+      for (const info of request.questions) {
+        parts.push(`question: ${info.question}`)
+        const options = (info.options ?? []) as ReadonlyArray<{ label: string; description: string }>
+        parts.push(`options: ${options.map((option) => `${option.label} (${option.description})`).join(" | ")}`)
+        if (info.custom) parts.push("the reader may also type their own answer")
+      }
+    }
+    for (const request of blockedPermissions) {
+      // `metadata` carries what the tool is trying to do; the patterns are what would be allowed.
+      const detail = Object.entries(request.metadata)
+        .filter(([, value]) => typeof value === "string" && value.length > 0 && value.length < 400)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(", ")
+      parts.push(`permission: the agent wants to use ${request.permission}`)
+      if (request.patterns.length > 0) parts.push(`matching: ${request.patterns.join(" | ")}`)
+      if (detail) parts.push(`detail: ${detail}`)
+      parts.push(`options: ${["once", "always", "reject"].join(" | ")}`)
+    }
+    return parts.join("\n")
+  })
+
+  /**
+   * The two lines that are not narration.
+   *
+   * The decision line wins over the closing one: a session blocked on a permission is *also* technically idle,
+   * and "done" would be a lie about what happened. Ordering matters more than either prompt.
+   */
+  const special = Effect.fn("SessionCommentary.special")(function* (sessionID: SessionID) {
+    const config = yield* current
+    if (!config.special) return undefined
+    const lease = state.leases.get(sessionID)
+    if (!lease || lease.expires <= (yield* Clock.currentTimeMillis)) return undefined
+    if (state.specialInFlight.has(sessionID)) return undefined
+    const last = state.lastSpecial.get(sessionID)
+    if (last !== undefined && (yield* Clock.currentTimeMillis) - last < config.specialMinGap) return undefined
+
+    const session = yield* sessions.get(sessionID)
+    if (!session.model) return undefined
+    const blocked = yield* pendingDigest(sessionID)
+    const now = yield* Clock.currentTimeMillis
+    const busy = (yield* status.get(sessionID)).type !== "idle"
+
+    // `closing` needs the busy -> idle transition, otherwise a session that was never busy produces a
+    // closing line about work that never happened.
+    const wasBusy = state.wasBusy.get(sessionID) ?? false
+    state.wasBusy.set(sessionID, busy)
+    if (!blocked && (busy || !wasBusy)) return undefined
+
+    const kind: "prompt" | "closing" = blocked ? "prompt" : "closing"
+    const messages = yield* sessions.messages({ sessionID })
+    const anchor = messages.at(-1)?.info.id
+    if (!anchor) return undefined
+
+    const agent = yield* agents.get("commentary")
+    if (!agent) return undefined
+    state.lastSpecial.set(sessionID, now)
+    state.specialInFlight.add(sessionID)
+
+    const system = kind === "prompt" ? DECISION_INSTRUCTIONS : CLOSING_INSTRUCTIONS
+    const body = blocked
+      ? `The agent is waiting for a decision.\n\n${blocked}`
+      : `The agent has finished. The recent work was:\n\n${digest(sliceFrom(messages, messages.at(-6)?.info.id)).join("\n") || "(no recent tool activity)"}`
+
+    const text = yield* llm
+      .stream({
+        agent,
+        user: syntheticUser(session, now),
+        sessionID,
+        model:
+          config.model === "small"
+            ? ((yield* models.getSmallModel(session.model.providerID)) ??
+              (yield* models.getModel(session.model.providerID, session.model.id)))
+            : yield* models.getModel(session.model.providerID, session.model.id),
+        small: config.model === "small",
+        system: [],
+        tools: {},
+        retries: 1,
+        messages: [{ role: "user", content: `${system}\n\n${body}` }],
+      })
+      .pipe(
+        Stream.filter(LLMEvent.is.textDelta),
+        Stream.map((event) => event.text),
+        Stream.mkString,
+        Effect.timeout(CALL_TIMEOUT_MS),
+        Effect.catchCause((cause) =>
+          Effect.logWarning("SessionCommentary: special line did not complete", { sessionID, kind }).pipe(
+            Effect.andThen(Effect.logDebug(Cause.pretty(cause))),
+            Effect.andThen(Effect.succeed("")),
+          ),
+        ),
+        Effect.ensuring(Effect.sync(() => state.specialInFlight.delete(sessionID))),
+      )
+
+    if (!text) return undefined
+    const parsed = parse(text)
+    if (!parsed.speak) return undefined
+    return yield* append({ sessionID, text: parsed.text, anchor, kind })
+  }, Effect.catchCause(() => Effect.succeed(undefined)))
+
   // The 10s loop: the only timer in the engine, so every per-session failure is swallowed and the lease is
   // a deadline rather than a count (two clients on one session still speak once). `Effect.repeat` runs its
   // effect immediately, so the first pass is delayed by one interval — a freshly opened instance must not
@@ -638,7 +893,10 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
             state.leases.delete(sessionID)
             continue
           }
+          // Forked separately: the two calls are independent, and awaiting one before starting the other
+          // would put a 40-99s narration ahead of every closing line.
           yield* tick(sessionID).pipe(Effect.ignore, Effect.forkScoped)
+          yield* special(sessionID).pipe(Effect.ignore, Effect.forkScoped)
         }
       }).pipe(Effect.ignore),
     ),
@@ -646,7 +904,7 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     Effect.forkScoped,
   )
 
-  return Service.of({ watch, unwatch, list, tick })
+  return Service.of({ watch, unwatch, list, tick, special, reconcileAudio })
 })
 
 const layer = Layer.effect(
@@ -665,11 +923,20 @@ const layer = Layer.effect(
       models: yield* Provider.Service,
       llm: yield* LLM.Service,
       audio: yield* CommentaryAudio.Service,
+      questions: yield* Question.Service,
+      permissions: yield* Permission.Service,
     }
     // The render fiber is forked into the instance scope, so it is interrupted when the instance is disposed.
     const state = yield* InstanceState.make(() =>
       Effect.gen(function* () {
-        return yield* make({ ...deps, scope: yield* Scope.Scope })
+        const svc = yield* make({ ...deps, scope: yield* Scope.Scope })
+        // Once per instance: repair the database against the file store before anything reads it. Non-blocking
+        // so an instance that opens a large database is not held up by a filesystem walk.
+        yield* svc.reconcileAudio().pipe(
+          Effect.catchCause((cause) => Effect.logWarning("commentary audio reconcile failed", { cause })),
+          Effect.forkIn(yield* Scope.Scope, { startImmediately: true }),
+        )
+        return svc
       }),
     )
     return Service.of({
@@ -678,6 +945,8 @@ const layer = Layer.effect(
       unwatch: (sessionID) => InstanceState.useEffect(state, (svc) => svc.unwatch(sessionID)),
       list: (input) => InstanceState.useEffect(state, (svc) => svc.list(input)),
       tick: (sessionID) => InstanceState.useEffect(state, (svc) => svc.tick(sessionID)),
+      special: (sessionID) => InstanceState.useEffect(state, (svc) => svc.special(sessionID)),
+      reconcileAudio: () => InstanceState.useEffect(state, (svc) => svc.reconcileAudio()),
     })
   }),
 )
@@ -695,6 +964,8 @@ export const node = LayerNode.make({
     Provider.node,
     LLM.node,
     CommentaryAudio.node,
+    Question.node,
+    Permission.node,
   ],
 })
 

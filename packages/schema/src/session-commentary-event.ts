@@ -13,12 +13,22 @@ import { SessionID } from "./session-id"
  * synthesizes the audio when the line is written and publishes the line again once the file exists, so a
  * client has to be able to tell "no audio for this line" from "audio not ready yet" — hence a real optional
  * field rather than something the client derives.
+ *
+ * `kind` separates the running narration from the two lines that are not narration: `closing` when the agent
+ * stops, `prompt` when it is blocked on a decision. They are worth telling apart in the panel because one of
+ * them is a request to the reader, not a statement about the work.
  */
 export const Entry = Schema.Struct({
   seq: Schema.Finite.annotate({ description: "Per-session monotonically increasing entry number" }),
   time: Schema.Finite.annotate({ description: "Creation time of the entry, in epoch milliseconds" }),
   text: Schema.NonEmptyString.annotate({ description: "The narration line itself" }),
   anchor: Schema.String.annotate({ description: "Last message id this entry describes" }),
+  kind: optional(
+    Schema.Literals(["closing", "prompt"]).annotate({
+      description:
+        "What this line is: absent for ordinary narration, 'closing' when the agent finished, 'prompt' when it is blocked on a decision",
+    }),
+  ),
   audio: optional(
     Schema.String.check(Schema.isPattern(/^[0-9a-f]{32}$/)).annotate({
       description: "Content hash of the pre-rendered audio for this line, or absent when none was rendered",

@@ -24,8 +24,12 @@ import { speechBaseUrl } from "@/server/routes/instance/httpapi/handlers/speech-
 
 export const DEFAULT_HOST = "192.168.1.162:8880"
 export const DEFAULT_VOICE = "cantonese"
-/** Files kept per session. Each line is 12-41 KB, so this is a few MB of narration. */
-export const DEFAULT_RETENTION = 100
+/**
+ * Files kept per session, which is also how many entries the panel shows. The narration is a running
+ * commentary rather than a transcript, so keeping the audio for a hundred lines nobody will read was paying
+ * disk for nothing. Beyond the window a row's `audio` is cleared and its file unlinked.
+ */
+export const DEFAULT_RETENTION = 15
 /** Ceiling across every session. */
 export const DEFAULT_MAX_BYTES = 512 * 1024 * 1024
 
@@ -64,6 +68,8 @@ export interface Interface {
   readonly release: (hash: string) => Effect.Effect<void>
   /** The stored bytes, or `undefined` when the hash is unknown, malformed, or the file has been swept. */
   readonly read: (hash: string) => Effect.Effect<Uint8Array | undefined>
+  /** Whether a file for this hash is actually on disk. Used to find rows pointing at nothing. */
+  readonly exists: (hash: string) => Effect.Effect<boolean>
   /**
    * Drop stored audio nothing points at any more. `keep` is the set of hashes still referenced by surviving
    * commentary rows; anything else on disk — unless it is still being rendered — is unreachable and removed.
@@ -155,6 +161,12 @@ export const make = Effect.gen(function* () {
       return yield* fs.readFile(target).pipe(Effect.catchCause(() => Effect.succeed(undefined)))
     })
 
+  const exists: Interface["exists"] = (hash) =>
+    Effect.gen(function* () {
+      if (!HASH_PATTERN.test(hash)) return false
+      return yield* fs.exists(file(hash)).pipe(Effect.catchCause(() => Effect.succeed(false)))
+    })
+
   const sweep: Interface["sweep"] = (keep) =>
     Effect.gen(function* () {
       const present = yield* fs
@@ -181,7 +193,7 @@ export const make = Effect.gen(function* () {
       rendering.delete(hash)
     })
 
-  return Service.of({ render, read, sweep, release })
+  return Service.of({ render, read, exists, sweep, release })
 })
 
 export const layer = Layer.effect(Service, make)

@@ -711,6 +711,8 @@ export const dict = {
   "session.tab.session": "セッション",
   "session.tab.review": "レビュー",
   "session.commentary.title": "Commentary",
+  "session.commentary.kind.closing": "完了",
+  "session.commentary.kind.prompt": "要あなたの判断",
   "session.commentary.empty": "Nothing narrated yet",
   "session.commentary.empty.description": "Commentary appears here while the agent works.",
   "session.commentary.waiting": "Watching the agent",

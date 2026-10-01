@@ -29,6 +29,24 @@ describe("hashFor", () => {
   })
 })
 
+describe("sound file management", () => {
+  test("the retention window matches what the panel shows, so audio and text age out together", () => {
+    // 15 in the panel and 100 on disk would mean the audio for a line you can no longer read outstays it by
+    // 85 lines. The two numbers are one decision.
+    expect(DEFAULT_RETENTION).toBe(15)
+  })
+
+  test("an absent section keeps the same window", () => {
+    expect(speech(undefined).retention).toBe(DEFAULT_RETENTION)
+    expect(speech({}).retention).toBe(DEFAULT_RETENTION)
+  })
+
+  test("the ceiling is a real ceiling", () => {
+    expect(DEFAULT_MAX_BYTES).toBeGreaterThan(0)
+    expect(DEFAULT_MAX_BYTES).toBeLessThanOrEqual(1024 * 1024 * 1024)
+  })
+})
+
 describe("speech settings", () => {
   test("an absent section speaks at the shipped defaults", () => {
     expect(speech(undefined)).toEqual({

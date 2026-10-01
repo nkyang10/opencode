@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "8146822a-749d-4505-b5a8-bf8cf2762f5e",
+  "id": "b22af86a-07ce-42f1-ac8d-0d581a9b6247",
   "prevIds": [
-    "582309fc-6f1e-4c1d-a766-6ec248f26671"
+    "8146822a-749d-4505-b5a8-bf8cf2762f5e"
   ],
   "ddl": [
     {
@@ -933,6 +933,16 @@
       "default": null,
       "generated": null,
       "name": "anchor",
+      "entityType": "columns",
+      "table": "session_commentary"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "kind",
       "entityType": "columns",
       "table": "session_commentary"
     },

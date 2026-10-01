@@ -199,6 +199,8 @@ export const SessionCommentaryTable = sqliteTable(
     time: integer().notNull(),
     text: text().notNull(),
     anchor: text().$type<MessageID>().notNull(),
+    // 'closing' | 'prompt' | null — null is ordinary narration, which is the overwhelming majority.
+    kind: text().$type<"closing" | "prompt">(),
     audio: text(),
   },
   (table) => [primaryKey({ columns: [table.session_id, table.seq] })],
