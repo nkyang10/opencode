@@ -106,9 +106,11 @@ export interface Settings {
 }
 
 /**
- * Where the spoken narration is rendered. Server-side and config-file only: the client is told the hash of a
- * file that already exists, so it never chooses a host and there is no request field to abuse. The defaults
- * mean the feature works with no `commentary.speech` section at all.
+ * Where the spoken narration is rendered, and with what voice.
+ *
+ * The defaults mean the feature works with no `commentary.speech` section at all. The reader's picker does
+ * NOT bypass any of this: it can only choose among `hosts` and the voices that endpoint actually offers, and
+ * whatever it sends still goes through `speechBaseUrl` before a request is made.
  */
 export interface SpeechSettings {
   readonly host: string
@@ -579,8 +581,8 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
    * browser, and a line must be rendered by the endpoint whose voice the reader is about to hear named after.
    *
    * The sweep runs on the global hash set rather than per session: the files are content-addressed and shared
-   * between sessions, so "the oldest 100 for this session" and "every hash a surviving row still references"
-   * are the same question only if you ask it across all of them.
+   * between sessions, so "the newest `speech.retention` for this session" and "every hash a surviving row
+   * still references" are the same question only if you ask it across all of them.
    */
   const renderAudio = Effect.fn("SessionCommentary.renderAudio")(function* (
     sessionID: SessionID,

@@ -14,8 +14,8 @@ import { speechBaseUrl } from "@/server/routes/instance/httpapi/handlers/speech-
  *
  * The alternative — synthesizing when the browser is about to play a line — makes the reader wait for the
  * speech service, and turns a speech-box outage into a silent line. Rendering at narration time costs a file
- * per line and buys instant playback, a line that survives the service being down, and a `host` that is config
- * rather than a field in a request body.
+ * per line and buys instant playback, a line that survives the service being down, and an endpoint that is
+ * configuration rather than something a request can dial.
  *
  * **The one thing to be careful about** is that the name is content-addressed, so two commentary rows can
  * legitimately share one file. `sweep` must therefore unlink a file only once no surviving row references its
