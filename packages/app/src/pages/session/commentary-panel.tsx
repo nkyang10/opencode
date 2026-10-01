@@ -9,7 +9,7 @@ import { useLayout } from "@/context/layout"
 import { useServer } from "@/context/server"
 import { useSync } from "@/context/sync"
 import { fetchCommentary, fetchCommentaryVoices } from "@/utils/server"
-import { optionLabel, unavailableHosts, voiceOptions, type VoiceCatalogue } from "@/utils/commentary-voices"
+import { optionLabel, unavailableHosts, voiceKey, voiceOptions, type VoiceCatalogue } from "@/utils/commentary-voices"
 import { getRelativeTime } from "@/utils/time"
 
 /**
@@ -182,7 +182,9 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
               appearance="inline"
               options={choices().options}
               current={choices().selected}
-              value={(option) => `${option.host}\n${option.voice}`}
+              // `voiceKey`, not a local template: this is the string Kobalte puts in a
+              // `[data-key="…"]` selector unescaped, and a newline in it throws.
+              value={(option) => voiceKey(option.host, option.voice)}
               label={(option) => optionLabel(option, catalogue().sources.length)}
               groupBy={(option) => option.host}
               aria-label={language.t("settings.general.commentary.row.audioVoice.title")}

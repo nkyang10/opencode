@@ -126,6 +126,9 @@ describe("voiceKey survives a CSS attribute selector", () => {
         expect(validInQuotedAttribute(voiceKey(host, voice))).toBe(true)
   })
 
+  // The panel builds its Select value from the same helper. When it used its own `\n` template instead,
+  // the fix above was in the catalogue and the picker still threw — so the test asserts on the helper the
+  // component actually imports, and the component is asserted to import it.
   test("host and voice stay distinguishable, which is the whole point of the key", () => {
     // DEC-061: the two builds answer to the same alias with different audio, so a key that could conflate
     // them would render on one endpoint and serve the other's recording.
