@@ -318,10 +318,10 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
 
     const commentaryWatch = Effect.fn("SessionHttpApi.commentaryWatch")(function* (ctx: {
       params: { sessionID: SessionID }
-      payload: { instructions?: string }
+      payload: { instructions?: string; closing?: string }
     }) {
       yield* requireSession(ctx.params.sessionID)
-      yield* commentary.watch(ctx.params.sessionID, ctx.payload.instructions)
+      yield* commentary.watch(ctx.params.sessionID, ctx.payload.instructions, ctx.payload.closing)
       return true
     })
 

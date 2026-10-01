@@ -61,6 +61,11 @@ export function createCommentaryWatch(input: {
   foregrounded: Accessor<boolean>
   /** The reader's narration preferences, re-sent on every heartbeat so an edit applies on the next tick. */
   instructions: Accessor<string>
+  /**
+   * The fixed closing phrase in the web UI's current language. Read on every heartbeat too, so switching the
+   * UI language changes what the agent says when it finishes without a restart.
+   */
+  closing: Accessor<string>
 }) {
   let heartbeat: number | undefined
   let held = false
@@ -69,7 +74,7 @@ export function createCommentaryWatch(input: {
     const id = input.sessionID()
     const base = input.http()
     if (!id || !base) return
-    void setCommentaryWatch({ server: base, sessionID: id, watching, instructions })
+    void setCommentaryWatch({ server: base, sessionID: id, watching, instructions, closing: input.closing() })
   }
 
   createEffect(() => {
@@ -79,6 +84,8 @@ export function createCommentaryWatch(input: {
     const base = input.http()
     const watching = !!id && !!base && input.enabled() && input.foregrounded() && input.watching()
     const instructions = input.instructions()
+    // Read here as well so a language change re-takes the lease with the new phrase.
+    input.closing()
 
     // Hand the lease back rather than waiting for the TTL. Without this the heartbeat from the previous
     // run kept refreshing a lease nobody was watching, so closing the panel or switching commentary off

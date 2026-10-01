@@ -67,6 +67,12 @@ export const DEFAULT_INTERVAL = 10_000
  */
 export const SPECIAL_MIN_GAP_MS = 30_000
 
+/**
+ * Used when a client predates the closing phrase on the lease. English rather than silence, because a reader
+ * who cannot hear that the work finished gets nothing at all.
+ */
+export const DEFAULT_CLOSING = "All done."
+
 export const DEFAULT_MAX_ENTRIES_PER_TURN = 20
 export const DEFAULT_MIN_ACTIVITY_CHARS = 120
 export const DEFAULT_NARRATION_HISTORY = 100
@@ -148,6 +154,17 @@ const args = (input: unknown) => oneLine(typeof input === "string" ? input : JSO
  * so that clearing the textarea in the settings UI does not leave an empty block in every prompt, and the
  * cap is applied here rather than in the UI so the server never trusts the client's arithmetic.
  */
+/**
+ * The closing phrase is a fixed string, not a narration: the point is that it is recognisable in half a second
+ * by ear, which a bespoke sentence never is. Capped so a client cannot inflate the row, and trimmed so a
+ * stray newline never reaches the speech service.
+ */
+export function normalizeClosing(value: string | undefined) {
+  const trimmed = (value ?? "").trim()
+  if (!trimmed) return undefined
+  return trimmed.length > 120 ? trimmed.slice(0, 120).trimEnd() : trimmed
+}
+
 export function normalizeInstructions(value: string | undefined) {
   const trimmed = (value ?? "").trim()
   if (!trimmed) return undefined
@@ -408,7 +425,7 @@ export function syntheticUser(session: Session.Info, now: number) {
 }
 
 export interface Interface {
-  readonly watch: (sessionID: SessionID, instructions?: string) => Effect.Effect<void>
+  readonly watch: (sessionID: SessionID, instructions?: string, closing?: string) => Effect.Effect<void>
   readonly unwatch: (sessionID: SessionID) => Effect.Effect<void>
   readonly list: (input: { sessionID: SessionID; limit?: number }) => Effect.Effect<Entry[]>
   readonly tick: (sessionID: SessionID) => Effect.Effect<Entry | undefined>
@@ -425,7 +442,12 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Se
  * one session still speak once, and the wording is whoever's preference landed most recently. That is the
  * accepted trade for keeping the per-client instructions out of any shared store — see DEC-058.
  */
-type Lease = { readonly expires: number; readonly instructions?: string }
+type Lease = {
+  readonly expires: number
+  readonly instructions?: string
+  /** The reader's own language for the fixed closing line, resolved by the client. */
+  readonly closing?: string
+}
 
 type State = {
   leases: Map<SessionID, Lease>
@@ -678,10 +700,15 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
   // memory because session drains are process-local, so there is nothing to persist and nothing to clean up.
   // The instructions are re-sent on every heartbeat, so editing the preference in settings takes effect on
   // the next tick without a restart.
-  const watch = Effect.fn("SessionCommentary.watch")(function* (sessionID: SessionID, instructions?: string) {
+  const watch = Effect.fn("SessionCommentary.watch")(function* (
+    sessionID: SessionID,
+    instructions?: string,
+    closing?: string,
+  ) {
     state.leases.set(sessionID, {
       expires: (yield* Clock.currentTimeMillis) + LEASE_TTL_MS,
       instructions: normalizeInstructions(instructions),
+      closing: normalizeClosing(closing),
     })
   })
 
@@ -843,6 +870,19 @@ const decisionSignature = (digest: string) => Bun.hash(digest).toString(16)
     else state.announcedDecision.set(sessionID, decision)
 
     const kind: "prompt" | "closing" = blocked ? "prompt" : "closing"
+
+    // The closing line is fixed text in the reader's own language, already on the lease. No model call: a
+    // phrase the point of which is that you recognise it by ear does not benefit from being written fresh,
+    // and skipping the call also removes a 43-99s wait and its cost. An older client that sends no phrase
+    // still gets the shipped default rather than silence.
+    if (kind === "closing") {
+      const text = lease.closing ?? DEFAULT_CLOSING
+      const messages = yield* sessions.messages({ sessionID })
+      const anchor = messages.at(-1)?.info.id
+      if (!anchor) return undefined
+      return yield* append({ sessionID, text, anchor, kind })
+    }
+
     const messages = yield* sessions.messages({ sessionID })
     const anchor = messages.at(-1)?.info.id
     if (!anchor) return undefined
@@ -852,10 +892,8 @@ const decisionSignature = (digest: string) => Bun.hash(digest).toString(16)
     state.lastSpecial.set(sessionID, now)
     state.specialInFlight.add(sessionID)
 
-    const system = kind === "prompt" ? DECISION_INSTRUCTIONS : CLOSING_INSTRUCTIONS
-    const body = blocked
-      ? `The agent is waiting for a decision.\n\n${blocked}`
-      : `The agent has finished. The recent work was:\n\n${digest(sliceFrom(messages, messages.at(-6)?.info.id)).join("\n") || "(no recent tool activity)"}`
+    const system = DECISION_INSTRUCTIONS
+    const body = `The agent is waiting for a decision.\n\n${blocked}`
 
     const text = yield* llm
       .stream({
@@ -967,8 +1005,8 @@ const layer = Layer.effect(
       }),
     )
     return Service.of({
-      watch: (sessionID, instructions) =>
-        InstanceState.useEffect(state, (svc) => svc.watch(sessionID, instructions)),
+      watch: (sessionID, instructions, closing) =>
+        InstanceState.useEffect(state, (svc) => svc.watch(sessionID, instructions, closing)),
       unwatch: (sessionID) => InstanceState.useEffect(state, (svc) => svc.unwatch(sessionID)),
       list: (input) => InstanceState.useEffect(state, (svc) => svc.list(input)),
       tick: (sessionID) => InstanceState.useEffect(state, (svc) => svc.tick(sessionID)),

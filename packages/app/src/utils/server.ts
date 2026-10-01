@@ -170,6 +170,12 @@ export async function setCommentaryWatch(input: {
    * tick without a restart. Ignored when unwatching. The server normalises and caps it.
    */
   instructions?: string
+  /**
+   * The fixed closing phrase, already translated into the UI's current language. Sent on every heartbeat, so
+   * switching the web UI to another language changes what the agent says when it finishes within one refresh.
+   * The server has no i18n of its own, so this is how the reader's language reaches it.
+   */
+  closing?: string
   fetch?: typeof globalThis.fetch
 }): Promise<void> {
   const auth = input.server.password
@@ -183,7 +189,10 @@ export async function setCommentaryWatch(input: {
   // The watch route declares a payload, so its body is always sent — `{}` when there is nothing to say. The
   // unwatch route takes no payload, so it keeps sending no body.
   const body = input.watching
-    ? JSON.stringify(input.instructions === undefined ? {} : { instructions: input.instructions })
+    ? JSON.stringify({
+        ...(input.instructions === undefined ? {} : { instructions: input.instructions }),
+        ...(input.closing === undefined ? {} : { closing: input.closing }),
+      })
     : undefined
   await (input.fetch ?? globalThis.fetch)(
     `${input.server.url}/session/${input.sessionID}/commentary/${input.watching ? "watch" : "unwatch"}`,

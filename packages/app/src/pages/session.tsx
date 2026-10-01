@@ -464,6 +464,9 @@ export default function Page() {
     http: () => server.current?.http,
     enabled: () => view().commentaryPanel.enabled(),
     instructions: () => view().commentaryPanel.instructions(),
+    // The closing phrase follows the web UI's language, so the agent says "工作完成" or "All done." to match
+    // what the reader is looking at.
+    closing: () => language.t("session.commentary.closing"),
     foregrounded: () => foregrounded(),
     watching: () => !!params.id && commentaryShouldWatch({
       isDesktop: isDesktop(),

@@ -59,6 +59,13 @@ export const CommentaryQuery = Schema.Struct({
  */
 export const CommentaryWatchPayload = Schema.Struct({
   instructions: Schema.optional(Schema.String),
+  /**
+   * The fixed "work is finished" phrase, already translated by the client into its own UI language. The server
+   * has no i18n of its own and a fixed phrase does not want a model call, so the reader's language has to
+   * arrive with the lease — the same way `instructions` already does. Optional so an older client that only
+   * sends `instructions` still works.
+   */
+  closing: Schema.optional(Schema.String),
 })
 /**
  * The audio hash arrives in a URL path segment. Constraining it in the schema means a malformed one is a
