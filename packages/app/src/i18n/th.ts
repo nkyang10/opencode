@@ -992,8 +992,6 @@ export const dict = {
     "แสดงส่วนเครื่องมือ edit, write และ patch แบบขยายตามค่าเริ่มต้นในไทม์ไลน์",
   "settings.general.row.newInterface.title": "เลย์เอาต์ใหม่",
   "settings.general.commentary.row.enabled.title": "Narrate while the agent works",
-  "settings.general.commentary.row.enabled.description":
-    "When this is off, this device does not ask the server to narrate. Other devices are not affected.",
   "settings.general.commentary.row.instructions.title": "Narration preferences",
   "settings.general.commentary.row.instructions.description":
     "How the narration should be written: tone, technical level, point of view. Added to the prompt that writes each line.",

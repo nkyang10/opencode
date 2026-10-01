@@ -1031,8 +1031,6 @@ export const dict = {
     "Az idővonalon alapértelmezés szerint kibontott szerkesztési, írási és javítási eszközrészek megjelenítése",
   "settings.general.row.newInterface.title": "Új elrendezés",
   "settings.general.commentary.row.enabled.title": "Narrate while the agent works",
-  "settings.general.commentary.row.enabled.description":
-    "When this is off, this device does not ask the server to narrate. Other devices are not affected.",
   "settings.general.commentary.row.instructions.title": "Narration preferences",
   "settings.general.commentary.row.instructions.description":
     "How the narration should be written: tone, technical level, point of view. Added to the prompt that writes each line.",

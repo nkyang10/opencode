@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { Icon } from "@opencode-ai/ui/icon"
+import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { Switch } from "@opencode-ai/ui/switch"
 import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
 import type { SessionCommentaryEvent } from "@opencode-ai/schema/session-commentary-event"
@@ -158,23 +159,32 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
       <div class="h-9 shrink-0 flex items-center gap-2 px-3 border-b border-border-weaker-base">
         <Icon size="small" name="commentary" class="text-icon-weak" />
         <div class="text-12-medium text-text-strong">{language.t("session.commentary.title")}</div>
-        {/* FU-122. The spoken toggle sits beside the title rather than in Settings: it is the one commentary
-            control you reach for while reading, and clicking it is also the user gesture that satisfies the
-            browser's autoplay policy — a toggle nobody can see next to the lines is worth less. The label is
-            the settings row's own string (visually hidden) so no locale gains a second English-only key.
-
-            Narration itself has its own switch in Settings. This one is *not* disabled when that is off: they
-            are independent preferences, and greying this one because an unrelated switch is off makes the pair
-            look broken and implies a link that does not exist. */}
+        {/* Narration on/off lives here rather than in Settings, for the reason it always did: it is the one
+            commentary control you reach for while reading, and it is the switch that says whether this session
+            is being narrated at all. Off by default — it is not free, and a reader who never asked should not
+            pay for it. */}
         <Switch
           hideLabel
-          data-action="commentary-audio-enabled"
-          checked={commentary.audioEnabled()}
-          title={language.t("settings.general.commentary.row.audioEnabled.title")}
-          onChange={(checked) => commentary.setAudioEnabled(checked)}
+          data-action="commentary-enabled"
+          checked={commentary.enabled()}
+          title={language.t("settings.general.commentary.row.enabled.title")}
+          onChange={(checked) => commentary.setEnabled(checked)}
         >
-          {language.t("settings.general.commentary.row.audioEnabled.title")}
+          {language.t("settings.general.commentary.row.enabled.title")}
         </Switch>
+        {/* Sound is a mute, not a second switch. It is a modifier on the narration above rather than a peer of
+            it, and two switches side by side implied the pair were independent — they are not: with narration
+            off there is nothing to hear. An icon says that better than a switch does. */}
+        <IconButtonV2
+          type="button"
+          variant="ghost-muted"
+          size="small"
+          data-action="commentary-audio-enabled"
+          aria-label={language.t("settings.general.commentary.row.audioEnabled.title")}
+          title={language.t("settings.general.commentary.row.audioEnabled.title")}
+          icon={<Icon name={commentary.audioEnabled() ? "commentary-audio-on" : "commentary-audio-off"} />}
+          onClick={() => commentary.setAudioEnabled(!commentary.audioEnabled())}
+        />
         {/* The voice, beside the switch rather than behind it. `groupBy` is the endpoint, because the same
             name on two services is two different recordings and a flat list of names would hide that. The
             label is the audio row's own string, so a header control adds no locale work. */}

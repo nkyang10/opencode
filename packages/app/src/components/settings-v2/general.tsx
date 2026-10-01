@@ -275,15 +275,6 @@ const CommentarySection: Component = () => {
       <h3 class="settings-v2-section-title">{language.t("settings.general.section.commentary")}</h3>
       <SettingsListV2>
         <SettingsRowV2
-          title={language.t("settings.general.commentary.row.enabled.title")}
-          description={language.t("settings.general.commentary.row.enabled.description")}
-        >
-          <div data-action="settings-commentary-enabled">
-            <Switch checked={commentary().enabled()} onChange={(checked) => commentary().setEnabled(checked)} />
-          </div>
-        </SettingsRowV2>
-
-        <SettingsRowV2
           stacked
           title={language.t("settings.general.commentary.row.instructions.title")}
           description={language.t("settings.general.commentary.row.instructions.description")}

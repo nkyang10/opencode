@@ -1014,8 +1014,6 @@ export const dict = {
     "ສະ​ແດງ​ການ​ແກ້​ໄຂ, ຂຽນ, ແລະ​ການ​ແກ້​ໄຂ​ສ່ວນ​ເຄື່ອງ​ມື​ທີ່​ຂະ​ຫຍາຍ​ໂດຍ​ຄ່າ​ເລີ່ມ​ຕົ້ນ​ໃນ​ໄລ​ຍະ​ເວ​ລາ",
   "settings.general.row.newInterface.title": "ໂຄງຮ່າງໃໝ່",
   "settings.general.commentary.row.enabled.title": "Narrate while the agent works",
-  "settings.general.commentary.row.enabled.description":
-    "When this is off, this device does not ask the server to narrate. Other devices are not affected.",
   "settings.general.commentary.row.instructions.title": "Narration preferences",
   "settings.general.commentary.row.instructions.description":
     "How the narration should be written: tone, technical level, point of view. Added to the prompt that writes each line.",

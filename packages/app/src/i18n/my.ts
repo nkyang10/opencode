@@ -1037,8 +1037,6 @@ export const dict = {
     "အချိန်ဇယားတွင် ပုံသေဖြင့် ချဲ့ထွင်ထားသော တည်းဖြတ်ခြင်း၊ ရေးသားခြင်းနှင့် ဖာထေးခြင်း ကိရိယာအစိတ်အပိုင်းများကို ပြသပါ။",
   "settings.general.row.newInterface.title": "အပြင်အဆင်အသစ်",
   "settings.general.commentary.row.enabled.title": "Narrate while the agent works",
-  "settings.general.commentary.row.enabled.description":
-    "When this is off, this device does not ask the server to narrate. Other devices are not affected.",
   "settings.general.commentary.row.instructions.title": "Narration preferences",
   "settings.general.commentary.row.instructions.description":
     "How the narration should be written: tone, technical level, point of view. Added to the prompt that writes each line.",
