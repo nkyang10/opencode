@@ -179,6 +179,10 @@ export function CommentaryPanel(props: { sessionID: string | undefined }) {
           type="button"
           variant="ghost-muted"
           size="small"
+          // A mute button has to be readable as a toggle, not only as a glyph: at 20px the two icons differ by
+          // a small mark, so the pressed state is what makes the current value obvious without inspecting it.
+          state={commentary.audioEnabled() ? "rest" : "pressed"}
+          aria-pressed={commentary.audioEnabled()}
           data-action="commentary-audio-enabled"
           aria-label={language.t("settings.general.commentary.row.audioEnabled.title")}
           title={language.t("settings.general.commentary.row.audioEnabled.title")}
