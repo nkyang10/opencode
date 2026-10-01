@@ -438,6 +438,12 @@ type State = {
   specialInFlight: Set<SessionID>
   /** When each session last got a special line, so `specialMinGap` can be enforced per session. */
   lastSpecial: Map<SessionID, number>
+  /**
+   * The signature of the decision last announced for a session. A time gap is the wrong guard for a prompt
+   * line: a decision the reader has not answered stays pending for as long as they look away, so a 30s window
+   * turns one request into a line every 30 seconds. What matters is that it is a *different* decision.
+   */
+  announcedDecision: Map<SessionID, string>
   /** Whether each session was busy at the previous pass. The closing line fires on busy -> idle. */
   wasBusy: Map<SessionID, boolean>
 }
@@ -466,6 +472,7 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     inFlight: new Set(),
     specialInFlight: new Set(),
     lastSpecial: new Map(),
+    announcedDecision: new Map(),
     wasBusy: new Map(),
   }
 
@@ -750,7 +757,13 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     return yield* append({ sessionID, text: parsed.text, anchor })
   }, Effect.catchCause(() => Effect.succeed(undefined)))
 
-  /** What the agent is blocked on, rendered for the model. Empty when nothing is pending. */
+  /**
+ * Identity of a pending decision. Only compared for equality, so a cheap non-cryptographic hash is right —
+ * and the audio module's `hashFor` would be the wrong thing to reach for, since this is not a file name.
+ */
+const decisionSignature = (digest: string) => Bun.hash(digest).toString(16)
+
+/** What the agent is blocked on, rendered for the model. Empty when nothing is pending. */
   const pendingDigest = Effect.fn("SessionCommentary.pendingDigest")(function* (sessionID: SessionID) {
     // Typed against the schema rather than the service's own re-export: `Question.Request`'s alias there is
     // `typeof Request.Type`, which resolves to nothing useful, so anything inferred through it is an `any`.
@@ -811,6 +824,11 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     const session = yield* sessions.get(sessionID)
     if (!session.model) return undefined
     const blocked = yield* pendingDigest(sessionID)
+    // The decision's own content is its identity. Re-announcing the same pending request is noise; a new
+    // request — different options, a different tool — is a new line even inside the time window.
+    const decision = blocked === undefined ? undefined : decisionSignature(blocked)
+    const alreadyAnnounced = decision !== undefined && state.announcedDecision.get(sessionID) === decision
+    if (alreadyAnnounced) return undefined
     const now = yield* Clock.currentTimeMillis
     const busy = (yield* status.get(sessionID)).type !== "idle"
 
@@ -819,6 +837,10 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     const wasBusy = state.wasBusy.get(sessionID) ?? false
     state.wasBusy.set(sessionID, busy)
     if (!blocked && (busy || !wasBusy)) return undefined
+    // A decision that has been announced and is still pending does not clear until it is answered, so the
+    // signature is only forgotten when the blocking goes away.
+    if (decision === undefined) state.announcedDecision.delete(sessionID)
+    else state.announcedDecision.set(sessionID, decision)
 
     const kind: "prompt" | "closing" = blocked ? "prompt" : "closing"
     const messages = yield* sessions.messages({ sessionID })
@@ -890,7 +912,12 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
         const now = yield* Clock.currentTimeMillis
         for (const [sessionID, lease] of state.leases) {
           if (lease.expires <= now) {
+            // Everything keyed by session goes at once: a lease that has expired means the panel is closed,
+            // and leaving the bookkeeping behind grows three maps for every session the server has ever seen.
             state.leases.delete(sessionID)
+            state.wasBusy.delete(sessionID)
+            state.lastSpecial.delete(sessionID)
+            state.announcedDecision.delete(sessionID)
             continue
           }
           // Forked separately: the two calls are independent, and awaiting one before starting the other

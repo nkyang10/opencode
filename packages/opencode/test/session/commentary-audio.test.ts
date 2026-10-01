@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { CommentaryAudio, DEFAULT_HOST, DEFAULT_MAX_BYTES, DEFAULT_RETENTION, DEFAULT_VOICE, HASH_PATTERN, hashFor } from "@/session/commentary-audio"
-import { speech } from "@/session/commentary"
+import { settings, speech } from "@/session/commentary"
 
 describe("hashFor", () => {
   test("is 32 lowercase hex characters, which is what the route and the column both validate", () => {
@@ -44,6 +44,17 @@ describe("sound file management", () => {
   test("the ceiling is a real ceiling", () => {
     expect(DEFAULT_MAX_BYTES).toBeGreaterThan(0)
     expect(DEFAULT_MAX_BYTES).toBeLessThanOrEqual(1024 * 1024 * 1024)
+  })
+})
+
+describe("review findings", () => {
+  test("the two special-line settings default on, because silence reads as a crash", () => {
+    expect(settings(undefined).special).toBe(true)
+  })
+
+  test("the special-line floor is long enough that a flapping session cannot spam", () => {
+    // Busy/idle alternation is common around tool boundaries; a floor measured in seconds would narrate it.
+    expect(settings(undefined).specialMinGap).toBeGreaterThanOrEqual(30_000)
   })
 })
 
