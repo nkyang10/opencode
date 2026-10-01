@@ -10,12 +10,19 @@ import { HttpClient, HttpClientRequest } from "effect/unstable/http"
  */
 const CONTEXT_FIELDS = ["max_model_len", "context_length", "context_window", "max_context_length", "max_input_tokens"]
 
+type ModelLimit = { readonly limit?: { readonly context?: number } | undefined }
+
+/** Narrows untrusted JSON to something with readable properties, without asserting past `unknown`. */
+function record(value: unknown) {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined
+}
+
 /** Reads a context size off one `/models` entry. Returns undefined when the entry does not carry one. */
 export function contextSize(entry: unknown) {
-  if (typeof entry !== "object" || entry === null) return undefined
-  const record = entry as Record<string, unknown>
+  const fields = record(entry)
+  if (!fields) return undefined
   for (const field of CONTEXT_FIELDS) {
-    const value = record[field]
+    const value = fields[field]
     if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) continue
     return Math.trunc(value)
   }
@@ -29,10 +36,10 @@ export function contextSize(entry: unknown) {
  */
 export function modelsPayload(json: unknown) {
   if (Array.isArray(json)) return json
-  if (typeof json !== "object" || json === null) return []
-  const record = json as Record<string, unknown>
-  if (Array.isArray(record.data)) return record.data
-  if (Array.isArray(record.models)) return record.models
+  const fields = record(json)
+  if (!fields) return []
+  if (Array.isArray(fields.data)) return fields.data
+  if (Array.isArray(fields.models)) return fields.models
   return []
 }
 
@@ -40,8 +47,7 @@ export function modelsPayload(json: unknown) {
 export function contextSizes(json: unknown) {
   const sizes = new Map<string, number>()
   for (const entry of modelsPayload(json)) {
-    if (typeof entry !== "object" || entry === null) continue
-    const id = (entry as Record<string, unknown>).id
+    const id = record(entry)?.id
     if (typeof id !== "string") continue
     const size = contextSize(entry)
     if (size !== undefined) sizes.set(id, size)
@@ -132,3 +138,105 @@ export function headers(provider: {
   if (typeof key !== "string" || !key) return undefined
   return { ...existing, Authorization: `Bearer ${key}` }
 }
+
+/**
+ * Context sizes the catalog already knows, keyed by bare model id.
+ *
+ * The same model id can appear under several providers, and when those disagree the size is not
+ * knowable from the id alone, so a conflicting id is dropped rather than resolved by iteration order.
+ */
+export function catalogLimits(catalog: Record<string, { models?: Record<string, ModelLimit | undefined> }>) {
+  const agreed = new Map<string, number>()
+  const conflicting = new Set<string>()
+  for (const provider of Object.values(catalog)) {
+    for (const [modelID, model] of Object.entries(provider.models ?? {})) {
+      const size = model?.limit?.context
+      if (typeof size !== "number" || size <= 0) continue
+      const seen = agreed.get(modelID)
+      if (seen === undefined) agreed.set(modelID, size)
+      else if (seen !== size) conflicting.add(modelID)
+    }
+  }
+  for (const modelID of conflicting) agreed.delete(modelID)
+  return agreed
+}
+
+/**
+ * Headers the gateway uses to name the model that actually served the request. `x-zen-model` is set by
+ * OpenCode's own Zen service and already forwarded by its inference proxy, so it is a first-party
+ * value rather than one gateway's private invention; the upstream id is the fallback.
+ */
+const RESOLVED_HEADERS = ["x-zen-model", "x-opencode-upstream-model-id"]
+
+const aliases = new Map<string, string | undefined>()
+
+const askAlias = (baseURL: string, headers: Record<string, string>, modelID: string) =>
+  Effect.gen(function* () {
+    const http = HttpClient.filterStatusOk(yield* HttpClient.HttpClient)
+    const request = yield* HttpClientRequest.post(`${baseURL.replace(/\/+$/, "")}/chat/completions`).pipe(
+      HttpClientRequest.setHeaders(headers),
+      HttpClientRequest.bodyJson({ model: modelID, messages: [{ role: "user", content: "hi" }], max_tokens: 1 }),
+    )
+    const response = yield* http.execute(request)
+    // Drain the body so the socket is released; the answer is in the headers.
+    yield* response.text.pipe(Effect.ignore)
+    const named = response.headers
+    return RESOLVED_HEADERS.map((name) => named[name]).find((value) => !!value)
+  }).pipe(
+    Effect.timeout(Duration.seconds(20)),
+    Effect.catchCause((cause) =>
+      Effect.as(
+        Effect.logWarning("model context size: could not resolve the alias", {
+          baseURL,
+          modelID,
+          cause: Cause.pretty(cause),
+        }),
+        undefined,
+      ),
+    ),
+    Effect.tap((resolved) => Effect.sync(() => aliases.set(`${baseURL}::${modelID}`, resolved))),
+  )
+
+/**
+ * Resolves a model id that is an **alias** rather than a model. A gateway entry like
+ * `opencode-go-default` is a routing name: it has no context size of its own and no catalog entry, and
+ * only a real request reveals what it points at. The answer is the resolved model's catalog size, so
+ * the number still comes from a source that knows it rather than from a guess.
+ *
+ * Only reached when the context size is still 0 after the `/models` probe. That is the right trigger:
+ * every id the catalog knows already arrived with a limit from the models.dev plugin, so anything still
+ * at 0 is an alias - and an alias is the only thing that costs a request.
+ */
+export function resolveAlias(input: {
+  readonly baseURL: string | undefined
+  readonly headers: Record<string, string> | undefined
+  readonly modelID: string
+  readonly current: number
+  readonly limits: ReadonlyMap<string, number>
+}): Effect.Effect<number, never, HttpClient.HttpClient> {
+  if (input.current > 0 || !input.baseURL || !input.headers) return Effect.succeed(input.current)
+  const baseURL = input.baseURL
+  const auth = input.headers
+  return Effect.gen(function* () {
+    const key = `${baseURL}::${input.modelID}`
+    const cached = aliases.get(key)
+    if (cached !== undefined) return input.limits.get(cached) ?? input.current
+    const resolved = yield* askAlias(baseURL, auth, input.modelID)
+    if (!resolved) return input.current
+    const size = input.limits.get(resolved)
+    if (size === undefined) {
+      yield* Effect.logWarning("model context size: the alias resolved to a model the catalog does not describe", {
+        modelID: input.modelID,
+        resolved,
+      })
+      return input.current
+    }
+    yield* Effect.logInfo("resolved a model alias to its context size", {
+      modelID: input.modelID,
+      resolved,
+      context: size,
+    })
+    return size
+  })
+}
+

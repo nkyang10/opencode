@@ -101,6 +101,146 @@ describe("ModelContextSize.headers", () => {
   })
 })
 
+describe("ModelContextSize.catalogLimits", () => {
+  test("keys catalog sizes by bare model id", () => {
+    const limits = ModelContextSize.catalogLimits({
+      opencode: { models: { "space-bunny-free": { limit: { context: 1048576 } } } },
+      "opencode-go": { models: { "space-bunny-free": { limit: { context: 1048576 } } } },
+    })
+    expect([...limits]).toEqual([["space-bunny-free", 1048576]])
+  })
+
+  // The same id under two providers with different numbers is not knowable from the id, so it is
+  // dropped rather than decided by iteration order.
+  test("drops an id whose providers disagree", () => {
+    const limits = ModelContextSize.catalogLimits({
+      a: { models: { shared: { limit: { context: 1048576 } } } },
+      b: { models: { shared: { limit: { context: 262144 } } } },
+    })
+    expect(limits.has("shared")).toBe(false)
+  })
+
+  test("ignores models with no usable size", () => {
+    const limits = ModelContextSize.catalogLimits({
+      a: { models: { none: {}, zero: { limit: { context: 0 } }, ok: { limit: { context: 4096 } } } },
+    })
+    expect([...limits]).toEqual([["ok", 4096]])
+  })
+})
+
+describe("ModelContextSize.resolveAlias", () => {
+  const withGateway = async (
+    handler: (path: string) => Response,
+    run: (baseURL: string, seen: () => string[]) => Promise<void>,
+  ) => {
+    const seen: string[] = []
+    const server = Bun.serve({
+      port: 0,
+      fetch: (request) => {
+        const path = new URL(request.url).pathname
+        seen.push(path)
+        return handler(path)
+      },
+    })
+    try {
+      await run(server.url.toString(), () => seen)
+    } finally {
+      server.stop(true)
+    }
+  }
+
+  const ask = (baseURL: string, modelID: string, limits: Record<string, number>) =>
+    Effect.runPromise(
+      ModelContextSize.resolveAlias({
+        baseURL: `${baseURL}/v1`,
+        headers: {},
+        modelID,
+        current: 0,
+        limits: new Map(Object.entries(limits)),
+      }).pipe(Effect.provide(FetchHttpClient.layer)),
+    )
+
+  const askWithoutAuth = (baseURL: string, modelID: string, limits: Record<string, number>) =>
+    Effect.runPromise(
+      ModelContextSize.resolveAlias({
+        baseURL: `${baseURL}/v1`,
+        headers: undefined,
+        modelID,
+        current: 0,
+        limits: new Map(Object.entries(limits)),
+      }).pipe(Effect.provide(FetchHttpClient.layer)),
+    )
+
+  test("takes the size of the model the response names", async () => {
+    await withGateway(
+      () =>
+        new Response("{}", {
+          headers: { "x-zen-model": "space-bunny-free", "content-type": "application/json" },
+        }),
+      async (baseURL, seen) => {
+        expect(await ask(baseURL, "opencode-go-default", { "space-bunny-free": 1048576 })).toBe(1048576)
+        expect(seen()).toEqual(["/v1/chat/completions"])
+      },
+    )
+  })
+
+  test("falls back to the upstream model id header", async () => {
+    await withGateway(
+      () => new Response("{}", { headers: { "x-opencode-upstream-model-id": "space-bunny" } }),
+      async (baseURL) => {
+        expect(await ask(baseURL, "opencode-go-default", { "space-bunny": 262144 })).toBe(262144)
+      },
+    )
+  })
+
+  test("asks once and reuses the resolved name", async () => {
+    await withGateway(
+      () => new Response("{}", { headers: { "x-zen-model": "space-bunny-free" } }),
+      async (baseURL, seen) => {
+        expect(await ask(baseURL, "opencode-go-default", { "space-bunny-free": 1048576 })).toBe(1048576)
+        expect(await ask(baseURL, "opencode-go-default", { "space-bunny-free": 1048576 })).toBe(1048576)
+        expect(seen().length).toBe(1)
+      },
+    )
+  })
+
+  test("stays at zero when the named model is not described", async () => {
+    await withGateway(() => new Response("{}", { headers: { "x-zen-model": "unlisted" } }), async (baseURL) => {
+      expect(await ask(baseURL, "alias", { "space-bunny-free": 1048576 })).toBe(0)
+    })
+  })
+
+  test("stays at zero when the provider names nothing", async () => {
+    await withGateway(() => new Response("{}", { status: 500 }), async (baseURL) => {
+      expect(await ask(baseURL, "alias", { "space-bunny-free": 1048576 })).toBe(0)
+    })
+  })
+
+  test("never asks for a model that already has a size", async () => {
+    await withGateway(() => new Response("{}", { headers: { "x-zen-model": "space-bunny-free" } }), async (baseURL, seen) => {
+      expect(
+        await Effect.runPromise(
+          ModelContextSize.resolveAlias({
+            baseURL: `${baseURL}/v1`,
+            headers: {},
+            modelID: "alias",
+            current: 500000,
+            limits: new Map([["space-bunny-free", 1048576]]),
+          }).pipe(Effect.provide(FetchHttpClient.layer)),
+        ),
+      ).toBe(500000)
+      expect(seen()).toEqual([])
+    })
+  })
+
+  test("does not call out without a credential", async () => {
+    await withGateway(() => new Response("{}", { headers: { "x-zen-model": "space-bunny-free" } }), async (baseURL, seen) => {
+      expect(await askWithoutAuth(baseURL, "alias-noauth", { "space-bunny-free": 1048576 })).toBe(0)
+      expect(seen()).toEqual([])
+    })
+  })
+})
+
 describe("ModelContextSize.fill", () => {
   // A real server, not a stubbed client: the point of these is the once-only caching, which a mock
   // would have to re-implement and could agree with by construction.

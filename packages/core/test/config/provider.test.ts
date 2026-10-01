@@ -4,6 +4,8 @@ import { Catalog } from "@opencode-ai/core/catalog"
 import { Config } from "@opencode-ai/core/config"
 import { ConfigProviderPlugin } from "@opencode-ai/core/config/plugin/provider"
 import { Integration } from "@opencode-ai/core/integration"
+import { ModelContextSize } from "@opencode-ai/core/model-context-size"
+import { ModelsDev } from "@opencode-ai/core/models-dev"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { PluginV2 } from "@opencode-ai/core/plugin"
 import { PluginHost } from "@opencode-ai/core/plugin/host"
@@ -13,10 +15,24 @@ import { PluginTestLayer } from "../plugin/fixture"
 
 const it = testEffect(PluginTestLayer)
 
-const addPlugin = Effect.fn(function* (config: Config.Interface) {
+type CatalogShape = Parameters<typeof ModelContextSize.catalogLimits>[0]
+
+// The stub is the catalog `catalogLimits` reads. It is cast to the service type because the fixture
+// does not carry the full ModelsDev.Provider contract, and this test is about the limit lookup, not
+// about catalog decoding.
+const stubModelsDev = (data: CatalogShape) =>
+  ModelsDev.Service.of({
+    get: () => Effect.succeed(data as unknown as Record<string, ModelsDev.Provider>),
+    refresh: () => Effect.void,
+  })
+
+const addPlugin = Effect.fn(function* (config: Config.Interface, catalog: CatalogShape) {
   const plugin = yield* PluginV2.Service
   const host = yield* PluginHost.make(plugin)
-  yield* ConfigProviderPlugin.Plugin.effect(host).pipe(Effect.provideService(Config.Service, config))
+  yield* ConfigProviderPlugin.Plugin.effect(host).pipe(
+    Effect.provideService(Config.Service, config),
+    Effect.provideService(ModelsDev.Service, stubModelsDev(catalog)),
+  )
 })
 
 function required<T>(value: T | undefined): T {
@@ -90,7 +106,7 @@ describe("ConfigProviderPlugin.Plugin", () => {
           ]),
       })
 
-      yield* addPlugin(config)
+      yield* addPlugin(config, {})
 
       const model = required(yield* catalog.model.get(providerID, modelID))
       expect(model.variants).toMatchObject([
@@ -141,7 +157,7 @@ describe("ConfigProviderPlugin.Plugin", () => {
           ]),
       })
 
-      yield* addPlugin(config)
+      yield* addPlugin(config, {})
 
       const model = required(yield* catalog.model.get(providerID, modelID))
       expect(model.variants[0]).toMatchObject({
@@ -235,7 +251,7 @@ describe("ConfigProviderPlugin.Plugin", () => {
             ]),
         })
 
-        yield* addPlugin(config)
+        yield* addPlugin(config, {})
 
         const provider = required(yield* catalog.provider.get(providerID))
         const model = required(yield* catalog.model.get(providerID, modelID))
@@ -271,7 +287,8 @@ describe("ConfigProviderPlugin.Plugin", () => {
   // answers like vLLM. A real Bun server, because the wiring under test is the request itself.
   describe("filling a missing context size from the provider API", () => {
     const withGateway = <A, E, R>(
-      body: unknown,
+      models: unknown,
+      resolved: string | undefined,
       use: (url: string, seen: () => (string | undefined)[]) => Effect.Effect<A, E, R>,
     ) =>
       Effect.acquireUseRelease(
@@ -280,9 +297,18 @@ describe("ConfigProviderPlugin.Plugin", () => {
           const server = Bun.serve({
             port: 0,
             fetch: (request) => {
+              const path = new URL(request.url).pathname
               seen.push(request.headers.get("authorization") ?? undefined)
-              if (new URL(request.url).pathname !== "/v1/models") return new Response("not found", { status: 404 })
-              return Response.json(body)
+              if (path === "/v1/models") return Response.json(models)
+              // An alias answers with no size of its own; the model it served is named in a header,
+              // which is how OpenCode's Zen service reports a resolved routing name.
+              if (path === "/v1/chat/completions") {
+                return Response.json(
+                  { id: "x", object: "chat.completion", model: "resolved", choices: [], usage: {} },
+                  { headers: resolved ? { "x-zen-model": resolved } : {} },
+                )
+              }
+              return new Response("not found", { status: 404 })
             },
           })
           return { server, seen }
@@ -313,10 +339,10 @@ describe("ConfigProviderPlugin.Plugin", () => {
       })
 
     it.effect("fills a zero context size from the gateway's own report", () =>
-      withGateway({ data: [{ id: "general", max_model_len: 1048576 }] }, (url, seen) =>
+      withGateway({ data: [{ id: "general", max_model_len: 1048576 }] }, undefined, (url, seen) =>
         Effect.gen(function* () {
           const catalog = yield* Catalog.Service
-          yield* addPlugin(configFor(url, { name: "Gateway" }))
+          yield* addPlugin(configFor(url, { name: "Gateway" }), {})
           expect(required(yield* catalog.model.get(providerID, modelID)).limit.context).toBe(1048576)
           expect(seen()).toEqual(["Bearer k"])
         }),
@@ -324,23 +350,53 @@ describe("ConfigProviderPlugin.Plugin", () => {
     )
 
     it.effect("never overwrites a context size the config already set", () =>
-      withGateway({ data: [{ id: "general", max_model_len: 1048576 }] }, (url, seen) =>
+      withGateway({ data: [{ id: "general", max_model_len: 1048576 }] }, undefined, (url, seen) =>
         Effect.gen(function* () {
           const catalog = yield* Catalog.Service
-          yield* addPlugin(configFor(url, { name: "Gateway", limit: { context: 500000, output: 32000 } }))
+          yield* addPlugin(configFor(url, { name: "Gateway", limit: { context: 500000, output: 32000 } }), {})
           expect(required(yield* catalog.model.get(providerID, modelID)).limit.context).toBe(500000)
           expect(seen()).toEqual([])
         }),
       ),
     )
 
-    it.effect("leaves the context size at zero when the gateway reports none", () =>
-      withGateway({ data: [{ id: "general", object: "model" }] }, (url, seen) =>
+    it.effect("resolves an alias through the model its response names", () =>
+      // The live `ocgo` case: `/v1/models` says nothing, the id is not a model at all, and the
+      // resolved model is described by the catalog.
+      withGateway({ data: [{ id: "general", object: "model" }] }, "space-bunny-free", (url, seen) =>
         Effect.gen(function* () {
           const catalog = yield* Catalog.Service
-          yield* addPlugin(configFor(url, { name: "Gateway" }))
+          yield* addPlugin(configFor(url, { name: "Gateway" }), {
+            opencode: { models: { "space-bunny-free": { limit: { context: 1048576 } } } },
+          })
+          expect(required(yield* catalog.model.get(providerID, modelID)).limit.context).toBe(1048576)
+          // one /v1/models, then one completion - and the credential rides both
+          expect(seen()).toEqual(["Bearer k", "Bearer k"])
+        }),
+      ),
+    )
+
+    it.effect("stays at zero when the alias resolves to a model the catalog does not describe", () =>
+      withGateway({ data: [{ id: "general", object: "model" }] }, "unlisted-model", (url, seen) =>
+        Effect.gen(function* () {
+          const catalog = yield* Catalog.Service
+          yield* addPlugin(configFor(url, { name: "Gateway" }), {
+            opencode: { models: { "space-bunny-free": { limit: { context: 1048576 } } } },
+          })
           expect(required(yield* catalog.model.get(providerID, modelID)).limit.context).toBe(0)
-          expect(seen().length).toBe(1)
+          expect(seen().length).toBe(2)
+        }),
+      ),
+    )
+
+    it.effect("leaves the context size at zero when nothing can answer", () =>
+      withGateway({ data: [{ id: "general", object: "model" }] }, undefined, (url, seen) =>
+        Effect.gen(function* () {
+          const catalog = yield* Catalog.Service
+          yield* addPlugin(configFor(url, { name: "Gateway" }), {})
+          expect(required(yield* catalog.model.get(providerID, modelID)).limit.context).toBe(0)
+          // /v1/models, then the alias probe which gets no name back
+          expect(seen().length).toBe(2)
         }),
       ),
     )

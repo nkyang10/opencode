@@ -5,6 +5,7 @@ import { Effect } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import { Config } from "../../config"
 import { ModelContextSize } from "../../model-context-size"
+import { ModelsDev } from "../../models-dev"
 import { ModelV2 } from "../../model"
 import { ProviderV2 } from "../../provider"
 
@@ -15,6 +16,7 @@ export const Plugin = define({
     // A catalog transform may not declare requirements, so the client is resolved once here and
     // handed to the transform's own effect rather than pulled from the ambient fiber.
     const http = yield* HttpClient.HttpClient
+    const modelsDev = yield* ModelsDev.Service
     yield* ctx.integration.transform(
       Effect.fn(function* (integrations) {
         const files = (yield* config.entries()).filter((entry): entry is Config.Document => entry.type === "document")
@@ -47,6 +49,7 @@ export const Plugin = define({
       Effect.fn(function* (catalog) {
         const entries = yield* config.entries()
         const files = entries.filter((entry): entry is Config.Document => entry.type === "document")
+        const limits = ModelContextSize.catalogLimits(yield* modelsDev.get())
         const configuredDefault = Config.latest(entries, "model")
         if (configuredDefault !== undefined) {
           const model = ModelV2.parse(configuredDefault)
@@ -118,21 +121,30 @@ export const Plugin = define({
               const baseURL = record?.provider.api.type === "aisdk" ? record.provider.api.url : undefined
               const auth = record && ModelContextSize.headers(record.provider)
               if (baseURL && auth) {
-                const current = catalog.model.get(providerID, id)?.limit.context ?? 0
-                const context = yield* ModelContextSize.fill({
-                  baseURL,
-                  headers: auth,
-                  modelID: id,
-                  current,
-                }).pipe(Effect.provideService(HttpClient.HttpClient, http))
-                if (context > 0 && context !== current) {
+                const withClient = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+                  effect.pipe(Effect.provideService(HttpClient.HttpClient, http))
+                const fromProvider = yield* withClient(
+                  ModelContextSize.fill({
+                    baseURL,
+                    headers: auth,
+                    modelID: id,
+                    current: catalog.model.get(providerID, id)?.limit.context ?? 0,
+                  }),
+                )
+                // Still 0 means the id is an alias, not a model: nothing the provider lists can say
+                // anything about it, and only a real request reveals what it points at.
+                const context = yield* withClient(
+                  ModelContextSize.resolveAlias({
+                    baseURL,
+                    headers: auth,
+                    modelID: id,
+                    current: fromProvider,
+                    limits: limits,
+                  }),
+                )
+                if (context > 0) {
                   catalog.model.update(providerID, id, (model) => {
                     model.limit.context = context
-                  })
-                  yield* Effect.logInfo("filled a missing model context size from the provider API", {
-                    providerID,
-                    modelID: id,
-                    context,
                   })
                 }
               }
