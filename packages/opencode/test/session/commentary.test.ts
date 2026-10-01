@@ -535,3 +535,86 @@ describe("closing grace", () => {
     expect(CLOSING_GRACE_MS).toBeGreaterThan(10_000)
   })
 })
+
+// The suite above tests the rule. This one feeds it a *sequence of ticks*, which is where the real defect was:
+// the evidence that work happened was consumed by the first idle tick, so the grace period spent it and a
+// narrated long turn stayed silent forever. A predicate test cannot see that, because the predicate was never
+// wrong — the state feeding it was. Found by watching a real 124-second turn finish and say nothing.
+describe("closing line across successive ticks", () => {
+  const makeSession = () => ({ pendingClose: false, idleSince: undefined as number | undefined })
+
+  /** One pass of the service's closing branch. */
+  const tick = (
+    state: ReturnType<typeof makeSession>,
+    input: { busy: boolean; unnarrated: boolean; answered: boolean; grace?: number },
+    now: number,
+  ) => {
+    const grace = input.grace ?? 15_000
+    if (input.busy) {
+      state.idleSince = undefined
+      state.pendingClose = true
+      return undefined
+    }
+    if (!state.pendingClose && !input.unnarrated) return undefined
+    if (!input.answered) return undefined
+    const idleSince = state.idleSince ?? now
+    state.idleSince = idleSince
+    if (now - idleSince < grace) return undefined
+    state.pendingClose = false
+    return "all done"
+  }
+
+  test("a long narrated turn says it once the grace has passed", () => {
+    // The narrator has spoken by the time the turn ends, so `unnarrated` is false from here on: the latch is
+    // the only thing still holding the evidence, which is exactly why it has to persist.
+    const state = makeSession()
+    tick(state, { busy: true, unnarrated: true, answered: true }, 0)
+    let said: string | undefined
+    for (let t = 10_000; t <= 60_000; t += 10_000)
+      said ??= tick(state, { busy: false, unnarrated: false, answered: true }, t)
+    expect(said).toBe("all done")
+  })
+
+  test("it waits out the grace rather than firing on the first idle tick", () => {
+    const state = makeSession()
+    tick(state, { busy: true, unnarrated: true, answered: true }, 0)
+    expect(tick(state, { busy: false, unnarrated: false, answered: true }, 10_000)).toBeUndefined()
+    // The grace counts from the first idle tick, so at t=20s only 10s of quiet has gone by.
+    expect(tick(state, { busy: false, unnarrated: false, answered: true }, 20_000)).toBeUndefined()
+    expect(tick(state, { busy: false, unnarrated: false, answered: true }, 25_000)).toBe("all done")
+  })
+
+  test("a reader who prompts again inside the grace restarts the wait", () => {
+    const state = makeSession()
+    tick(state, { busy: true, unnarrated: true, answered: true }, 0)
+    expect(tick(state, { busy: false, unnarrated: false, answered: true }, 10_000)).toBeUndefined()
+    tick(state, { busy: true, unnarrated: false, answered: false }, 15_000)
+    expect(tick(state, { busy: false, unnarrated: false, answered: true }, 20_000)).toBeUndefined()
+    expect(tick(state, { busy: false, unnarrated: false, answered: true }, 40_000)).toBe("all done")
+  })
+
+  test("it is said once, not on every later idle tick", () => {
+    const state = makeSession()
+    tick(state, { busy: true, unnarrated: true, answered: true }, 0)
+    let count = 0
+    for (let t = 10_000; t <= 120_000; t += 10_000)
+      if (tick(state, { busy: false, unnarrated: false, answered: true }, t)) count++
+    expect(count).toBe(1)
+  })
+
+  test("a short turn never seen busy still closes, on unnarrated activity", () => {
+    const state = makeSession()
+    let said: string | undefined
+    for (let t = 10_000; t <= 60_000; t += 10_000)
+      said ??= tick(state, { busy: false, unnarrated: t < 40_000, answered: true }, t)
+    expect(said).toBe("all done")
+  })
+
+  test("idle and quiet the whole time never says anything", () => {
+    const state = makeSession()
+    let said: string | undefined
+    for (let t = 10_000; t <= 120_000; t += 10_000)
+      said ??= tick(state, { busy: false, unnarrated: false, answered: true }, t)
+    expect(said).toBeUndefined()
+  })
+})

@@ -557,6 +557,17 @@ type State = {
   wasBusy: Map<SessionID, boolean>
   /** When each session was first seen idle, so the closing line can wait out the grace period. */
   idleSince: Map<SessionID, number>
+  /**
+   * Sessions with work finished but not yet announced. Set when a tick sees the session busy, spent only when
+   * the closing line is actually written.
+   *
+   * This has to be a latch rather than "was it busy on the previous tick", because the grace period spans
+   * several ticks: the evidence of work is consumed by the first idle tick and the second finds nothing left
+   * to close out, so a narrated long turn never said a word. Found by watching a real turn finish and stay
+   * silent — the unit test on the predicate could not see it, because the predicate was never wrong, only
+   * the state feeding it was.
+   */
+  pendingClose: Set<SessionID>
 }
 
 type Deps = {
@@ -586,6 +597,7 @@ const make = Effect.fn("SessionCommentary.make")(function* (deps: Deps) {
     announcedDecision: new Map(),
     wasBusy: new Map(),
     idleSince: new Map(),
+    pendingClose: new Set(),
   }
 
   const current = Effect.map(config.get(), (cfg) => settings(cfg.commentary))
@@ -982,17 +994,17 @@ const decisionSignature = (digest: string) => Bun.hash(digest).toString(16)
     //
     // and neither fires for a session that has been idle and quiet all along, which is what stops this
     // narrating an empty room every 30 seconds.
-    const wasBusy = state.wasBusy.get(sessionID) ?? false
     state.wasBusy.set(sessionID, busy)
     if (!blocked && busy) {
       state.idleSince.delete(sessionID)
+      state.pendingClose.add(sessionID)
       return undefined
     }
     if (!blocked) {
       const history = yield* list({ sessionID, limit: config.narrationHistory })
       const messages = yield* sessions.messages({ sessionID })
       const unnarrated = sliceFrom(messages, cursorOf(history)).length > 0
-      if (!wasBusy && !unnarrated) return undefined
+      if (!state.pendingClose.has(sessionID) && !unnarrated) return undefined
 
       // "All done" has to mean *done*, not merely idle. A prompt the reader has already sent and the agent has
       // not answered yet is a follow-up, and a tool call still running is not a finished turn — a session
@@ -1006,6 +1018,8 @@ const decisionSignature = (digest: string) => Bun.hash(digest).toString(16)
       const idleSince = state.idleSince.get(sessionID) ?? now
       state.idleSince.set(sessionID, idleSince)
       if (now - idleSince < config.closingGrace) return undefined
+      // Spent only now, so the latch survives the wait above.
+      state.pendingClose.delete(sessionID)
     }
     // A decision that has been announced and is still pending does not clear until it is answered, so the
     // signature is only forgotten when the blocking goes away.
@@ -1100,6 +1114,7 @@ const decisionSignature = (digest: string) => Bun.hash(digest).toString(16)
             state.lastSpecial.delete(sessionID)
             state.announcedDecision.delete(sessionID)
             state.idleSince.delete(sessionID)
+            state.pendingClose.delete(sessionID)
             continue
           }
           // Forked separately: the two calls are independent, and awaiting one before starting the other
