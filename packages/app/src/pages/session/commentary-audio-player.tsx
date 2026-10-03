@@ -1,9 +1,10 @@
 import { createEffect, createMemo, onCleanup, untrack } from "solid-js"
+import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { useServer } from "@/context/server"
 import { useSync } from "@/context/sync"
 import { CommentaryAudio } from "@/utils/commentary-audio"
-import { showToast } from "@/utils/toast"
+import { dismissToast, showToast } from "@/utils/toast"
 import { authTokenFromCredentials } from "@/utils/server"
 
 /**
@@ -20,11 +21,21 @@ import { authTokenFromCredentials } from "@/utils/server"
  */
 export function CommentaryAudioPlayer(props: { sessionID: string | undefined }) {
   const layout = useLayout()
+  const language = useLanguage()
   const server = useServer()
   const sync = useSync()
 
   const settings = () => layout.commentary
   const audioOn = createMemo(() => settings().enabled() && settings().audioEnabled())
+
+  // s095: the "your browser wants a tap" prompt. One toast at a time, and it outlives a slow reader because
+  // the line behind it is parked until they do: a prompt that timed out first would be a line nobody hears.
+  let blockedToast: number | undefined
+  const clearBlocked = () => {
+    if (blockedToast === undefined) return
+    dismissToast(blockedToast)
+    blockedToast = undefined
+  }
 
   console.log(`[audio] player created for session=${props.sessionID}`)
   const player = new CommentaryAudio({
@@ -40,6 +51,25 @@ export function CommentaryAudioPlayer(props: { sessionID: string | undefined }) 
       }
     },
     onError: (message) => showToast({ variant: "error", title: message }),
+    // The button's own `onClick` IS the gesture, which is the only place a `play()` counts. It is also the
+    // moment to wake the audio session, so this one tap covers the silent switch as well as the block.
+    onGestureRequired: () => {
+      clearBlocked()
+      blockedToast = showToast({
+        title: language.t("session.commentary.audioBlocked.title"),
+        description: language.t("session.commentary.audioBlocked.description"),
+        persistent: true,
+        actions: [
+          {
+            label: language.t("session.commentary.audioBlocked.action"),
+            onClick: () => {
+              clearBlocked()
+              player.resume()
+            },
+          },
+        ],
+      })
+    },
   })
 
   const sessionID = createMemo(() => props.sessionID)
@@ -79,9 +109,16 @@ export function CommentaryAudioPlayer(props: { sessionID: string | undefined }) 
   // a tab nobody is looking at.
   createEffect(() => {
     console.log(`[audio] audio toggle is now ${audioOn() ? "ON" : "OFF"}`)
-    if (!audioOn()) player.stop()
+    // The prompt goes with it: a "tap to hear this" toast for a reader who just turned the sound off is a lie.
+    if (!audioOn()) {
+      player.stop()
+      clearBlocked()
+    }
   })
-  onCleanup(() => player.stop())
+  onCleanup(() => {
+    player.stop()
+    clearBlocked()
+  })
 
   return null
 }

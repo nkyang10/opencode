@@ -34,10 +34,18 @@ class FakeAudio {
   preload = ""
   paused = true
   private result: "ok" | "reject" = "ok"
+  /**
+   * s095: refusals queued up for the *next* `play()` calls, one each. A queue rather than a flag because the
+   * behaviour under test is "the first attempt is refused, the one inside the tap is not" — which a sticky
+   * per-element flag cannot express, since the retry builds a brand new element.
+   */
+  static refusals: { name: string; message: string }[] = []
   pause() {
     this.paused = true
   }
   play() {
+    const refusal = FakeAudio.refusals.shift()
+    if (refusal) return Promise.reject(Object.assign(new Error(refusal.message), { name: refusal.name }))
     if (this.result === "reject") return Promise.reject(new Error("autoplay blocked"))
     this.paused = false
     // A real element fires these once the bytes are in; the tests drive them explicitly otherwise.
@@ -81,8 +89,17 @@ const clip = (seq: number, sessionID = "s1", text = `line ${seq}`, audio: string
 /** A line the server could not synthesize: same shape the event carries, with no hash at all. */
 const textOnly = (seq: number, sessionID = "s1", text = `line ${seq}`) => ({ sessionID, seq, text })
 
-function setup(options: { fetch?: typeof globalThis.fetch; onError?: (m: string) => void; gapMs?: number } = {}) {
+function setup(
+  options: {
+    fetch?: typeof globalThis.fetch
+    onError?: (m: string) => void
+    gapMs?: number
+    onGestureRequired?: () => void
+    createAudioContext?: () => AudioContext
+  } = {},
+) {
   FakeAudio.instances = []
+  FakeAudio.refusals = []
   let clock = 1_000
   const audio = new CommentaryAudio({
     sessionID: () => "s1",
@@ -91,8 +108,35 @@ function setup(options: { fetch?: typeof globalThis.fetch; onError?: (m: string)
     now: () => clock,
     gapMs: options.gapMs,
     onError: options.onError,
+    onGestureRequired: options.onGestureRequired,
+    createAudioContext: options.createAudioContext,
   })
   return { audio, tick: (ms: number) => (clock += ms) }
+}
+
+/** What a phone does when it will not play without being touched. The name is the whole signal. */
+const GESTURE = { name: "NotAllowedError", message: "play() can only be initiated by a user gesture." }
+/** Any other refusal — a codec it cannot decode, a source it will not load. Not something a tap can fix. */
+const CODEC = { name: "NotSupportedError", message: "the media could not be played" }
+
+/** s095: an `AudioContext` stand-in that records the two things that matter — resume, and a started buffer. */
+function fakeAudioContext() {
+  const state = { resumed: 0, started: 0 }
+  const context = {
+    sampleRate: 48_000,
+    destination: {},
+    resume() {
+      state.resumed++
+      return Promise.resolve()
+    },
+    createBuffer: () => ({}),
+    createBufferSource: () => ({
+      buffer: undefined as unknown,
+      connect: () => {},
+      start: () => state.started++,
+    }),
+  }
+  return { context: context as unknown as AudioContext, state }
 }
 
 const settle = () => new Promise((r) => setTimeout(r, 0))
@@ -446,5 +490,118 @@ describe("auth", () => {
     await settleChain()
     expect(seen[0]!.credentials).toBe("include")
     expect(seen[0]!.cache).toBe("no-store")
+  })
+})
+
+// s095: a phone that will not play without being touched. The rule the whole feature rests on is that the
+// line WAITS rather than being dropped, because the tap is the only place a `play()` counts.
+describe("CommentaryAudio when the browser wants a gesture", () => {
+  test("a gesture block parks the line and asks for a tap instead of dropping it", async () => {
+    const onError = mock((_message: string) => {})
+    const onGestureRequired = mock(() => {})
+    const { audio } = setup({ onError, onGestureRequired, gapMs: 0 })
+    FakeAudio.refusals.push(GESTURE)
+    audio.enqueue(clip(1))
+    await settleChain()
+    expect(onGestureRequired).toHaveBeenCalledTimes(1)
+    // Not an error toast: nothing has failed yet, it is waiting.
+    expect(onError).not.toHaveBeenCalled()
+    // The lock is deliberately HELD. Releasing it would start the next line over the top of this one.
+    expect(audio.isPlaying).toBe(true)
+    audio.enqueue(clip(2))
+    await settleChain()
+    expect(FakeAudio.instances).toHaveLength(1)
+  })
+
+  test("the tap replays the parked line, and the line is spoken after all", async () => {
+    const onError = mock((_message: string) => {})
+    const onGestureRequired = mock(() => {})
+    const { audio } = setup({ onError, onGestureRequired, gapMs: 0 })
+    FakeAudio.refusals.push(GESTURE)
+    audio.enqueue(clip(1))
+    await settleChain()
+    audio.resume()
+    await settleChain()
+    expect(FakeAudio.instances).toHaveLength(2)
+    expect(FakeAudio.instances[1]!.src).toContain("blob:")
+    FakeAudio.instances[1]!.finish()
+    await settleChain()
+    expect(audio.isPlaying).toBe(false)
+    expect(onError).not.toHaveBeenCalled()
+  })
+
+  test("the tap also wakes the audio session, which is what a silent phone obeys", async () => {
+    const { context, state } = fakeAudioContext()
+    const onGestureRequired = mock(() => {})
+    const { audio } = setup({ onGestureRequired, createAudioContext: () => context, gapMs: 0 })
+    FakeAudio.refusals.push(GESTURE)
+    audio.enqueue(clip(1))
+    await settleChain()
+    expect(state.resumed).toBe(0)
+    audio.resume()
+    expect(state.resumed).toBe(1)
+    // One frame of silence: enough to move the session out of the ringer category, short enough to be free.
+    await settle()
+    expect(state.started).toBe(1)
+  })
+
+  test("a refusal that is not about a gesture is still reported, never a prompt", async () => {
+    const onError = mock((_message: string) => {})
+    const onGestureRequired = mock(() => {})
+    const { audio } = setup({ onError, onGestureRequired, gapMs: 0 })
+    FakeAudio.refusals.push(CODEC)
+    audio.enqueue(clip(1))
+    await settleChain()
+    expect(onGestureRequired).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(audio.isPlaying).toBe(false)
+  })
+
+  test("a second refusal after the tap releases the lock and does not ask again", async () => {
+    const onError = mock((_message: string) => {})
+    const onGestureRequired = mock(() => {})
+    const { audio } = setup({ onError, onGestureRequired, gapMs: 0 })
+    FakeAudio.refusals.push(GESTURE, GESTURE)
+    audio.enqueue(clip(1))
+    await settleChain()
+    audio.resume()
+    await settleChain()
+    // The tap did not help, which is information \u2014 but not an invitation to tap forever.
+    expect(onGestureRequired).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(audio.isPlaying).toBe(false)
+  })
+
+  test("turning the sound off cancels a parked prompt, so the tap does nothing", async () => {
+    const onGestureRequired = mock(() => {})
+    const { audio } = setup({ onGestureRequired, gapMs: 0 })
+    FakeAudio.refusals.push(GESTURE)
+    audio.enqueue(clip(1))
+    await settleChain()
+    audio.stop()
+    audio.resume()
+    await settleChain()
+    // They said they do not want sound. Playing anyway would be the bug.
+    expect(FakeAudio.instances).toHaveLength(1)
+    expect(audio.isPlaying).toBe(false)
+  })
+
+  test("a line queued while one is parked plays after the parked one finishes", async () => {
+    const onGestureRequired = mock(() => {})
+    const { audio } = setup({ onGestureRequired, gapMs: 0 })
+    FakeAudio.refusals.push(GESTURE)
+    audio.enqueue(clip(1))
+    await settleChain()
+    audio.enqueue(clip(2))
+    audio.resume()
+    await settleChain()
+    expect(FakeAudio.instances).toHaveLength(2)
+    FakeAudio.instances[1]!.finish()
+    await settleChain()
+    // The second line took over by itself the moment the first was done, so a parked clip cannot strand the
+    // queue \u2014 which is the failure the old "release the lock" branch existed to prevent.
+    expect(FakeAudio.instances).toHaveLength(3)
+    expect(audio.pending).toBe(0)
+    expect(audio.isPlaying).toBe(true)
   })
 })

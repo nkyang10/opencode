@@ -40,6 +40,14 @@ export type SpeechOptions = {
   createAudio?: () => HTMLAudioElement
   now?: () => number
   onError?: (message: string) => void
+  /**
+   * s095: the browser refused playback until the reader interacts with the page, so the line is parked and
+   * this is called instead of dropping it. The caller shows whatever prompt it likes and then calls
+   * `resume()` **from inside a real gesture handler** — that is the only place a `play()` counts.
+   */
+  onGestureRequired?: () => void
+  /** Injected in tests; defaults to a real `AudioContext`. */
+  createAudioContext?: () => AudioContext
 }
 
 export type CommentaryClip = { sessionID: string; seq: number; text: string; audio?: string }
@@ -56,6 +64,17 @@ export function audioBlobFromBase64(encoded: string) {
   return new Blob([bytes], { type: "audio/mpeg" })
 }
 
+/**
+ * Did the browser refuse because it wants a user gesture, or because it cannot play this at all?
+ *
+ * The distinction is the whole of s095, and guessing it wrong in either direction is bad: treat a codec
+ * failure as a gesture and the reader is invited to tap a button that can never help; treat a gesture
+ * block as a codec failure and the line is silently dropped, which is what s094 measured.
+ */
+function isGestureRequired(error: unknown) {
+  return typeof error === "object" && error !== null && (error as { name?: string }).name === "NotAllowedError"
+}
+
 export class CommentaryAudio {
   private readonly queue: CommentaryClip[] = []
   private readonly spoken = new Map<string, number>()
@@ -64,11 +83,18 @@ export class CommentaryAudio {
   private playing = false
   private lastEndedAt = 0
   private gapTimer: ReturnType<typeof setTimeout> | undefined
+  /**
+   * s095: the retry for the line a gesture block parked, or undefined when nothing is parked. It is cleared
+   * by `stop()`, so a prompt the reader taps after switching the sound off is a no-op rather than a surprise.
+   */
+  private parked: (() => void) | undefined
   private readonly gapMs: number
   private readonly doFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
   private readonly createAudio: () => HTMLAudioElement
+  private readonly createAudioContext: () => AudioContext
   private readonly now: () => number
   private readonly onError: ((message: string) => void) | undefined
+  private readonly onGestureRequired: (() => void) | undefined
   private readonly sessionID: () => string | undefined
   private readonly extraHeaders: () => Record<string, string>
 
@@ -87,8 +113,10 @@ export class CommentaryAudio {
         element.preload = "auto"
         return element
       })
+    this.createAudioContext = options.createAudioContext ?? (() => new AudioContext())
     this.now = options.now ?? (() => Date.now())
     this.onError = options.onError
+    this.onGestureRequired = options.onGestureRequired
     this.sessionID = options.sessionID ?? (() => undefined)
     this.extraHeaders = options.headers ?? (() => ({}))
   }
@@ -146,6 +174,8 @@ export class CommentaryAudio {
   /** Drop anything queued and release the element. Used when audio is switched off or the tab is hidden. */
   stop() {
     this.queue.length = 0
+    // A prompt the reader taps after this must do nothing at all: they have just said they do not want sound.
+    this.parked = undefined
     if (this.gapTimer !== undefined) {
       clearTimeout(this.gapTimer)
       this.gapTimer = undefined
@@ -153,6 +183,48 @@ export class CommentaryAudio {
     if (this.audio) {
       this.audio.pause()
       this.release()
+    }
+  }
+
+  /**
+   * s095: play the line a gesture block parked. **Must be called from inside a real gesture handler** — that
+   * is the entire point, and it is why this cannot be a timer: measured under Chrome's strictest autoplay
+   * policy, a `play()` issued seconds after a tap is refused exactly like one issued before it.
+   *
+   * Waking the audio session first is what makes the tap worth asking for on iOS: a context started inside a
+   * gesture moves the session out of the ringer category, which is what a phone on silent obeys.
+   */
+  resume() {
+    const retry = this.parked
+    if (!retry) return
+    this.parked = undefined
+    this.wake()
+    console.log(`[audio] resume() from a user gesture, ${this.queue.length} line(s) still queued`)
+    retry()
+  }
+
+  /**
+   * Start (or wake) an `AudioContext` and push one frame of silence through it.
+   *
+   * iOS refuses programmatic playback until a context has been started inside a gesture, and it routes a bare
+   * `HTMLAudioElement` through the ringer category — so a phone on silent plays nothing. Both are fixed by the
+   * same gesture-bound context. Every call here is best-effort: a browser that throws instead of refusing must
+   * not take the playback down with it, because playback may well be allowed on its own.
+   */
+  private wake() {
+    try {
+      const context = this.createAudioContext()
+      const silence = () => {
+        const source = context.createBufferSource()
+        source.buffer = context.createBuffer(1, 1, context.sampleRate)
+        source.connect(context.destination)
+        source.start(0)
+      }
+      const resumed = context.resume()
+      if (resumed && typeof resumed.then === "function") resumed.then(silence).catch(() => {})
+      else silence()
+    } catch (error) {
+      console.log(`[audio] could not wake the audio session: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
@@ -256,7 +328,7 @@ export class CommentaryAudio {
       const blob = audioBlobFromBase64(encoded)
       url = URL.createObjectURL(blob)
       console.log(`[audio] seq=${clip.seq} blob ${blob.size} bytes -> ${url}`)
-      await this.play(url)
+      await this.play(url, clip)
     } catch (error) {
       console.error(
         `[audio] EXCEPTION: pump failed for seq=${clip.seq}`,
@@ -296,15 +368,28 @@ export class CommentaryAudio {
     this.onError?.(status === 404 ? `Speech: ${detail || "audio is missing"}` : `Speech: request failed (${status})`)
   }
 
-  private play(url: string): Promise<void> {
+  /**
+   * s095: play one clip, and survive a browser that will not play it without a gesture.
+   *
+   * The whole shape exists because of one measurement (s094): under Chrome's strictest autoplay policy a
+   * `play()` issued seconds after a real tap is refused exactly like one issued before it. So "unlock once"
+   * is not a thing — the play always comes from a timer, and a timer is never inside a gesture. What *is* a
+   * gesture is the reader tapping a prompt, so that is where the line goes to wait: `onGestureRequired`
+   * raises the prompt and `resume()` replays the clip from inside the tap.
+   *
+   * One promise spans both attempts, so the queue's gap and locking are unchanged and the object URL stays
+   * alive exactly as long as the line is waiting to be heard.
+   */
+  private play(url: string, clip: CommentaryClip): Promise<void> {
     return new Promise<void>((resolve) => {
-      const element = this.createAudio()
-      this.audio = element
       // `play()` resolving only means the browser accepted the request. If the media never loads, that
       // promise has already settled and nothing else will ever report a problem — which is exactly how a
       // Content Security Policy block turned into a completely silent feature.
       let watchdog: ReturnType<typeof setTimeout> | undefined
       let finished = false
+      // One prompt per clip: a reader who has tapped and still hears nothing should be told once, not
+      // invited into a loop of taps.
+      let asked = false
       const done = () => {
         if (finished) return
         finished = true
@@ -316,64 +401,80 @@ export class CommentaryAudio {
         this.scheduleNext()
         resolve()
       }
-      element.onended = () => {
-        console.log(`[audio] onended after ${element.duration?.toFixed(2)}s`)
-        done()
-      }
-      element.onerror = () => {
-        // A clip that already reached `ended` is not a failure, whatever the element says afterwards.
-        if (finished) return
-        const code = element.error?.code
-        const meaning =
-          code === 3
-            ? "MEDIA_ERR_DECODE — the bytes are not decodable audio"
-            : code === 4
-              ? "MEDIA_ERR_SRC_NOT_SUPPORTED — the browser refused the source (a CSP block on blob: looks like this)"
-              : `media error code ${code ?? "unknown"}`
-        console.error(`[audio] EXCEPTION: media element failed — ${meaning}`, element.error ?? "")
-        this.complain(0, "playback failed")
-        done()
-      }
-      element.addEventListener("loadedmetadata", () =>
-        console.log(`[audio] loadedmetadata duration=${element.duration?.toFixed(2)}s`),
-      )
-      element.addEventListener("canplay", () => {
-        console.log(`[audio] canplay — the media actually loaded`)
-        clearTimeout(watchdog)
-      })
-      element.addEventListener("stalled", () => console.log(`[audio] stalled`))
-      // `play()` resolving only means the browser accepted the request. If the media never loads, the promise
-      // has already settled and nothing else will ever report a problem — which is exactly how a Content
-      // Security Policy block produced a completely silent feature.
-      watchdog = setTimeout(() => {
-        if (element.readyState < 2) {
-          console.error(
-            `[audio] EXCEPTION: play() was accepted but the media never loaded (readyState=${element.readyState}, networkState=${element.networkState})`,
-            new Error(
-              `audio never loaded: readyState ${element.readyState}, networkState ${element.networkState}. If the source is a blob: URL this is a Content Security Policy block on media-src.`,
-            ),
-          )
+
+      const attempt = () => {
+        const element = this.createAudio()
+        this.audio = element
+        element.onended = () => {
+          console.log(`[audio] onended after ${element.duration?.toFixed(2)}s`)
+          done()
         }
-      }, 8000)
-      element.src = url
-      console.log(`[audio] play() called`)
-      const started = element.play()
-      // Autoplay rejection lands here. Releasing the lock is the whole point: leaving `playing` set would
-      // wedge the queue with no visible symptom.
-      if (started && typeof started.then === "function") {
+        element.onerror = () => {
+          // A clip that already reached `ended` is not a failure, whatever the element says afterwards.
+          if (finished) return
+          const code = element.error?.code
+          const meaning =
+            code === 3
+              ? "MEDIA_ERR_DECODE — the bytes are not decodable audio"
+              : code === 4
+                ? "MEDIA_ERR_SRC_NOT_SUPPORTED — the browser refused the source (a CSP block on blob: looks like this)"
+                : `media error code ${code ?? "unknown"}`
+          console.error(`[audio] EXCEPTION: media element failed — ${meaning}`, element.error ?? "")
+          this.complain(0, "playback failed")
+          done()
+        }
+        element.addEventListener("loadedmetadata", () =>
+          console.log(`[audio] loadedmetadata duration=${element.duration?.toFixed(2)}s`),
+        )
+        element.addEventListener("canplay", () => {
+          console.log(`[audio] canplay — the media actually loaded`)
+          clearTimeout(watchdog)
+        })
+        element.addEventListener("stalled", () => console.log(`[audio] stalled`))
+        watchdog = setTimeout(() => {
+          if (element.readyState < 2) {
+            console.error(
+              `[audio] EXCEPTION: play() was accepted but the media never loaded (readyState=${element.readyState}, networkState=${element.networkState})`,
+              new Error(
+                `audio never loaded: readyState ${element.readyState}, networkState ${element.networkState}. If the source is a blob: URL this is a Content Security Policy block on media-src.`,
+              ),
+            )
+          }
+        }, 8000)
+        element.src = url
+        console.log(`[audio] play() called${asked ? " (from a user gesture)" : ""}`)
+        const started = element.play()
+        if (!started || typeof started.then !== "function") return
         started.then(
           () =>
             console.log(
               `[audio] play() accepted — waiting for the media itself (this is where a blob: CSP block shows up)`,
             ),
-          (error: unknown) =>
-            console.log(`[audio] play() REJECTED: ${error instanceof Error ? error.message : String(error)}`),
+          (error: unknown) => {
+            console.log(`[audio] play() REJECTED: ${error instanceof Error ? error.message : String(error)}`)
+            // A gesture block is neither a failure to report nor a line to drop. Park it, keep the lock so
+            // nothing else starts over the top of it, and wait for the reader.
+            if (isGestureRequired(error) && !asked && this.onGestureRequired) {
+              asked = true
+              // The watchdog exists to catch a `play()` that resolved but never loaded. A refused play has
+              // already said what is wrong, so leaving it armed would log that false eight seconds from now.
+              if (watchdog) clearTimeout(watchdog)
+              this.parked = attempt
+              console.log(
+                `[audio] seq=${clip.seq} PARKED: the browser wants a gesture. The line keeps the lock and waits.`,
+              )
+              this.onGestureRequired()
+              return
+            }
+            // Anything else — a codec, a CSP block, a second refusal after the reader tapped — releases
+            // the lock. Wedge it and every later line is stranded behind a clip that will never play.
+            this.complain(0, "playback was refused")
+            done()
+          },
         )
-        started.catch(() => {
-          this.complain(0, "autoplay blocked — click the page once to allow sound")
-          done()
-        })
       }
+
+      attempt()
     })
   }
 }
