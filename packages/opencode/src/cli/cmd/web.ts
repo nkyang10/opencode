@@ -5,6 +5,7 @@ import { withNetworkOptions, resolveNetworkOptions, hasArg } from "../network"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Global } from "@opencode-ai/core/global"
 import { WebuiAutostart } from "../web-autostart"
+import { ServerLifecycle } from "@/server/lifecycle"
 import open from "open"
 import { networkInterfaces } from "os"
 
@@ -142,6 +143,31 @@ export const WebCommand = effectCmd({
       UI.println(UI.Style.TEXT_INFO_BOLD + "  Web interface:    ", UI.Style.TEXT_NORMAL, displayUrl)
       open(displayUrl).catch(() => {})
     }
+
+// s100: a stop signal drains instead of cutting. Installing a SIGTERM handler suppresses Node's
+    // default exit, so this handler owns the exit — including the "already inside the drain window"
+    // case, where the window was armed over HTTP by the deploy script and this signal is only the
+    // trigger. A second signal means "stop waiting": a reader who sends SIGINT twice means it, and so
+    // does a deploy script that has already waited out its backstop.
+    let draining = false
+    const drain = (signal: NodeJS.Signals) => {
+      if (draining) {
+        process.stderr.write(`[webui] ${signal} again — exiting now\n`)
+        process.exit(0)
+      }
+      draining = true
+      if (!ServerLifecycle.info().draining) ServerLifecycle.arm(ServerLifecycle.DefaultTimeoutMs, `signal:${signal}`)
+      const wait = ServerLifecycle.remainingMs()
+      process.stderr.write(
+        `[webui] ${signal} received — draining for ${wait}ms (reason: ${ServerLifecycle.reason()})\n`,
+      )
+      setTimeout(() => {
+        process.stderr.write("[webui] drain window elapsed — exiting\n")
+        process.exit(0)
+      }, wait)
+    }
+    process.on("SIGTERM", () => drain("SIGTERM"))
+    process.on("SIGINT", () => drain("SIGINT"))
 
     yield* Effect.never
   }),

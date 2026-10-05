@@ -4,6 +4,7 @@ import { EffectBridge } from "@/effect/bridge"
 import { EventV2 } from "@opencode-ai/core/event"
 import { Installation } from "@/installation"
 import { disposeAllInstancesAndEmitGlobalDisposed } from "@/server/global-lifecycle"
+import { ServerLifecycle } from "@/server/lifecycle"
 import { Webui } from "@/server/webui"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { Effect, Queue } from "effect"
@@ -107,6 +108,15 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       return true
     })
 
+    // s100: arming the window is a request, not a stop. The stop stays with whoever asked for it
+    // (the deploy script, or SIGTERM in the web command) — this endpoint only makes the drain
+    // *visible* to connected clients so they can count down and hold what the reader was sending.
+    const lifecycleArm = Effect.fn("GlobalHttpApi.lifecycleArm")(function* (ctx) {
+      const timeoutMs = ctx.payload.timeoutMs
+      const reason = ctx.payload.reason ?? "requested"
+      return ServerLifecycle.arm(timeoutMs, reason)
+    })
+
     const upgrade = Effect.fn("GlobalHttpApi.upgrade")(function* (ctx: { payload: typeof GlobalUpgradeInput.Type }) {
       const method = yield* installation.method()
       if (method === "unknown") {
@@ -143,6 +153,8 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       .handle("configUpdate", configUpdate)
       .handle("webui", webui)
       .handle("dispose", dispose)
+      .handle("lifecycle", () => Effect.sync(() => ServerLifecycle.info()))
+      .handle("lifecycleArm", lifecycleArm)
       .handle("upgrade", upgrade)
   }),
 )

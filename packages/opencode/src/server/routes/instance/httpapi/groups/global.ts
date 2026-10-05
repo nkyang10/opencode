@@ -84,7 +84,21 @@ export const GlobalPaths = {
   webui: "/global/webui",
   dispose: "/global/dispose",
   upgrade: "/global/upgrade",
+  lifecycle: "/global/lifecycle",
 } as const
+
+// s100: the restart window. `remainingMs` is a duration rather than a timestamp so a client with a
+// skewed clock can still count the right seconds — see `server/lifecycle.ts`.
+const GlobalLifecycle = Schema.Struct({
+  draining: Schema.Boolean,
+  remainingMs: Schema.NullOr(Schema.Number),
+  reason: Schema.NullOr(Schema.String),
+}).annotate({ identifier: "GlobalLifecycle" })
+
+const GlobalLifecycleInput = Schema.Struct({
+  timeoutMs: Schema.optional(Schema.Finite),
+  reason: Schema.optional(Schema.String),
+})
 
 export const GlobalApi = HttpApi.make("global").add(
   HttpApiGroup.make("global")
@@ -144,6 +158,27 @@ export const GlobalApi = HttpApi.make("global").add(
           identifier: "global.dispose",
           summary: "Dispose instance",
           description: "Clean up and dispose all OpenCode instances, releasing all resources.",
+        }),
+      ),
+      HttpApiEndpoint.get("lifecycle", GlobalPaths.lifecycle, {
+        success: described(GlobalLifecycle, "Restart window status"),
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.lifecycle",
+          summary: "Get restart window status",
+          description:
+            "Report whether the server has announced a restart, and how many milliseconds of the drain window are left. A client polls this to show a countdown that keeps running locally once the server stops answering.",
+        }),
+      ),
+      HttpApiEndpoint.post("lifecycleArm", GlobalPaths.lifecycle, {
+        payload: GlobalLifecycleInput,
+        success: described(GlobalLifecycle, "Restart window status"),
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.lifecycle.arm",
+          summary: "Announce a restart window",
+          description:
+            "Arm the drain window before stopping the server, so connected clients can count down, stop sending new prompts, and hold what the reader was trying to send.",
         }),
       ),
       HttpApiEndpoint.post("upgrade", GlobalPaths.upgrade, {
