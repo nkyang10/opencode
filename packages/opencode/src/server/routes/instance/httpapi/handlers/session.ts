@@ -10,6 +10,7 @@ import { SessionCommentary } from "@/session/commentary"
 import { CommentaryAudio } from "@/session/commentary-audio"
 import { SessionCompaction } from "@/session/compaction"
 import { MessageV2 } from "@/session/message-v2"
+import { NotFoundError } from "@/storage/storage"
 import { SessionPrompt } from "@/session/prompt"
 import { SessionRevert } from "@/session/revert"
 import { SessionRunState } from "@/session/run-state"
@@ -420,18 +421,39 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       const st = yield* statusSvc.get(sessionID)
       if (st.type !== "idle") return { status: "busy" as const }
       const page = yield* MessageV2.page({ sessionID, limit: 10 }).pipe(
-        Effect.orDie,
+        // `page` fails with NotFoundError when the session row is gone; a defect from a documented
+        // error path would surface as a 500 crash rather than the contract's 404.
+        Effect.catchIf(NotFoundError.isInstance, () => notFound(`Session not found: ${sessionID}`)),
       )
-      const { assistant } = MessageV2.latest(page.items)
-      // The interrupted-turn signal: an assistant message that never completed. Once the
-      // continuation is admitted, a newer message follows it and this stops being true —
-      // the endpoint is one-shot without any extra state.
-      if (!assistant || assistant.time.completed) return { status: "nothing-to-resume" as const }
+      const { user, assistant } = MessageV2.latest(page.items)
+      // Two shapes, same story — and finding the second one is why this endpoint exists at all:
+      //
+      // 1. **Cut off**: an assistant message that never completed. The row is written *before* the
+      //    model call, so a stop during a slow completion still leaves this shape.
+      // 2. **Never started**: the newest message overall is a user message with no assistant after
+      //    it. The gap between persisting the user message and creating the assistant row is small
+      //    but real (compaction, system prompt, history), and a stop inside it leaves a prompt that
+      //    nothing would ever answer — no marker, no resume, just a silent swallow.
+      //
+      // Both are one-shot without any extra state: the admitted continuation is a newer message than
+      // whatever was incomplete, so the derivation stops being true the moment it lands.
+      const tail = page.items.at(-1)?.info
+      const cutOff = assistant !== undefined && !assistant.time.completed
+      const neverStarted = assistant === undefined && tail?.role === "user"
+      if (!cutOff && !neverStarted) return { status: "nothing-to-resume" as const }
+      // The continuation continues the interrupted turn, so it borrows that turn's agent and model.
+      // With no assistant yet, the user message carries both.
+      const source = assistant ?? user
+      if (!source) return { status: "nothing-to-resume" as const }
+      const model =
+        "modelID" in source
+          ? { providerID: source.providerID, modelID: source.modelID }
+          : { providerID: source.model.providerID, modelID: source.model.modelID, variant: source.model.variant }
       yield* promptSvc
         .prompt({
           sessionID,
-          agent: assistant.agent,
-          model: { providerID: assistant.providerID, modelID: assistant.modelID },
+          agent: source.agent,
+          model,
           parts: [{ type: "text", text: RESUME_PROMPT }],
         })
         .pipe(

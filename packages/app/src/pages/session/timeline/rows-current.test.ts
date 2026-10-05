@@ -227,7 +227,10 @@ describe("current session timeline rows", () => {
     // is the whole window where the user used to see nothing at all.
     test("shows the progress row for a submitted turn the server has not acknowledged", () => {
       expect(rows("idle", "msg_u")).toEqual(["UserMessage", "Thinking"])
-      expect(rows("idle")).toEqual(["UserMessage"])
+      // Without the pending marker the server *has* acknowledged it and answered nothing: the turn
+      // was cut off before its assistant row existed. It used to render as a bare user message,
+      // which is how a swallowed prompt looked like nothing at all (s100).
+      expect(rows("idle")).toEqual(["UserMessage", "TurnDivider"])
     })
 
     // A retry backoff is still the server working on the turn: the row must not blank out and read
@@ -274,6 +277,15 @@ describe("current session timeline rows", () => {
         },
       ] satisfies SessionMessageInfo[]
       expect(dividerLabels(rowsFor(source, "idle"))).toEqual(["cut-off"])
+    })
+
+    test("marks a turn whose assistant never even started", () => {
+      // The gap between persisting the user message and creating the assistant row is real
+      // (compaction, system prompt, history). A stop inside it leaves a prompt with nothing to
+      // answer it — and `noReply` prompts, the only other way to get here, have no callers.
+      const source = [{ id: "msg_u", type: "user", text: "go", time: { created: 1 } }] satisfies SessionMessageInfo[]
+      expect(dividerLabels(rowsFor(source, "idle"))).toEqual(["cut-off"])
+      expect(dividerLabels(rowsFor(source, "busy"))).toEqual([])
     })
 
     test("marks nothing while the server is still working on the turn", () => {

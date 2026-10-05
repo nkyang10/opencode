@@ -220,12 +220,15 @@ export namespace Timeline {
     // must be idle, because during a live turn the tail assistant is *also* incomplete. A graceful
     // abort writes an error and is already handled by the "interrupted" divider above.
     const lastAssistant = assistantMessages.at(-1)
+    // A turn can be cut off two ways: the assistant message exists but never completed, or the turn
+    // never got one at all (a stop between persisting the user message and creating the assistant
+    // row — compaction, system prompt, history). The second shape is why the check cannot be
+    // "incomplete assistant": a prompt with no assistant and an idle session has no other
+    // explanation, and nothing else would ever answer it.
     const cutOff =
       isActive &&
       !inFlight &&
-      lastAssistant !== undefined &&
-      !lastAssistant.time.completed &&
-      !lastAssistant.error
+      (assistantMessages.length === 0 || (!lastAssistant!.time.completed && !lastAssistant!.error))
     if (cutOff) {
       rows.push(
         new TimelineRow.TurnDivider({
