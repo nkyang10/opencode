@@ -410,6 +410,9 @@ export const dict = {
   "dialog.directory.readError": "Nepodarilo sa načítať tento priečinok",
   "app.server.unreachable": "Nepodarilo sa kontaktovať {{server}}",
   "app.server.retrying": "Automaticky opakujem...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Iné servery",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

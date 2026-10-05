@@ -420,6 +420,9 @@ export const dict = {
   "dialog.directory.readError": "یہ فولڈر پڑھا نہیں جا سکا",
   "app.server.unreachable": "{{server}} تک نہیں پہنچ سکا",
   "app.server.retrying": "خودکار طور پر دوبارہ کوشش کر رہا ہے...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "دوسرے سرورز",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

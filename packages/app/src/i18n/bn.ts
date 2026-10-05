@@ -411,6 +411,9 @@ export const dict: Record<string, string> = {
   "dialog.directory.readError": "এই ফোল্ডারটি পড়তে অক্ষম৷",
   "app.server.unreachable": "{{server}} এ পৌঁছানো যায়নি",
   "app.server.retrying": "স্বয়ংক্রিয়ভাবে পুনরায় চেষ্টা করা হচ্ছে...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "অন্যান্য সার্ভার",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

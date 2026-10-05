@@ -445,6 +445,9 @@ export const dict = {
 
   "app.server.unreachable": "Tidak dapat menjangkau {{server}}",
   "app.server.retrying": "Mencoba ulang secara otomatis...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Server lainnya",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

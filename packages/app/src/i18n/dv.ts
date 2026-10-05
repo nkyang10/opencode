@@ -417,6 +417,9 @@ export const dict = {
   "dialog.directory.readError": "މި ފޯލްޑަރ ކިޔަން ނުކުޅެދިއްޖެއެވެ",
   "app.server.unreachable": "{{server}} އަށް ވާސިލްވެވޭ ގޮތެއް ނުވިއެވެ",
   "app.server.retrying": "އޮޓޮމެޓިކުން އަލުން މަސައްކަތް ކުރަނީ...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "އެހެން ސަރވަރތަކެވެ",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

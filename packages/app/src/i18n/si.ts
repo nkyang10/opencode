@@ -410,6 +410,9 @@ export const dict: Record<string, string> = {
   "dialog.directory.readError": "මෙම ෆෝල්ඩරය කියවීමට නොහැක",
   "app.server.unreachable": "{{server}} වෙත ළඟා විය නොහැක",
   "app.server.retrying": "ස්වයංක්‍රීයව නැවත උත්සාහ කරමින්...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "වෙනත් සේවාදායකයන්",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

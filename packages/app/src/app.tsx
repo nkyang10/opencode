@@ -49,9 +49,11 @@ import { LanguageProvider, type Locale, useLanguage } from "@/context/language"
 import { LayoutProvider } from "@/context/layout"
 import { ModelsProvider } from "@/context/models"
 import { NotificationProvider } from "@/context/notification"
+import { RestartBanner } from "@/components/restart-banner"
 import { PermissionProvider } from "@/context/permission"
 import { usePlatform } from "@/context/platform"
 import { PromptProvider } from "@/context/prompt"
+import { RestartProvider } from "@/context/restart"
 import { ServerConnection, ServerProvider, serverName, useServer } from "@/context/server"
 import { SettingsProvider, useSettings } from "@/context/settings"
 import { TabsProvider, useTabs, type DraftTab } from "@/context/tabs"
@@ -318,7 +320,12 @@ function SharedProviders(props: ParentProps) {
       <DocumentTitle />
       <CommandProvider>
         <DesktopCommands />
-        <HighlightsProvider>{props.children}</HighlightsProvider>
+        <HighlightsProvider>
+          <RestartProvider>
+            <RestartBanner />
+            {props.children}
+          </RestartProvider>
+        </HighlightsProvider>
       </CommandProvider>
     </>
   )

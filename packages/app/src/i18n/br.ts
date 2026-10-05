@@ -1190,6 +1190,9 @@ export const dict = {
 
   "app.server.unreachable": "Não foi possível conectar a {{server}}",
   "app.server.retrying": "Tentando novamente automaticamente...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Outros servidores",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

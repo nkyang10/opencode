@@ -415,6 +415,9 @@ export const dict = {
   "dialog.directory.readError": "ဤဖိုင်တွဲကို ဖတ်၍မရပါ။",
   "app.server.unreachable": "{{server}} သို့ မရောက်ရှိနိုင်ပါ။",
   "app.server.retrying": "အလိုအလျောက် ပြန်ကြိုးစားနေသည်...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "အခြားဆာဗာများ",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

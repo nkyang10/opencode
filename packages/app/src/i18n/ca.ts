@@ -413,6 +413,9 @@ export const dict = {
   "dialog.directory.readError": "No es pot llegir aquesta carpeta",
   "app.server.unreachable": "No s'ha pogut arribar a {{server}}",
   "app.server.retrying": "S'està tornant a provar automàticament...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Altres servidors",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

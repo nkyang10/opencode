@@ -413,6 +413,9 @@ export const dict = {
   "dialog.directory.readError": "Δεν είναι δυνατή η ανάγνωση αυτού του φακέλου",
   "app.server.unreachable": "Δεν ήταν δυνατή η πρόσβαση στο {{server}}",
   "app.server.retrying": "Αυτόματη προσπάθεια επανάληψης...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Άλλοι διακομιστές",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

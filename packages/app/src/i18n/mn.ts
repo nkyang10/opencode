@@ -414,6 +414,9 @@ export const dict = {
   "dialog.directory.readError": "Энэ фолдерыг унших боломжгүй байна",
   "app.server.unreachable": "{{server}}-д хүрч чадсангүй",
   "app.server.retrying": "Автоматаар дахин оролдож байна...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Бусад серверүүд",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

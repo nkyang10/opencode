@@ -415,6 +415,9 @@ export const dict = {
   "dialog.directory.readError": "Get ekki lesið þessa möppu",
   "app.server.unreachable": "Ekki tókst að ná í {{server}}",
   "app.server.retrying": "Reynir sjálfkrafa aftur...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Aðrir netþjónar",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

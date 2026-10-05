@@ -413,6 +413,9 @@ export const dict = {
   "dialog.directory.readError": "Ин ҷузвдонро хондан ғайриимкон аст",
   "app.server.unreachable": "Ба {{server}} расида натавонистам",
   "app.server.retrying": "Кӯшиши худкор...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Дигар серверҳо",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

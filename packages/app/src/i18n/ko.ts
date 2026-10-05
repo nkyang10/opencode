@@ -865,6 +865,9 @@ export const dict = {
 
   "app.server.unreachable": "{{server}}에 연결할 수 없습니다",
   "app.server.retrying": "자동으로 재시도 중...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "다른 서버",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

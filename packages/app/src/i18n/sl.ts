@@ -410,6 +410,9 @@ export const dict = {
   "dialog.directory.readError": "Te mape ni mogoče prebrati",
   "app.server.unreachable": "Ni bilo mogoče doseči {{server}}",
   "app.server.retrying": "Samodejni ponovni poskus ...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Drugi strežniki",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

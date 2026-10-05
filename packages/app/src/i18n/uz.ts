@@ -413,6 +413,9 @@ export const dict = {
   "dialog.directory.readError": "Bu jildni oʻqib boʻlmadi",
   "app.server.unreachable": "{{server}} ga etib boʻlmadi",
   "app.server.retrying": "Avtomatik qayta urinish...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Boshqa serverlar",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

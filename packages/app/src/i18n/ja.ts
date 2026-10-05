@@ -1172,6 +1172,9 @@ export const dict = {
 
   "app.server.unreachable": "{{server}} に到達できませんでした",
   "app.server.retrying": "自動的に再試行中...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "その他のサーバー",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

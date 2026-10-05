@@ -414,6 +414,9 @@ export const dict = {
   "dialog.directory.readError": "Тази папка не може да се прочете",
   "app.server.unreachable": "Не може да се достигне до {{server}}",
   "app.server.retrying": "Опитва се автоматично...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Други сървъри",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

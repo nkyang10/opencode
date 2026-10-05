@@ -416,6 +416,9 @@ export const dict: Record<string, string> = {
   "dialog.directory.readError": "སྣོད་འཛིན་འདི་ལྷག་མི་ཚུགས།",
   "app.server.unreachable": "{{server}} ལུ་ལྷོད་མ་ཚུགས།",
   "app.server.retrying": "རང་བཞིན་གྱིས་ལོག་འབད་རྩོལ་བསྐྱེད་དོ།",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "སར་བར་གཞན་ཚུ།",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

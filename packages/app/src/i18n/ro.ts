@@ -410,6 +410,9 @@ export const dict = {
   "dialog.directory.readError": "Nu se poate citi acest folder",
   "app.server.unreachable": "Nu s-a putut accesa {{server}}",
   "app.server.retrying": "Se reîncearcă automat...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Alte servere",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

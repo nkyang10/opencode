@@ -3,12 +3,13 @@ import { showToast } from "@/utils/toast"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { Binary } from "@opencode-ai/core/util/binary"
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
-import { batch, startTransition, type Accessor } from "solid-js"
+import { batch, createEffect, createSignal, startTransition, type Accessor } from "solid-js"
 import { useTabs } from "@/context/tabs"
 import { useServerSync, type ServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { useLocal, type ModelSelection } from "@/context/local"
+import { useRestart } from "@/context/restart"
 import { usePermission } from "@/context/permission"
 import { type ContextItem, type ImageAttachmentPart, type Prompt, type usePrompt } from "@/context/prompt"
 import { useSDK, type DirectorySDK } from "@/context/sdk"
@@ -250,6 +251,10 @@ export function createPromptSubmit(input: PromptSubmitInput) {
   const [search] = useSearchParams<{ draftId?: string }>()
   const tabs = useTabs()
   const pendingKey = (sessionID: string) => ScopedKey.from(sdk().scope, sessionID)
+  // s100: while the daemon is draining (or unreachable) a submit is held, not dropped — the
+  // reader's text stays in the editor and re-fires when the phase returns to idle.
+  const restart = useRestart()
+  const [owedSubmit, setOwedSubmit] = createSignal(false)
 
   const errorMessage = (err: unknown) => {
     if (err && typeof err === "object" && "message" in err && typeof err.message === "string") return err.message
@@ -322,6 +327,15 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
   const handleSubmit = async (event: Event) => {
     event.preventDefault()
+
+    if (restart.blocking()) {
+      setOwedSubmit(true)
+      showToast({
+        title: language.t("restart.held.title"),
+        description: language.t("restart.held.description"),
+      })
+      return
+    }
 
     const target = prompt.capture()
     const submission = createPromptSubmissionState({
@@ -650,6 +664,16 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       if (restoreInput()) restoreCommentItems(submission.target(), commentItems)
     })
   }
+
+  createEffect(() => {
+    if (restart.phase() !== "idle") return
+    if (!owedSubmit()) return
+    setOwedSubmit(false)
+    const target = prompt.capture()
+    // An editor the reader emptied while held is a cancelled prompt, not an empty send.
+    if (target.current().length === 0) return
+    void handleSubmit(new globalThis.Event("submit"))
+  })
 
   return {
     abort,

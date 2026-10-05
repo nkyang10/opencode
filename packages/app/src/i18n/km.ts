@@ -410,6 +410,9 @@ export const dict = {
   "dialog.directory.readError": "មិនអាចអានថតឯកសារនេះបានទេ។",
   "app.server.unreachable": "មិនអាចទៅដល់ {{server}} បានទេ។",
   "app.server.retrying": "កំពុងព្យាយាមម្តងទៀតដោយស្វ័យប្រវត្តិ...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "ម៉ាស៊ីនមេផ្សេងទៀត។",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

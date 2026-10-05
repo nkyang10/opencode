@@ -412,6 +412,9 @@ export const dict = {
   "dialog.directory.readError": "Kan deze map niet lezen",
   "app.server.unreachable": "Kan {{server}} niet bereiken",
   "app.server.retrying": "Automatisch opnieuw proberen...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Andere servers",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

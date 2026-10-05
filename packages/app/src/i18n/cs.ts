@@ -411,6 +411,9 @@ export const dict = {
   "dialog.directory.readError": "Tuto složku nelze přečíst",
   "app.server.unreachable": "Nelze dosáhnout {{server}}",
   "app.server.retrying": "Automaticky opakování...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Jiné servery",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

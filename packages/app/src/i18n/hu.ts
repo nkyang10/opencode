@@ -415,6 +415,9 @@ export const dict = {
   "dialog.directory.readError": "Ez a mappa nem olvasható",
   "app.server.unreachable": "A {{server}} nem érhető el",
   "app.server.retrying": "Automatikus újrapróbálkozás...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Egyéb szerverek",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

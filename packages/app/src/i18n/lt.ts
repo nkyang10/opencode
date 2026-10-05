@@ -416,6 +416,9 @@ export const dict = {
   "dialog.directory.readError": "Nepavyko perskaityti šio aplanko",
   "app.server.unreachable": "Nepavyko pasiekti {{server}}",
   "app.server.retrying": "Automatiškai bandoma iš naujo...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Kiti serveriai",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

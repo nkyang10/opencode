@@ -268,6 +268,13 @@ beforeAll(async () => {
     }),
   }))
 
+  mock.module("@/context/restart", () => ({
+    useRestart: () => ({
+      phase: () => "idle" as const,
+      remaining: () => null,
+      blocking: () => false,
+    }),
+  }))
   mock.module("@/context/language", () => ({
     useLanguage: () => ({
       t: (key: string) => key,

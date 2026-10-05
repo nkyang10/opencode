@@ -418,6 +418,9 @@ export const dict = {
   "dialog.directory.readError": "Không thể đọc thư mục này",
   "app.server.unreachable": "Không thể đạt tới {{server}}",
   "app.server.retrying": "Đang tự động thử lại...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Máy chủ khác",
 
   "app.title.tabs": "[{{done}} of {{total}}]",

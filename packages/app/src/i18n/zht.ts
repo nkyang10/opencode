@@ -1272,6 +1272,9 @@ export const dict = {
 
   "app.server.unreachable": "無法連線至 {{server}}",
   "app.server.retrying": "正在自動重試...",
+  "restart.window.countdown": "MarkCode 將在 {{seconds}} 秒後重啟——暫停送出",
+  "restart.held.title": "提示詞已保留",
+  "restart.held.description": "您的文字會留在編輯器中，伺服器恢復後自動送出。",
   "app.server.otherServers": "其他伺服器",
 
   "app.title.tabs": "[已完成 {{done}} / 共 {{total}}]",

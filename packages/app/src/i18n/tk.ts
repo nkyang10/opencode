@@ -411,6 +411,9 @@ export const dict = {
   "dialog.directory.readError": "Bu bukjany okap bolmaýar",
   "app.server.unreachable": "{{server}} baryp bilmedi",
   "app.server.retrying": "Awtomatiki usulda gaýtadan synanyşmak ...",
+  "restart.window.countdown": "MarkCode restarts in {{seconds}}s — sending is paused",
+  "restart.held.title": "Prompt held",
+  "restart.held.description": "Your text stays in the editor and will be sent when the server is back.",
   "app.server.otherServers": "Beýleki serwerler",
 
   "app.title.tabs": "[{{done}} of {{total}}]",
