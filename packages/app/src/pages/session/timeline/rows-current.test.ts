@@ -279,6 +279,16 @@ describe("current session timeline rows", () => {
       expect(dividerLabels(rowsFor(source, "idle"))).toEqual(["cut-off"])
     })
 
+    test("does not mark a never-started turn that is younger than the staleness threshold", () => {
+      // Another device sees a just-submitted prompt assistant-less for the beat before the first
+      // status event; offering Resume there would target a turn that is about to start.
+      const now = Date.now()
+      const source = [
+        { id: "msg_u", type: "user", text: "go", time: { created: now - 1_000 } },
+      ] satisfies SessionMessageInfo[]
+      expect(dividerLabels(rowsFor(source, "idle"))).toEqual([])
+    })
+
     test("marks a turn whose assistant never even started", () => {
       // The gap between persisting the user message and creating the assistant row is real
       // (compaction, system prompt, history). A stop inside it leaves a prompt with nothing to

@@ -32,6 +32,9 @@ export type TimelineRowMap = {
   Error: { userMessageID: string; text: string }
 }
 
+/** How old a no-assistant user message must be before "never started" may be assumed. */
+export const neverStartedStaleMs = 30_000
+
 export namespace Timeline {
   export function constructSessionMessageRows(
     messages: SessionMessageInfo[],
@@ -225,10 +228,25 @@ export namespace Timeline {
     // row — compaction, system prompt, history). The second shape is why the check cannot be
     // "incomplete assistant": a prompt with no assistant and an idle session has no other
     // explanation, and nothing else would ever answer it.
+    //
+    // The never-started shape additionally has to be **stale**. A user message that just arrived on
+    // another device sits assistant-less for the beat between its write and the first status event;
+    // marking it there would offer a Resume button on a turn that is about to start. Thirty seconds
+    // cannot be beaten by an honest gap, and the shape a crash leaves behind is always older than
+    // that. (An incomplete-assistant turn needs no threshold — the row existing proves the turn
+    // started and died.) The stamp is the server's clock, so this compares across a skew; the
+    // threshold absorbs it. One cost, accepted: a tab that sits quiet never re-derives, so its
+    // marker waits for the next sync event instead of appearing by itself.
+    const neverStartedStale = Date.now() - userMessage.time.created > neverStartedStaleMs
     const cutOff =
       isActive &&
       !inFlight &&
-      (assistantMessages.length === 0 || (!lastAssistant!.time.completed && !lastAssistant!.error))
+      (assistantMessages.length === 0
+        ? // Never started: only once the prompt is too old for any honest gap to explain.
+          neverStartedStale
+        : // Started but never finished: the row proves the turn ran; a graceful abort carries an
+          // error and is already covered by the "interrupted" divider.
+          !lastAssistant!.time.completed && !lastAssistant!.error)
     if (cutOff) {
       rows.push(
         new TimelineRow.TurnDivider({

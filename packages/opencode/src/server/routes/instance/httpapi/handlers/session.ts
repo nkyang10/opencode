@@ -54,9 +54,10 @@ const DEFAULT_SPEECH_VOICE = "cantonese"
 // What the resume turn is told. Bounded on purpose: one verification pass, then finish —
 // not an invitation to re-explore the whole session.
 const RESUME_PROMPT = [
-  "The server restarted while this session was running, so your previous turn was cut off.",
+  "The server restarted while this session was running, so the previous turn was cut off",
+  "or the last prompt was never processed.",
   "Tool calls that had already started may have partially taken effect: verify the current state",
-  "before continuing (read-only checks first), then finish the original request.",
+  "before continuing (read-only checks first), then complete the last user request.",
   "Do not redo work that is already done.",
 ].join(" ")
 
