@@ -81,6 +81,7 @@ export type Event =
   | EventProjectUpdated
   | EventSessionStatus
   | EventSessionIdle
+  | EventSessionCommentary
   | EventQuestionAsked
   | EventQuestionReplied
   | EventQuestionRejected
@@ -691,6 +692,33 @@ export type SessionStatus =
   | {
       type: "busy"
     }
+
+export type SessionCommentaryEntry = {
+  /**
+   * Per-session monotonically increasing entry number
+   */
+  seq: number
+  /**
+   * Creation time of the entry, in epoch milliseconds
+   */
+  time: number
+  /**
+   * The narration line itself
+   */
+  text: string
+  /**
+   * Last message id this entry describes
+   */
+  anchor: string
+  /**
+   * What this line is: absent for ordinary narration, 'closing' when the agent finished, 'prompt' when it is blocked on a decision
+   */
+  kind?: "closing" | "prompt"
+  /**
+   * Content hash of the pre-rendered audio for this line, or absent when none was rendered
+   */
+  audio?: string
+}
 
 export type QuestionOption = {
   /**
@@ -1507,6 +1535,14 @@ export type GlobalEvent = {
       }
     | {
         id: string
+        type: "session.commentary"
+        properties: {
+          sessionID: string
+          entry: SessionCommentaryEntry
+        }
+      }
+    | {
+        id: string
         type: "question.asked"
         properties: {
           id: string
@@ -1643,6 +1679,10 @@ export type GlobalEvent = {
  */
 export type LogLevel = "DEBUG" | "INFO" | "WARN" | "ERROR"
 
+export type ServerWebuiConfig = {
+  autoStart?: boolean
+}
+
 /**
  * Server configuration for opencode serve and web commands
  */
@@ -1652,6 +1692,39 @@ export type ServerConfig = {
   mdns?: boolean
   mdnsDomain?: string
   cors?: Array<string>
+  webui?: ServerWebuiConfig
+}
+
+export type CommentaryConfig = {
+  enabled?: boolean
+  interval?: number
+  model?: "session" | "small"
+  maxEntriesPerTurn?: number
+  minActivityChars?: number
+  narrationHistory?: number
+  minGap?: number
+  speech?: {
+    host?: string
+    hosts?: Array<string>
+    voice?: string
+    retention?: number
+    maxBytes?: number
+  }
+  special?: {
+    enabled?: boolean
+    minGap?: number
+    closingGrace?: number
+  }
+}
+
+export type SearchConfig = {
+  provider?: "auto" | "exa" | "parallel" | "serper"
+  serper?: {
+    key?: string
+    country?: string
+    locale?: string
+    numResults?: number
+  }
 }
 
 export type PermissionActionConfig = "ask" | "allow" | "deny"
@@ -1901,6 +1974,8 @@ export type Config = {
       subtask?: boolean
     }
   }
+  commentary?: CommentaryConfig
+  search?: SearchConfig
   skills?: {
     paths?: Array<string>
     urls?: Array<string>
@@ -2031,6 +2106,13 @@ export type Config = {
     mcp_timeout?: number
     policies?: Array<ConfigV2ExperimentalPolicy>
   }
+}
+
+export type GlobalLifecycle = {
+  draining: boolean
+  remainingMs: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+  reason: string
+  activeTurns: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
 }
 
 export type Model = {
@@ -2599,6 +2681,10 @@ export type SubtaskPartInput = {
   command?: string
 }
 
+export type SessionResumeResult = {
+  status: "resumed" | "busy" | "nothing-to-resume"
+}
+
 export type SessionBusyError = {
   _tag: "SessionBusyError"
   sessionID: string
@@ -2933,6 +3019,7 @@ export type V2Event =
   | ProjectUpdated
   | SessionStatus2
   | SessionIdle
+  | SessionCommentary
   | QuestionAsked
   | QuestionReplied2
   | QuestionRejected2
@@ -5932,6 +6019,24 @@ export type SessionIdle = {
   }
 }
 
+export type SessionCommentary = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "session.commentary"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    sessionID: string
+    entry: SessionCommentaryEntry
+  }
+}
+
 export type QuestionAsked = {
   id: string
   metadata?: {
@@ -6950,6 +7055,15 @@ export type EventSessionIdle = {
   }
 }
 
+export type EventSessionCommentary = {
+  id: string
+  type: "session.commentary"
+  properties: {
+    sessionID: string
+    entry: SessionCommentaryEntry
+  }
+}
+
 export type EventQuestionAsked = {
   id: string
   type: "question.asked"
@@ -7331,6 +7445,38 @@ export type GlobalConfigUpdateResponses = {
 
 export type GlobalConfigUpdateResponse = GlobalConfigUpdateResponses[keyof GlobalConfigUpdateResponses]
 
+export type GlobalWebuiData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/global/webui"
+}
+
+export type GlobalWebuiErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type GlobalWebuiError = GlobalWebuiErrors[keyof GlobalWebuiErrors]
+
+export type GlobalWebuiResponses = {
+  /**
+   * Web interface server status
+   */
+  200: {
+    configuredPort: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    defaultPort: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    runningPort: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    runningHostname: string
+    autoStart: boolean
+    restartRequired: boolean
+  }
+}
+
+export type GlobalWebuiResponse = GlobalWebuiResponses[keyof GlobalWebuiResponses]
+
 export type GlobalDisposeData = {
   body?: never
   path?: never
@@ -7355,6 +7501,59 @@ export type GlobalDisposeResponses = {
 }
 
 export type GlobalDisposeResponse = GlobalDisposeResponses[keyof GlobalDisposeResponses]
+
+export type GlobalLifecycleData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/global/lifecycle"
+}
+
+export type GlobalLifecycleErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type GlobalLifecycleError = GlobalLifecycleErrors[keyof GlobalLifecycleErrors]
+
+export type GlobalLifecycleResponses = {
+  /**
+   * Restart window status
+   */
+  200: GlobalLifecycle
+}
+
+export type GlobalLifecycleResponse = GlobalLifecycleResponses[keyof GlobalLifecycleResponses]
+
+export type GlobalLifecycleArmData = {
+  body?: {
+    timeoutMs?: number
+    reason?: string
+  }
+  path?: never
+  query?: never
+  url: "/global/lifecycle"
+}
+
+export type GlobalLifecycleArmErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type GlobalLifecycleArmError = GlobalLifecycleArmErrors[keyof GlobalLifecycleArmErrors]
+
+export type GlobalLifecycleArmResponses = {
+  /**
+   * Restart window status
+   */
+  200: GlobalLifecycle
+}
+
+export type GlobalLifecycleArmResponse = GlobalLifecycleArmResponses[keyof GlobalLifecycleArmResponses]
 
 export type GlobalUpgradeData = {
   body?: {
@@ -9726,6 +9925,200 @@ export type SessionTodoResponses = {
 
 export type SessionTodoResponse = SessionTodoResponses[keyof SessionTodoResponses]
 
+export type SessionCommentaryListData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+    limit?: string
+  }
+  url: "/session/{sessionID}/commentary"
+}
+
+export type SessionCommentaryListErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionCommentaryListError = SessionCommentaryListErrors[keyof SessionCommentaryListErrors]
+
+export type SessionCommentaryListResponses = {
+  /**
+   * Commentary entries, oldest first
+   */
+  200: Array<SessionCommentaryEntry>
+}
+
+export type SessionCommentaryListResponse = SessionCommentaryListResponses[keyof SessionCommentaryListResponses]
+
+export type SessionCommentaryWatchData = {
+  body?: {
+    instructions?: string
+    closing?: string
+    voice?: string
+    host?: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/commentary/watch"
+}
+
+export type SessionCommentaryWatchErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionCommentaryWatchError = SessionCommentaryWatchErrors[keyof SessionCommentaryWatchErrors]
+
+export type SessionCommentaryWatchResponses = {
+  /**
+   * Watching
+   */
+  200: boolean
+}
+
+export type SessionCommentaryWatchResponse = SessionCommentaryWatchResponses[keyof SessionCommentaryWatchResponses]
+
+export type SessionCommentaryAudioData = {
+  body?: never
+  path: {
+    sessionID: string
+    /**
+     * Content hash of a stored narration audio file
+     */
+    hash: string
+  }
+  query?: never
+  url: "/session/{sessionID}/commentary/audio/{hash}"
+}
+
+export type SessionCommentaryAudioErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionCommentaryAudioError = SessionCommentaryAudioErrors[keyof SessionCommentaryAudioErrors]
+
+export type SessionCommentaryAudioResponses = {
+  /**
+   * Base64-encoded audio
+   */
+  200: string
+}
+
+export type SessionCommentaryAudioResponse = SessionCommentaryAudioResponses[keyof SessionCommentaryAudioResponses]
+
+export type SessionCommentaryVoicesData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+    refresh?: "true" | "false"
+  }
+  url: "/session/{sessionID}/commentary/voices"
+}
+
+export type SessionCommentaryVoicesErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionCommentaryVoicesError = SessionCommentaryVoicesErrors[keyof SessionCommentaryVoicesErrors]
+
+export type SessionCommentaryVoicesResponses = {
+  /**
+   * What each speech endpoint can speak, and the configured default
+   */
+  200: {
+    default: {
+      host: string
+      voice: string
+    }
+    sources: Array<{
+      host: string
+      voices: Array<{
+        name: string
+        locale?: string
+        friendly?: string
+        aliases: Array<string>
+      }>
+      error?: string
+    }>
+  }
+}
+
+export type SessionCommentaryVoicesResponse = SessionCommentaryVoicesResponses[keyof SessionCommentaryVoicesResponses]
+
+export type SessionCommentaryUnwatchData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/commentary/unwatch"
+}
+
+export type SessionCommentaryUnwatchErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionCommentaryUnwatchError = SessionCommentaryUnwatchErrors[keyof SessionCommentaryUnwatchErrors]
+
+export type SessionCommentaryUnwatchResponses = {
+  /**
+   * No longer watching
+   */
+  200: boolean
+}
+
+export type SessionCommentaryUnwatchResponse =
+  SessionCommentaryUnwatchResponses[keyof SessionCommentaryUnwatchResponses]
+
 export type SessionDiffData = {
   body?: never
   path: {
@@ -10191,6 +10584,40 @@ export type SessionPromptAsyncResponses = {
 }
 
 export type SessionPromptAsyncResponse = SessionPromptAsyncResponses[keyof SessionPromptAsyncResponses]
+
+export type SessionResumeData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/resume"
+}
+
+export type SessionResumeErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionResumeError = SessionResumeErrors[keyof SessionResumeErrors]
+
+export type SessionResumeResponses = {
+  /**
+   * Resume outcome for a turn a server restart cut off
+   */
+  200: SessionResumeResult
+}
+
+export type SessionResumeResponse = SessionResumeResponses[keyof SessionResumeResponses]
 
 export type SessionCommandData = {
   body?: {

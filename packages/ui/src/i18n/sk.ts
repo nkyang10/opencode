@@ -192,6 +192,8 @@ export const dict: Record<string, string> = {
   "ui.message.duration.seconds": "{{count}} s",
   "ui.message.duration.minutesSeconds": "{{minutes}} m {{seconds}} s",
   "ui.message.interrupted": "Prerušené",
+  "ui.message.cutOff": "Interrupted — the server restarted mid-turn",
+  "ui.message.cutOff.action": "Resume",
   "ui.message.queued": "Zaradené do fronty",
   "ui.message.attachment.alt": "príloha",
   "ui.patch.action.deleted": "Odstránené",

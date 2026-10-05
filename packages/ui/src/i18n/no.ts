@@ -169,6 +169,8 @@ export const dict: Record<Keys, string> = {
   "ui.message.copyResponse": "Kopier svar",
   "ui.message.copied": "Kopiert!",
   "ui.message.interrupted": "Avbrutt",
+  "ui.message.cutOff": "Interrupted — the server restarted mid-turn",
+  "ui.message.cutOff.action": "Resume",
   "ui.message.queued": "I kø",
   "ui.message.attachment.alt": "vedlegg",
 

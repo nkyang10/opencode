@@ -194,6 +194,8 @@ export const dict = {
   "ui.message.copyResponse": "複製回覆",
   "ui.message.copied": "已複製！",
   "ui.message.interrupted": "已中斷",
+  "ui.message.cutOff": "已中斷——伺服器在回合中途重啟",
+  "ui.message.cutOff.action": "繼續",
   "ui.message.queued": "已加入佇列",
   "ui.message.attachment.alt": "附件",
 

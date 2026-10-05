@@ -166,6 +166,8 @@ export const dict = {
   "ui.message.copyResponse": "응답 복사",
   "ui.message.copied": "복사됨!",
   "ui.message.interrupted": "중단됨",
+  "ui.message.cutOff": "Interrupted — the server restarted mid-turn",
+  "ui.message.cutOff.action": "Resume",
   "ui.message.queued": "대기열에 추가됨",
   "ui.message.attachment.alt": "첨부 파일",
 

@@ -206,6 +206,8 @@ export const dict = {
   "ui.message.copyResponse": "نسخ الرد",
   "ui.message.copied": "تم النسخ!",
   "ui.message.interrupted": "تمت المقاطعة",
+  "ui.message.cutOff": "Interrupted — the server restarted mid-turn",
+  "ui.message.cutOff.action": "Resume",
   "ui.message.queued": "في قائمة الانتظار",
   "ui.message.attachment.alt": "مرفق",
 

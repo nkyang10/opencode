@@ -185,6 +185,8 @@ export const dict = {
   "ui.message.duration.seconds": "{{count}}s",
   "ui.message.duration.minutesSeconds": "{{minutes}}m {{seconds}}s",
   "ui.message.interrupted": "រំខាន",
+  "ui.message.cutOff": "Interrupted — the server restarted mid-turn",
+  "ui.message.cutOff.action": "Resume",
   "ui.message.queued": "តម្រង់ជួរ\nឯកសារភ្ជាប់",
   "ui.message.attachment.alt": "ឯកសារភ្ជាប់",
   "ui.patch.action.deleted": "បានលុប",

@@ -183,6 +183,8 @@ export const dict: Record<string, string> = {
   "ui.message.duration.seconds": "{{count}} ሰ",
   "ui.message.duration.minutesSeconds": "{{minutes}} ደ {{seconds}} ሰ",
   "ui.message.interrupted": "የተቋረጠ",
+  "ui.message.cutOff": "Interrupted — the server restarted mid-turn",
+  "ui.message.cutOff.action": "Resume",
   "ui.message.queued": "ወረፋ ላይ",
   "ui.message.attachment.alt": "አባሪ",
   "ui.patch.action.deleted": "የተሰረዘ",

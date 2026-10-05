@@ -213,6 +213,8 @@ export const dict: Record<string, string> = {
   "ui.message.duration.seconds": "{{count}}с",
   "ui.message.duration.minutesSeconds": "{{minutes}}хв {{seconds}}с",
   "ui.message.interrupted": "Перервано",
+  "ui.message.cutOff": "Interrupted — the server restarted mid-turn",
+  "ui.message.cutOff.action": "Resume",
   "ui.message.queued": "У черзі",
   "ui.message.attachment.alt": "вкладення",
 

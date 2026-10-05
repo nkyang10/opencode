@@ -184,6 +184,8 @@ export const dict = {
   "ui.message.duration.seconds": "{{count}}с",
   "ui.message.duration.minutesSeconds": "{{minutes}} мин. {{seconds}} сек.",
   "ui.message.interrupted": "Прекинато",
+  "ui.message.cutOff": "Interrupted — the server restarted mid-turn",
+  "ui.message.cutOff.action": "Resume",
   "ui.message.queued": "Во редица",
   "ui.message.attachment.alt": "приврзаност",
   "ui.patch.action.deleted": "Избришано",

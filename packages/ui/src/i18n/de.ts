@@ -176,6 +176,8 @@ export const dict = {
   "ui.message.copyResponse": "Antwort kopieren",
   "ui.message.copied": "Kopiert!",
   "ui.message.interrupted": "Unterbrochen",
+  "ui.message.cutOff": "Interrupted — the server restarted mid-turn",
+  "ui.message.cutOff.action": "Resume",
   "ui.message.queued": "In der Warteschlange",
   "ui.message.attachment.alt": "Anhang",
 

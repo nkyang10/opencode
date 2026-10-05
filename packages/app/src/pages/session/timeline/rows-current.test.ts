@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from "bun:test"
 import type { SessionMessageInfo } from "@opencode-ai/client/promise"
+import type { TimelineRow as TimelineRowModule } from "./rows"
 import { normalizeSessionMessages } from "@/utils/session-message"
 
 mock.module("@opencode-ai/session-ui/message-part", () => ({
@@ -234,6 +235,96 @@ describe("current session timeline rows", () => {
     test("shows the progress row while the server is retrying", () => {
       expect(rows("retry")).toEqual(["UserMessage", "Thinking", "Retry"])
       expect(rows("busy")).toEqual(["UserMessage", "Thinking"])
+    })
+  })
+
+  // s100: a daemon stop leaves an assistant message with no completion and no error — the same
+  // signal the server's resume endpoint reads. It must read as interrupted only on the last turn
+  // while the session is idle: during a live turn the tail assistant is *also* incomplete, and a
+  // graceful abort carries an error the existing "interrupted" divider already covers.
+  describe("turn cut off by a daemon stop", () => {
+    const base = { agent: "build", model: { id: "model", providerID: "provider" } }
+    const rowsFor = (source: SessionMessageInfo[], status: "idle" | "busy" | "retry") => {
+      const normalized = normalizeSessionMessages("ses_1", source)
+      const result = Timeline.constructSessionMessageRows(
+        source,
+        (messageID) => normalized.messages.find((message) => message.id === messageID),
+        () => [],
+        true,
+        status,
+        true,
+        normalized.messages.filter((message) => message.role === "user"),
+      )
+      return result.rows
+    }
+    const dividerLabels = (rows: TimelineRowModule.TimelineRow[]) =>
+      rows
+        .filter((row) => row._tag === "TurnDivider")
+        .map((row) => (row as Extract<TimelineRowModule.TimelineRow, { _tag: "TurnDivider" }>).label)
+
+    test("marks the last turn when its tail assistant never completed and the session is idle", () => {
+      const source = [
+        { id: "msg_u", type: "user", text: "go", time: { created: 1 } },
+        {
+          id: "msg_a",
+          type: "assistant",
+          ...base,
+          content: [{ type: "text", text: "partial" }],
+          time: { created: 2 },
+        },
+      ] satisfies SessionMessageInfo[]
+      expect(dividerLabels(rowsFor(source, "idle"))).toEqual(["cut-off"])
+    })
+
+    test("marks nothing while the server is still working on the turn", () => {
+      const source = [
+        { id: "msg_u", type: "user", text: "go", time: { created: 1 } },
+        {
+          id: "msg_a",
+          type: "assistant",
+          ...base,
+          content: [{ type: "text", text: "partial" }],
+          time: { created: 2 },
+        },
+      ] satisfies SessionMessageInfo[]
+      expect(dividerLabels(rowsFor(source, "busy"))).toEqual([])
+      expect(dividerLabels(rowsFor(source, "retry"))).toEqual([])
+    })
+
+    test("marks nothing when the turn completed", () => {
+      const source = [
+        { id: "msg_u", type: "user", text: "go", time: { created: 1 } },
+        {
+          id: "msg_a",
+          type: "assistant",
+          ...base,
+          content: [{ type: "text", text: "done" }],
+          time: { created: 2, completed: 3 },
+        },
+      ] satisfies SessionMessageInfo[]
+      expect(dividerLabels(rowsFor(source, "idle"))).toEqual([])
+    })
+
+    test("marks only the last turn — an older incomplete turn stays history", () => {
+      const source = [
+        { id: "msg_u1", type: "user", text: "first", time: { created: 1 } },
+        {
+          id: "msg_a1",
+          type: "assistant",
+          ...base,
+          content: [{ type: "text", text: "partial" }],
+          time: { created: 2 },
+        },
+        { id: "msg_u2", type: "user", text: "second", time: { created: 3 } },
+        {
+          id: "msg_a2",
+          type: "assistant",
+          ...base,
+          content: [{ type: "text", text: "partial" }],
+          time: { created: 4 },
+        },
+      ] satisfies SessionMessageInfo[]
+      expect(dividerLabels(rowsFor(source, "idle"))).toEqual(["cut-off"])
     })
   })
 })

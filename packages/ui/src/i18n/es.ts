@@ -194,6 +194,8 @@ export const dict = {
   "ui.message.copyResponse": "Copiar respuesta",
   "ui.message.copied": "¡Copiado!",
   "ui.message.interrupted": "Interrumpido",
+  "ui.message.cutOff": "Interrupted — the server restarted mid-turn",
+  "ui.message.cutOff.action": "Resume",
   "ui.message.queued": "En cola",
   "ui.message.attachment.alt": "adjunto",
 

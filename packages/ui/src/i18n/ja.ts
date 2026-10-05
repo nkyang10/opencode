@@ -189,6 +189,8 @@ export const dict = {
   "ui.message.copyResponse": "応答をコピー",
   "ui.message.copied": "コピーしました！",
   "ui.message.interrupted": "中断",
+  "ui.message.cutOff": "Interrupted — the server restarted mid-turn",
+  "ui.message.cutOff.action": "Resume",
   "ui.message.queued": "待機中",
   "ui.message.attachment.alt": "添付ファイル",
 

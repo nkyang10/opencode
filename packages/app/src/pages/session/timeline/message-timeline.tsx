@@ -391,6 +391,23 @@ export function MessageTimeline(props: {
     if (!id) return idle
     return sync().data.session_status[id] ?? idle
   })
+  // s100: resume a turn the daemon died in. The server derives the interrupted turn itself and
+  // refuses when busy or when there is nothing to resume, so this is safe to fire; the marker's
+  // reactive derivation (idle + tail assistant incomplete) makes it disappear the moment the
+  // continuation is admitted.
+  const resumeTurn = async () => {
+    const id = sessionID()
+    if (!id) return
+    try {
+      await sdk().client.session.resume({ sessionID: id })
+    } catch (error) {
+      showToast({
+        title: language.t("common.requestFailed"),
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
   // A prompt this client submitted and the server has not acknowledged yet. The timeline shows the
   // turn as in flight from the submit keystroke, not from the server's first status event.
   const pendingMessageID = createMemo(() => {
@@ -1328,13 +1345,24 @@ export function MessageTimeline(props: {
         return (
           <TimelineRowFrame row={turnDividerRow}>
             <div data-slot="session-turn-message-container" class="w-full px-4 md:px-5">
-              <div data-slot="session-turn-compaction">
-                <MessageDivider
-                  label={language.t(
-                    turnDividerRow().label === "compaction" ? "ui.messagePart.compaction" : "ui.message.interrupted",
-                  )}
-                />
-              </div>
+              <Show
+                when={turnDividerRow().label === "cut-off"}
+                fallback={
+                  <div data-slot="session-turn-compaction">
+                    <MessageDivider
+                      label={language.t(
+                        turnDividerRow().label === "compaction"
+                          ? "ui.messagePart.compaction"
+                          : "ui.message.interrupted",
+                      )}
+                    />
+                  </div>
+                }
+              >
+                <div data-slot="session-turn-cut-off">
+                  <SessionInterrupted onResume={() => void resumeTurn()} />
+                </div>
+              </Show>
             </div>
           </TimelineRowFrame>
         )
@@ -2067,6 +2095,25 @@ export function MessageTimeline(props: {
           </Show>
         </div>
       </ScrollView>
+    </div>
+  )
+}
+
+function SessionInterrupted(props: { onResume: () => void }) {
+  const language = useLanguage()
+  return (
+    <div data-slot="session-turn-interrupted" class="flex items-center gap-2 py-1.5">
+      <span class="size-2 shrink-0 rounded-full bg-v2-text-text-accent" aria-hidden="true" />
+      <span class="min-w-0 flex-1 truncate text-[13px] leading-4 tracking-[-0.04px] text-v2-text-text-faint">
+        {language.t("ui.message.cutOff")}
+      </span>
+      <button
+        type="button"
+        class="flex h-6 shrink-0 items-center rounded-[6px] border border-v2-border-border-base px-2 text-[13px] leading-none tracking-[-0.04px] text-v2-text-text-base transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
+        onClick={() => props.onResume()}
+      >
+        {language.t("ui.message.cutOff.action")}
+      </button>
     </div>
   )
 }

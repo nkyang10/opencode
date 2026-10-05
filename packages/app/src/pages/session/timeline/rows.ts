@@ -19,7 +19,7 @@ export type TimelineRowMap = {
   }
   TurnDivider: {
     userMessageID: string
-    label: "compaction" | "interrupted"
+    label: "compaction" | "interrupted" | "cut-off"
   }
   AssistantPart: {
     userMessageID: string
@@ -213,6 +213,27 @@ export namespace Timeline {
     }
 
     if (isActive && status === "retry") rows.push(new TimelineRow.Retry({ userMessageID: userMessage.id }))
+
+    // s100: a turn the daemon died in has no error to show — the last assistant message simply never
+    // completed. Same signal the resume endpoint reads server-side. It must be the last turn (an
+    // older turn left incomplete by a crash stays history, not something to act on) and the session
+    // must be idle, because during a live turn the tail assistant is *also* incomplete. A graceful
+    // abort writes an error and is already handled by the "interrupted" divider above.
+    const lastAssistant = assistantMessages.at(-1)
+    const cutOff =
+      isActive &&
+      !inFlight &&
+      lastAssistant !== undefined &&
+      !lastAssistant.time.completed &&
+      !lastAssistant.error
+    if (cutOff) {
+      rows.push(
+        new TimelineRow.TurnDivider({
+          userMessageID: userMessage.id,
+          label: "cut-off",
+        }),
+      )
+    }
 
     const diffs = uniqueSummaryDiffs(userMessage.summary?.diffs)
     if (diffs.length > 0 && (status === "idle" || !isActive)) {

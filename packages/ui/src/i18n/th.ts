@@ -190,6 +190,8 @@ export const dict = {
   "ui.message.copyResponse": "คัดลอกคำตอบ",
   "ui.message.copied": "คัดลอกแล้ว!",
   "ui.message.interrupted": "ถูกขัดจังหวะ",
+  "ui.message.cutOff": "Interrupted — the server restarted mid-turn",
+  "ui.message.cutOff.action": "Resume",
   "ui.message.queued": "อยู่ในคิว",
   "ui.message.attachment.alt": "ไฟล์แนบ",
 

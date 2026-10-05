@@ -86,8 +86,14 @@ import type {
   GlobalEventResponses,
   GlobalHealthErrors,
   GlobalHealthResponses,
+  GlobalLifecycleArmErrors,
+  GlobalLifecycleArmResponses,
+  GlobalLifecycleErrors,
+  GlobalLifecycleResponses,
   GlobalUpgradeErrors,
   GlobalUpgradeResponses,
+  GlobalWebuiErrors,
+  GlobalWebuiResponses,
   InstanceDisposeErrors,
   InstanceDisposeResponses,
   LocationRef,
@@ -181,6 +187,16 @@ import type {
   SessionChildrenResponses,
   SessionCommandErrors,
   SessionCommandResponses,
+  SessionCommentaryAudioErrors,
+  SessionCommentaryAudioResponses,
+  SessionCommentaryListErrors,
+  SessionCommentaryListResponses,
+  SessionCommentaryUnwatchErrors,
+  SessionCommentaryUnwatchResponses,
+  SessionCommentaryVoicesErrors,
+  SessionCommentaryVoicesResponses,
+  SessionCommentaryWatchErrors,
+  SessionCommentaryWatchResponses,
   SessionCreateErrors,
   SessionCreateResponses,
   SessionDeleteErrors,
@@ -205,6 +221,8 @@ import type {
   SessionPromptAsyncResponses,
   SessionPromptErrors,
   SessionPromptResponses,
+  SessionResumeErrors,
+  SessionResumeResponses,
   SessionRevertErrors,
   SessionRevertResponses,
   SessionShareErrors,
@@ -1321,6 +1339,43 @@ export class Config extends HeyApiClient {
   }
 }
 
+export class Lifecycle extends HeyApiClient {
+  /**
+   * Announce a restart window
+   *
+   * Arm the drain window before stopping the server, so connected clients can count down, stop sending new prompts, and hold what the reader was trying to send.
+   */
+  public arm<ThrowOnError extends boolean = false>(
+    parameters?: {
+      timeoutMs?: number
+      reason?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "body", key: "timeoutMs" },
+            { in: "body", key: "reason" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<GlobalLifecycleArmResponses, GlobalLifecycleArmErrors, ThrowOnError>({
+      url: "/global/lifecycle",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
 export class Global extends HeyApiClient {
   /**
    * Get health
@@ -1347,6 +1402,18 @@ export class Global extends HeyApiClient {
   }
 
   /**
+   * Get web interface server status
+   *
+   * Get the configured web interface port and auto-start setting, the port the server is actually listening on, and whether a restart is needed to apply a port change.
+   */
+  public webui<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<GlobalWebuiResponses, GlobalWebuiErrors, ThrowOnError>({
+      url: "/global/webui",
+      ...options,
+    })
+  }
+
+  /**
    * Dispose instance
    *
    * Clean up and dispose all OpenCode instances, releasing all resources.
@@ -1354,6 +1421,18 @@ export class Global extends HeyApiClient {
   public dispose<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
     return (options?.client ?? this.client).post<GlobalDisposeResponses, GlobalDisposeErrors, ThrowOnError>({
       url: "/global/dispose",
+      ...options,
+    })
+  }
+
+  /**
+   * Get restart window status
+   *
+   * Report whether the server has announced a restart, and how many milliseconds of the drain window are left. A client polls this to show a countdown that keeps running locally once the server stops answering.
+   */
+  public lifecycle<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<GlobalLifecycleResponses, GlobalLifecycleErrors, ThrowOnError>({
+      url: "/global/lifecycle",
       ...options,
     })
   }
@@ -1385,6 +1464,11 @@ export class Global extends HeyApiClient {
   private _config?: Config
   get config(): Config {
     return (this._config ??= new Config({ client: this.client }))
+  }
+
+  private _lifecycle?: Lifecycle
+  get lifecycle2(): Lifecycle {
+    return (this._lifecycle ??= new Lifecycle({ client: this.client }))
   }
 }
 
@@ -3365,6 +3449,203 @@ export class Provider extends HeyApiClient {
   }
 }
 
+export class Commentary extends HeyApiClient {
+  /**
+   * Get session commentary
+   *
+   * Retrieve the commentary narration written for a session. New entries are delivered over the event stream; this is the initial paint.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      limit?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "limit" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      SessionCommentaryListResponses,
+      SessionCommentaryListErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/commentary",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Watch session commentary
+   *
+   * Start or refresh the lease that keeps the commentary narration running, optionally carrying the reader's narration preferences. Call again before the lease expires to keep it alive.
+   */
+  public watch<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      instructions?: string
+      closing?: string
+      voice?: string
+      host?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "instructions" },
+            { in: "body", key: "closing" },
+            { in: "body", key: "voice" },
+            { in: "body", key: "host" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionCommentaryWatchResponses,
+      SessionCommentaryWatchErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/commentary/watch",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Get a narration line's audio
+   *
+   * Return the pre-rendered speech for a commentary entry, addressed by the content hash carried on that entry.
+   */
+  public audio<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      hash: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "hash" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      SessionCommentaryAudioResponses,
+      SessionCommentaryAudioErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/commentary/audio/{hash}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List the voices offered by the configured speech endpoints
+   *
+   * One entry per configured `commentary.speech.hosts` endpoint with the voices that endpoint reports. An endpoint that could not be reached comes back with `error` set and an empty list rather than failing the request.
+   */
+  public voices<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      refresh?: "true" | "false"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "refresh" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      SessionCommentaryVoicesResponses,
+      SessionCommentaryVoicesErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/commentary/voices",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Stop watching session commentary
+   *
+   * Release the commentary lease. A client that disappears without calling this is dropped when its lease expires.
+   */
+  public unwatch<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionCommentaryUnwatchResponses,
+      SessionCommentaryUnwatchErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/commentary/unwatch",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class Session2 extends HeyApiClient {
   /**
    * List sessions
@@ -4154,6 +4435,38 @@ export class Session2 extends HeyApiClient {
   }
 
   /**
+   * Resume an interrupted session
+   *
+   * Continue a turn that a server restart cut off. Refuses while the session is busy or when the transcript shows no interrupted turn; one-shot by construction, because the admitted continuation is a newer message than the incomplete assistant.
+   */
+  public resume<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SessionResumeResponses, SessionResumeErrors, ThrowOnError>({
+      url: "/session/{sessionID}/resume",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
    * Send command
    *
    * Send a new command to a session for execution by the AI assistant.
@@ -4330,6 +4643,11 @@ export class Session2 extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  private _commentary?: Commentary
+  get commentary(): Commentary {
+    return (this._commentary ??= new Commentary({ client: this.client }))
   }
 }
 

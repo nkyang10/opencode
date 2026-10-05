@@ -138,6 +138,10 @@ export const SummarizePayload = Schema.Struct({
   auto: Schema.optional(Schema.Boolean),
 })
 export const PromptPayload = Schema.Struct(Struct.omit(SessionPrompt.PromptInput.fields, ["sessionID"]))
+
+const SessionResumeResult = Schema.Struct({
+  status: Schema.Literals(["resumed", "busy", "nothing-to-resume"]),
+}).annotate({ identifier: "SessionResumeResult" })
 export const CommandPayload = Schema.Struct(Struct.omit(SessionPrompt.CommandInput.fields, ["sessionID"]))
 export const ShellPayload = Schema.Struct(Struct.omit(SessionPrompt.ShellInput.fields, ["sessionID"]))
 export const RevertPayload = Schema.Struct(Struct.omit(SessionRevert.RevertInput.fields, ["sessionID"]))
@@ -169,6 +173,7 @@ export const SessionPaths = {
   summarize: `${root}/:sessionID/summarize`,
   prompt: `${root}/:sessionID/message`,
   promptAsync: `${root}/:sessionID/prompt_async`,
+  resume: `${root}/:sessionID/resume`,
   command: `${root}/:sessionID/command`,
   shell: `${root}/:sessionID/shell`,
   revert: `${root}/:sessionID/revert`,
@@ -482,6 +487,22 @@ export const SessionApi = HttpApi.make("session")
             summary: "Send async message",
             description:
               "Create and send a new message to a session asynchronously, starting the session if needed and returning immediately.",
+          }),
+        ),
+        HttpApiEndpoint.post("resume", SessionPaths.resume, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(
+            SessionResumeResult,
+            "Resume outcome for a turn a server restart cut off",
+          ),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.resume",
+            summary: "Resume an interrupted session",
+            description:
+              "Continue a turn that a server restart cut off. Refuses while the session is busy or when the transcript shows no interrupted turn; one-shot by construction, because the admitted continuation is a newer message than the incomplete assistant.",
           }),
         ),
         HttpApiEndpoint.post("command", SessionPaths.command, {

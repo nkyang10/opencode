@@ -184,6 +184,8 @@ export const dict: Record<string, string> = {
   "ui.message.duration.seconds": "{{count}} վ",
   "ui.message.duration.minutesSeconds": "{{minutes}}ր {{seconds}}վ",
   "ui.message.interrupted": "Ընդհատված",
+  "ui.message.cutOff": "Interrupted — the server restarted mid-turn",
+  "ui.message.cutOff.action": "Resume",
   "ui.message.queued": "Հերթում",
   "ui.message.attachment.alt": "կցված",
   "ui.patch.action.deleted": "Ջնջված",

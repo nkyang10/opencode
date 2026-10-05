@@ -50,6 +50,15 @@ const MAX_SPEECH_RESPONSE_BYTES = 8 * 1024 * 1024
 const SPEECH_TIMEOUT = "30 seconds"
 const DEFAULT_SPEECH_VOICE = "cantonese"
 
+// What the resume turn is told. Bounded on purpose: one verification pass, then finish —
+// not an invitation to re-explore the whole session.
+const RESUME_PROMPT = [
+  "The server restarted while this session was running, so your previous turn was cut off.",
+  "Tool calls that had already started may have partially taken effect: verify the current state",
+  "before continuing (read-only checks first), then finish the original request.",
+  "Do not redo work that is already done.",
+].join(" ")
+
 const tryParseJson = (text: string) =>
   Effect.try({
     try: () => JSON.parse(text) as unknown,
@@ -398,6 +407,48 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       return HttpApiSchema.NoContent.make()
     })
 
+    // s100: the continuation for a turn a server restart cut off. The text is LLM-facing and
+    // deliberately English — it is an instruction to the agent, not UI copy. "Verify first" is the
+    // user's own idea (recorded in ide 40-knowledge/session-interruption-recovery.md): a tool that
+    // was running when the process died has an *unknown* effect, and the model must check before
+    // continuing rather than assume the last command failed or succeeded.
+    const resume = Effect.fn("SessionHttpApi.resume")(function* (ctx: {
+      params: { sessionID: SessionID }
+    }) {
+      const sessionID = ctx.params.sessionID
+      yield* requireSession(sessionID)
+      const st = yield* statusSvc.get(sessionID)
+      if (st.type !== "idle") return { status: "busy" as const }
+      const page = yield* MessageV2.page({ sessionID, limit: 10 }).pipe(
+        Effect.orDie,
+      )
+      const { assistant } = MessageV2.latest(page.items)
+      // The interrupted-turn signal: an assistant message that never completed. Once the
+      // continuation is admitted, a newer message follows it and this stops being true —
+      // the endpoint is one-shot without any extra state.
+      if (!assistant || assistant.time.completed) return { status: "nothing-to-resume" as const }
+      yield* promptSvc
+        .prompt({
+          sessionID,
+          agent: assistant.agent,
+          model: { providerID: assistant.providerID, modelID: assistant.modelID },
+          parts: [{ type: "text", text: RESUME_PROMPT }],
+        })
+        .pipe(
+          Effect.catchCause((cause) =>
+            Effect.gen(function* () {
+              yield* Effect.logError("resume failed", { sessionID, cause })
+              yield* events.publish(Session.Event.Error, {
+                sessionID,
+                error: new NamedError.Unknown({ message: Cause.pretty(cause) }).toObject(),
+              })
+            }),
+          ),
+          Effect.forkIn(scope, { startImmediately: true }),
+        )
+      return { status: "resumed" as const }
+    })
+
     const command = Effect.fn("SessionHttpApi.command")(function* (ctx: {
       params: { sessionID: SessionID }
       payload: typeof CommandPayload.Type
@@ -505,6 +556,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("commentaryAudio", commentaryAudio)
       .handle("prompt", prompt)
       .handle("promptAsync", promptAsync)
+      .handle("resume", resume)
       .handle("command", command)
       .handle("shell", shell)
       .handle("revert", revert)
