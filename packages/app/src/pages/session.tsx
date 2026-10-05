@@ -102,10 +102,6 @@ type VcsMode = "git" | "branch"
 const sessionViewState = () => ({
   messageId: undefined as string | undefined,
   mobileTab: "session" as "session" | "changes" | "commentary",
-  // FU-111: once you have opened the Commentary tab on a phone, the narration keeps running for the rest of
-  // this page visit, so you can read the chat and still get lines. Deliberately NOT persisted — this store
-  // is local, and persisting it would narrate every session you ever opened.
-  commentaryLatched: false,
 })
 
 function isCurrentSessionNotFoundError(error: unknown, sessionID: string | undefined) {
@@ -456,9 +452,10 @@ export default function Page() {
   const desktopCommentaryOpen = createMemo(() => isDesktop() && view().commentaryPanel.opened())
   const commentaryWidth = createMemo(() => (desktopCommentaryOpen() ? view().commentaryPanel.width() : 0))
 
-  // FU-028 / FU-111: the lease. Desktop watches while the column is open; mobile watches once the user has
-  // opened the Commentary tab in this visit, so reading the chat on a phone does not stop the narration.
-  // Mounted here, once per session view, so the panel itself can be mounted and unmounted freely.
+  // FU-028 / s097: the lease. Desktop watches while the column is open; mobile watches whenever the
+  // three-tab layout is up, because a phone shows the narration *or* the chat and sitting in the chat is
+  // exactly the case the narration exists for. Mounted here, once per session view, so the panel itself can
+  // be mounted and unmounted freely.
   createCommentaryWatch({
     sessionID: () => params.id,
     http: () => server.current?.http,
@@ -475,7 +472,6 @@ export default function Page() {
     watching: () => !!params.id && commentaryShouldWatch({
       isDesktop: isDesktop(),
       panelOpened: view().commentaryPanel.opened(),
-      latched: store.commentaryLatched,
       enabled: view().commentaryPanel.enabled(),
       foregrounded: foregrounded(),
     }),
@@ -2096,8 +2092,8 @@ export default function Page() {
             ? language.t("session.review.filesChanged", { count: reviewCount() })
             : language.t("session.review.change.other")}
         </Tabs.Trigger>
-        {/* FU-111: the narration tab. Selecting it latches the lease for the rest of this page visit, so
-            switching back to the chat does not stop the narration — a phone cannot show both at once. */}
+        {/* FU-111: the narration tab. Selecting it is not what starts the narration — s097 made the lease
+            follow the three-tab layout itself, so the lines keep coming while you read the chat. */}
         <Tabs.Trigger
           value="commentary"
           classList={{
@@ -2105,10 +2101,7 @@ export default function Page() {
             "!border-b-0 !border-t !border-border-weak-base [&:has([data-selected])]:!border-t-transparent": bottom,
           }}
           classes={{ button: compact ? "w-full !px-1 !py-2" : "w-full !px-1" }}
-          onClick={() => {
-            setStore("commentaryLatched", true)
-            setStore("mobileTab", "commentary")
-          }}
+          onClick={() => setStore("mobileTab", "commentary")}
         >
           {language.t("session.commentary.title")}
         </Tabs.Trigger>

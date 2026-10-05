@@ -10,13 +10,19 @@ import type { ServerConnection } from "@/context/server"
  *
  * - **Desktop** — the narration column is beside the chat, so being on screen *is* watching. The column's
  *   open state is the signal, exactly as before.
- * - **Mobile** — the narration is a tab, and a phone cannot show the tab and the chat at once. Tapping
- *   back to the chat would therefore stop the narration, which is the opposite of what someone reading a
- *   transcript on their phone wants. So the user's first visit to the tab latches it for the rest of the
- *   page visit: they can read the conversation and the lines keep accumulating.
+ * * **Mobile** — the narration is one of three tabs, and a phone cannot show it beside the chat, so which
+ *   tab is selected says nothing about whether the reader wants the lines. Sitting in the chat therefore
+ *   counts as watching (s097). The previous version made it conditional on a **latch** — the first tap of
+ *   the Commentary tab, held for the page visit — which was right about the tab and wrong about the cost:
+ *   the tap was the *only* affordance the feature had, so anyone who had not found that tab got no lease,
+ *   no lines, no hint and nothing to show that the feature existed. The cost that latch was protecting
+ *   against is bounded already by the two terms above it: one `enabled` switch the reader sets
+ *   deliberately, and one lease per session actually in front of them (there is no keep-alive, so a second
+ *   agent tab is not mounted and does not narrate).
  *
- * `enabled` is the Settings switch, and it is checked first because it is the only input that can be false
- * while the panel is open. It is a real off switch rather than a hidden button: the server narrates only
+ * `enabled` is the narration switch, which DEC-062 moved into the panel header (it used to be a Settings
+ * row), and it is checked first because it is the only input that can be false while the panel is open.
+ * It is a real off switch rather than a hidden button: the server narrates only
  * while some client holds a lease, so never asking is the same as not spending anything.
  *
  * `foregrounded` is FU-122's addition, and it is the one that changes what the lease MEANS. Audio is only
@@ -25,22 +31,22 @@ import type { ServerConnection } from "@/context/server"
  * predicate now governs both spending and speaking, which is the only way to stop those two drifting apart:
  * there is exactly one answer to "should this session be narrating right now".
  *
- * The latch is deliberately NOT persisted (it lives in the non-persisted `sessionViewState`), otherwise
- * every session you ever opened would narrate forever — the cost that the latch exists to avoid.
+ * The latch that used to sit here is gone rather than kept as a spare input: with the mobile rule reduced to
+ * "the three-tab layout is up", there is no state left for it to hold, and a field that no longer decides
+ * anything is a second answer to the same question.
  *
  * Pure and exported so the whole policy is unit-testable; `packages/app` has no `.test.tsx`.
  */
 export function commentaryShouldWatch(input: {
   isDesktop: boolean
   panelOpened: boolean
-  latched: boolean
   enabled: boolean
   foregrounded: boolean
 }): boolean {
   if (!input.enabled) return false
   // A hidden window gets no lease: it cannot be read, and with audio on it must not be heard either.
   if (!input.foregrounded) return false
-  return input.isDesktop ? input.panelOpened : input.latched
+  return input.isDesktop ? input.panelOpened : true
 }
 
 const HEARTBEAT_MS = 15_000
