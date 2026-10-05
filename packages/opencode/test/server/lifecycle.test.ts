@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { ServerLifecycle } from "@/server/lifecycle"
+import { ActiveTurns } from "@/session/active-turns"
 
 // The module reads Date.now() directly, so the clock is the only thing under test. Patching it here is
 // what makes a window elapse deterministically — real sleeps would make this suite slow and flaky, and
@@ -24,7 +25,7 @@ describe("ServerLifecycle", () => {
 
   test("no window is the resting state, and it says so with nulls rather than zeros", () => {
     at(0)
-    expect(ServerLifecycle.info()).toEqual({ draining: false, remainingMs: null, reason: null })
+    expect(ServerLifecycle.info()).toEqual({ draining: false, remainingMs: null, reason: null, activeTurns: 0 })
   })
 
   test("arming reports a duration, not a timestamp, so a skewed client clock cannot change it", () => {
@@ -72,7 +73,7 @@ describe("ServerLifecycle", () => {
     at(0)
     ServerLifecycle.arm(60_000, "deploy")
     ServerLifecycle.disarm()
-    expect(ServerLifecycle.info()).toEqual({ draining: false, remainingMs: null, reason: null })
+    expect(ServerLifecycle.info()).toEqual({ draining: false, remainingMs: null, reason: null, activeTurns: 0 })
     expect(ServerLifecycle.remainingMs()).toBe(0)
   })
 
@@ -89,6 +90,21 @@ describe("ServerLifecycle", () => {
     expect(armed.draining).toBe(true)
     expect(armed.remainingMs).toBe(8_000)
     expect(armed.reason).toBe("deploy")
+  })
+
+  test("the turn counter tracks what the drain waits for, and cannot go negative", () => {
+    at(0)
+    expect(ActiveTurns.active()).toBe(0)
+    ActiveTurns.begin()
+    ActiveTurns.begin()
+    expect(ServerLifecycle.info().activeTurns).toBe(2)
+    ActiveTurns.end()
+    expect(ActiveTurns.active()).toBe(1)
+    // A turn that ends twice (a defect, an old fiber's finalizer) must not push the count below zero
+    // and turn "idle" into "-1 turns remaining".
+    ActiveTurns.end()
+    ActiveTurns.end()
+    expect(ActiveTurns.active()).toBe(0)
   })
 
   test("a negative or absurd timeout cannot produce a negative window", () => {

@@ -18,6 +18,8 @@
 
 export * as ServerLifecycle from "./lifecycle"
 
+import { ActiveTurns } from "@/session/active-turns"
+
 const DefaultTimeoutMs = 60_000
 
 let deadline: number | undefined
@@ -34,6 +36,8 @@ export type Info = {
   remainingMs: number | null
   /** What armed the window, for the log line and for support. */
   reason: string | null
+  /** Prompt turns still running in this process — the drain waits for this to reach zero. */
+  activeTurns: number
 }
 
 /**
@@ -67,11 +71,13 @@ export function disarm() {
 }
 
 export function info(): Info {
-  if (deadline === undefined) return { draining: false, remainingMs: null, reason: null }
+  if (deadline === undefined)
+    return { draining: false, remainingMs: null, reason: null, activeTurns: ActiveTurns.active() }
   return {
     draining: true,
     remainingMs: Math.max(0, deadline - Date.now()),
     reason: armedBy ?? null,
+    activeTurns: ActiveTurns.active(),
   }
 }
 
@@ -86,3 +92,42 @@ export function reason() {
 }
 
 export { DefaultTimeoutMs }
+
+/**
+ * A stop signal drains instead of cutting (s100). Installing a handler suppresses Node's default
+ * exit, so this owns the process exit — including the "already inside the drain window" case, where
+ * the window was armed over HTTP by the deploy script and the signal is only the trigger.
+ *
+ * The wait ends at whichever comes first: the window elapsing, or **the last turn finishing** — an
+ * idle server has nothing to protect, so a deploy against it should not sit out the whole window. A
+ * second signal means "stop waiting": a reader who sends SIGINT twice means it, and so does a deploy
+ * script that has already waited out its backstop.
+ */
+export function installSignalDrain(label = "opencode") {
+  if (installed) return
+  installed = true
+  const handler = (signal: NodeJS.Signals) => {
+    if (draining) {
+      process.stderr.write(`[${label}] ${signal} again — exiting now\n`)
+      process.exit(0)
+    }
+    draining = true
+    if (!info().draining) arm(DefaultTimeoutMs, `signal:${signal}`)
+    process.stderr.write(`[${label}] ${signal} received — draining (reason: ${reason()})\n`)
+    const tick = setInterval(() => {
+      if (remainingMs() > 0 && ActiveTurns.active() > 0) return
+      clearInterval(tick)
+      process.stderr.write(
+        ActiveTurns.active() === 0
+          ? `[${label}] drain complete — exiting\n`
+          : `[${label}] drain window elapsed — exiting\n`,
+      )
+      process.exit(0)
+    }, 500)
+  }
+  process.on("SIGTERM", () => handler("SIGTERM"))
+  process.on("SIGINT", () => handler("SIGINT"))
+}
+
+let installed = false
+let draining = false

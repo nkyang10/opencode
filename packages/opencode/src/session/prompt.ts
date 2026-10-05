@@ -29,6 +29,7 @@ import { pathToFileURL, fileURLToPath } from "url"
 import { Config } from "@/config/config"
 import { ConfigMarkdown } from "@/config/markdown"
 import { SessionSummary } from "./summary"
+import { ActiveTurns } from "./active-turns"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { SessionProcessor } from "./processor"
 import { Tool } from "@/tool/tool"
@@ -1353,7 +1354,16 @@ const layer = Layer.effect(
     const loop: (input: LoopInput) => Effect.Effect<SessionV1.WithParts> = Effect.fn("SessionPrompt.loop")(function* (
       input: LoopInput,
     ) {
-      return yield* state.ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID))
+      // s100: the drain reads this process-global counter to know whether any turn is still in
+      // flight, so every entry — including a join onto an already-running turn — must hold a slot
+      // until its own await is satisfied. `Effect.ensuring` brings it back down on success, failure
+      // or interruption alike.
+      return yield* Effect.suspend(() => {
+        ActiveTurns.begin()
+        return state
+          .ensureRunning(input.sessionID, lastAssistant(input.sessionID), runLoop(input.sessionID))
+          .pipe(Effect.ensuring(Effect.sync(() => ActiveTurns.end())))
+      })
     })
 
     const shell: (input: ShellInput) => Effect.Effect<SessionV1.WithParts, Session.BusyError> = Effect.fn(

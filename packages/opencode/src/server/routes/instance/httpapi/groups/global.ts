@@ -93,6 +93,7 @@ const GlobalLifecycle = Schema.Struct({
   draining: Schema.Boolean,
   remainingMs: Schema.NullOr(Schema.Number),
   reason: Schema.NullOr(Schema.String),
+  activeTurns: Schema.Number,
 }).annotate({ identifier: "GlobalLifecycle" })
 
 const GlobalLifecycleInput = Schema.Struct({
