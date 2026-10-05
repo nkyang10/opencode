@@ -1,12 +1,15 @@
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
+import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
+import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { WordmarkV2 } from "@opencode-ai/ui/v2/wordmark-v2"
 import { Show, createMemo, createSignal, type Accessor } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Portal } from "solid-js/web"
 import createPresence from "solid-presence"
+import { useSearchParams } from "@solidjs/router"
 import { PromptInputV2Composer } from "@/components/prompt-input-v2"
 import { PromptGitStatus, PromptWorkspaceSelector } from "@/components/prompt-workspace-selector"
 import {
@@ -15,7 +18,9 @@ import {
   type PromptProjectController,
 } from "@/components/prompt-project-selector"
 import { StatusPopoverV2 } from "@/components/status-popover"
+import { useCommand } from "@/context/command"
 import { useLanguage } from "@/context/language"
+import { useTabs } from "@/context/tabs"
 import { useSDK } from "@/context/sdk"
 import { useServerSync } from "@/context/server-sync"
 import { useProviders } from "@/hooks/use-providers"
@@ -85,6 +90,48 @@ export function NewSessionStatus(props: { mount: Accessor<HTMLElement | null>; v
             <Tooltip placement="bottom" value={language.t("status.popover.trigger")}>
               <StatusPopoverV2 />
             </Tooltip>
+          </Show>
+        </Portal>
+      )}
+    </Show>
+  )
+}
+
+export function NewSessionCloseTab(props: { mount: Accessor<HTMLElement | null> }) {
+  const language = useLanguage()
+  const command = useCommand()
+  const tabs = useTabs()
+  const [searchParams] = useSearchParams<{ draftId?: string }>()
+  const index = () =>
+    tabs.store.findIndex((tab) => tab.type === "draft" && tab.draftID === searchParams.draftId)
+
+  return (
+    <Show when={props.mount()} keyed>
+      {(mount) => (
+        <Portal mount={mount}>
+          <Show when={index() !== -1}>
+            <TooltipV2
+              placement="bottom"
+              value={
+                <>
+                  {language.t("common.closeTab")}
+                  <KeybindV2 keys={command.keybindParts("tab.close")} variant="neutral" />
+                </>
+              }
+            >
+              <IconButtonV2
+                type="button"
+                variant="ghost-muted"
+                size="large"
+                class="shrink-0"
+                icon={<IconV2 name="close" />}
+                onClick={() => {
+                  const i = index()
+                  if (i !== -1) tabs.closeTab(i)
+                }}
+                aria-label={language.t("common.closeTab")}
+              />
+            </TooltipV2>
           </Show>
         </Portal>
       )}
