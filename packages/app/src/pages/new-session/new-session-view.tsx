@@ -74,6 +74,12 @@ export function NewSessionView(props: {
           </div>
         </div>
         <ProviderTip />
+        {/* The 48px row and the ghost-muted/large button mirror the session title row
+            (message-timeline.tsx `h-12 … justify-between` and its right-hand action
+            cluster), so the close control lands where a session's own title row is. */}
+        <div class="absolute right-2 top-0 flex h-12 items-center">
+          <NewSessionCloseTab />
+        </div>
       </div>
     </div>
   )
@@ -97,44 +103,37 @@ export function NewSessionStatus(props: { mount: Accessor<HTMLElement | null>; v
   )
 }
 
-export function NewSessionCloseTab(props: { mount: Accessor<HTMLElement | null> }) {
+export function NewSessionCloseTab() {
   const language = useLanguage()
   const command = useCommand()
   const tabs = useTabs()
   const [searchParams] = useSearchParams<{ draftId?: string }>()
-  const index = () =>
-    tabs.store.findIndex((tab) => tab.type === "draft" && tab.draftID === searchParams.draftId)
+  const index = () => tabs.store.findIndex((tab) => tab.type === "draft" && tab.draftID === searchParams.draftId)
 
   return (
-    <Show when={props.mount()} keyed>
-      {(mount) => (
-        <Portal mount={mount}>
-          <Show when={index() !== -1}>
-            <TooltipV2
-              placement="bottom"
-              value={
-                <>
-                  {language.t("common.closeTab")}
-                  <KeybindV2 keys={command.keybindParts("tab.close")} variant="neutral" />
-                </>
-              }
-            >
-              <IconButtonV2
-                type="button"
-                variant="ghost-muted"
-                size="large"
-                class="shrink-0"
-                icon={<IconV2 name="close" />}
-                onClick={() => {
-                  const i = index()
-                  if (i !== -1) tabs.closeTab(i)
-                }}
-                aria-label={language.t("common.closeTab")}
-              />
-            </TooltipV2>
-          </Show>
-        </Portal>
-      )}
+    <Show when={index() !== -1}>
+      <TooltipV2
+        placement="bottom"
+        value={
+          <>
+            {language.t("common.closeTab")}
+            <KeybindV2 keys={command.keybindParts("tab.close")} variant="neutral" />
+          </>
+        }
+      >
+        <IconButtonV2
+          type="button"
+          variant="ghost-muted"
+          size="large"
+          class="shrink-0"
+          icon={<IconV2 name="close" />}
+          onClick={() => {
+            const i = index()
+            if (i !== -1) tabs.closeTab(i)
+          }}
+          aria-label={language.t("common.closeTab")}
+        />
+      </TooltipV2>
     </Show>
   )
 }
