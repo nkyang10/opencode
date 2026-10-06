@@ -43,10 +43,13 @@ describe("ServerLifecycle", () => {
     expect(ServerLifecycle.remainingMs()).toBe(6_000)
     at(10_000)
     expect(ServerLifecycle.remainingMs()).toBe(0)
-    // Past the deadline this must read as 0, not a negative number a client would render as a countdown.
+    // Past the deadline this reads as 0, not a negative number a client would render as a countdown —
+    // and as NOT draining: a window that elapsed with no stop behind it must let input go back, or
+    // every client holds forever with no route back (answering the poll proves the process is up;
+    // a stop that is still coming shows up as the next poll failing).
     at(99_000)
     expect(ServerLifecycle.info().remainingMs).toBe(0)
-    expect(ServerLifecycle.info().draining).toBe(true)
+    expect(ServerLifecycle.info().draining).toBe(false)
   })
 
   test("a later, longer window cannot push out one that is already running", () => {
@@ -81,8 +84,8 @@ describe("ServerLifecycle", () => {
     at(0)
     ServerLifecycle.arm(2_000, "impatient")
     at(5_000)
-    // Still draining: this process is up and still supposed to stop, so the client keeps holding.
-    expect(ServerLifecycle.info().draining).toBe(true)
+    // Elapsed: not draining any more, and reported as 0 rather than a negative.
+    expect(ServerLifecycle.info().draining).toBe(false)
     expect(ServerLifecycle.info().remainingMs).toBe(0)
     // But the next caller must still get the window it asked for. Before the fix the stale deadline
     // compared as "earlier than now+8s", so this arm returned the old window and 8s never happened.
@@ -110,6 +113,8 @@ describe("ServerLifecycle", () => {
   test("a negative or absurd timeout cannot produce a negative window", () => {
     at(0)
     expect(ServerLifecycle.arm(-5, "bad").remainingMs).toBe(0)
-    expect(ServerLifecycle.arm(0, "now").draining).toBe(true)
+    // A zero-length window is over the instant it exists, so it reads as "not draining" — which is
+    // also why the signal handler re-arms the default rather than trusting it.
+    expect(ServerLifecycle.arm(0, "now").draining).toBe(false)
   })
 })

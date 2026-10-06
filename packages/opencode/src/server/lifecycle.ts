@@ -70,15 +70,24 @@ export function disarm() {
   armedBy = undefined
 }
 
+/**
+ * An **elapsed** window is not a window. Found by arming one on a live server with no stop behind it
+ * (a demo, or a deploy that aborts after announcing): the window counted down to zero and then kept
+ * reporting `draining`, so every client held input forever with no way back — there is no other path
+ * to `draining: false` once a deadline exists.
+ *
+ * Unblocking at zero is safe because **answering this poll at all proves the process is still up**.
+ * If the stop is genuinely imminent the next poll fails and the client moves to `reconnecting`, which
+ * holds again — so the honest reading is "the announcement is over; the server is answering", not
+ * "never unblock".
+ */
 export function info(): Info {
+  const activeTurns = ActiveTurns.active()
   if (deadline === undefined)
-    return { draining: false, remainingMs: null, reason: null, activeTurns: ActiveTurns.active() }
-  return {
-    draining: true,
-    remainingMs: Math.max(0, deadline - Date.now()),
-    reason: armedBy ?? null,
-    activeTurns: ActiveTurns.active(),
-  }
+    return { draining: false, remainingMs: null, reason: null, activeTurns }
+  const remainingMs = Math.max(0, deadline - Date.now())
+  if (remainingMs === 0) return { draining: false, remainingMs: 0, reason: null, activeTurns }
+  return { draining: true, remainingMs, reason: armedBy ?? null, activeTurns }
 }
 
 /** How long is left, for a drain loop that wants to sleep until the window closes. */
