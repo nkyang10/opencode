@@ -1,3 +1,6 @@
+import { ServerMaintenance } from "@/server/maintenance"
+import { SessionV2 } from "@opencode-ai/core/session"
+import { ActiveTurns } from "@/session/active-turns"
 import { Config } from "@/config/config"
 import { GlobalBus, type GlobalEvent as GlobalBusEvent } from "@/bus/global"
 import { EffectBridge } from "@/effect/bridge"
@@ -14,7 +17,7 @@ import { HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import * as Sse from "effect/unstable/encoding/Sse"
 import { RootHttpApi } from "../api"
-import { DirectoryPickerRequestError, GlobalUpgradeInput } from "../groups/global"
+import { DirectoryPickerRequestError, GlobalUpgradeInput, ServerRestartUnavailable } from "../groups/global"
 
 function eventData(data: unknown): Sse.Event {
   return {
@@ -62,6 +65,7 @@ function eventResponse() {
 
 export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handlers) =>
   Effect.gen(function* () {
+    const sessions = yield* SessionV2.Service
     const config = yield* Config.Service
     const installation = yield* Installation.Service
     const bridge = yield* EffectBridge.make()
@@ -162,6 +166,20 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       .handle("configUpdate", configUpdate)
       .handle("webui", webui)
       .handle("dispose", dispose)
+      .handle("maintenance", () => Effect.sync(ServerMaintenance.info))
+      .handle("restart", () =>
+        Effect.gen(function* () {
+          const accepted = ServerMaintenance.request(
+            async () => (await Effect.runPromise(sessions.active)).size + ActiveTurns.active(),
+          )
+          if (!accepted)
+            return yield* new ServerRestartUnavailable({
+              message:
+                "This host does not support self-restart. Restart it through its owning application or service manager.",
+            })
+          return { accepted }
+        }),
+      )
       .handle("lifecycle", () => Effect.sync(() => ServerLifecycle.info()))
       .handle("lifecycleArm", lifecycleArm)
       .handle("upgrade", upgrade)

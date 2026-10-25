@@ -6,6 +6,8 @@ import DESCRIPTION from "./websearch.txt"
 import { checksum } from "@opencode-ai/core/util/encode"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { Config } from "@/config/config"
+import { SerperSearch } from "@opencode-ai/core/tool/serper"
 
 export const Parameters = Schema.Struct({
   query: Schema.String.annotate({ description: "Websearch query" }),
@@ -24,12 +26,17 @@ export const Parameters = Schema.Struct({
   }),
 })
 
-const WebSearchProviderSchema = Schema.Literals(["exa", "parallel"])
+const WebSearchProviderSchema = Schema.Literals(["exa", "parallel", "serper"])
 export type WebSearchProvider = Schema.Schema.Type<typeof WebSearchProviderSchema>
 
-export function selectWebSearchProvider(sessionID: string, flags = { exa: false, parallel: false }): WebSearchProvider {
+export function selectWebSearchProvider(
+  sessionID: string,
+  flags = { exa: false, parallel: false },
+  serperKey?: string,
+): WebSearchProvider {
   const override = process.env.OPENCODE_WEBSEARCH_PROVIDER
-  if (override === "exa" || override === "parallel") return override
+  if (override === "exa" || override === "parallel" || override === "serper") return override
+  if (serperKey?.trim() || process.env.SERPER_API_KEY?.trim()) return "serper"
   if (flags.parallel) return "parallel"
   if (flags.exa) return "exa"
 
@@ -37,6 +44,7 @@ export function selectWebSearchProvider(sessionID: string, flags = { exa: false,
 }
 
 export function webSearchProviderLabel(provider: unknown) {
+  if (provider === "serper") return "Serper Web Search"
   if (provider === "parallel") return "Parallel Web Search"
   if (provider === "exa") return "Exa Web Search"
   return "Web Search"
@@ -62,7 +70,9 @@ function callProvider(
   provider: WebSearchProvider,
   params: Schema.Schema.Type<typeof Parameters>,
   ctx: Tool.Context,
+  serperKey?: string,
 ) {
+  if (provider === "serper") return SerperSearch.search(http, serperKey ?? process.env.SERPER_API_KEY, params)
   if (provider === "parallel") {
     return McpWebSearch.call(
       http,
@@ -101,6 +111,7 @@ export const WebSearchTool = Tool.define(
   Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient
     const flags = yield* RuntimeFlags.Service
+    const config = yield* Config.Service
 
     return {
       get description() {
@@ -109,10 +120,15 @@ export const WebSearchTool = Tool.define(
       parameters: Parameters,
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         Effect.gen(function* () {
-          const provider = selectWebSearchProvider(ctx.sessionID, {
-            exa: flags.enableExa,
-            parallel: flags.enableParallel,
-          })
+          const key = (yield* config.get()).search?.serper?.key
+          const provider = selectWebSearchProvider(
+            ctx.sessionID,
+            {
+              exa: flags.enableExa,
+              parallel: flags.enableParallel,
+            },
+            key,
+          )
           const title = webSearchProviderLabel(provider)
           yield* ctx.metadata({ title: `${title} "${params.query}"`, metadata: { provider } })
 
@@ -130,7 +146,7 @@ export const WebSearchTool = Tool.define(
             },
           })
 
-          const result = yield* callProvider(http, provider, params, ctx)
+          const result = yield* callProvider(http, provider, params, ctx, key)
 
           return {
             output: result ?? "No search results found. Please try a different query.",

@@ -55,12 +55,17 @@ import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { McpCatalog } from "@/mcp/catalog"
 
-export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
+export function webSearchEnabled(
+  providerID: ProviderV2.ID,
+  flags = { exa: false, parallel: false },
+  serperKey?: string,
+) {
   return (
     providerID === ProviderV2.ID.opencode ||
     providerID === ProviderV2.ID.make("opencode-go") ||
     flags.exa ||
-    flags.parallel
+    flags.parallel ||
+    !!(serperKey?.trim() || process.env.SERPER_API_KEY?.trim())
   )
 }
 
@@ -289,9 +294,10 @@ const layer = Layer.effect(
     })
 
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
+      const searchKey = (yield* config.get()).search?.serper?.key
       const filtered = (yield* all()).filter((tool) => {
         if (tool.id === WebSearchTool.id) {
-          return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })
+          return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel }, searchKey)
         }
 
         const usePatch =

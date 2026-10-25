@@ -5,6 +5,7 @@ import type { ModelSelection } from "@/context/local"
 
 let createPromptSubmit: typeof import("./submit").createPromptSubmit
 
+let restartPhase: "idle" | "draining" | "reconnecting" = "idle"
 const createdClients: string[] = []
 const createdSessions: string[] = []
 const sessionCreateInputs: Array<{
@@ -270,9 +271,9 @@ beforeAll(async () => {
 
   mock.module("@/context/restart", () => ({
     useRestart: () => ({
-      phase: () => "idle" as const,
+      phase: () => restartPhase,
       remaining: () => null,
-      blocking: () => false,
+      blocking: () => restartPhase !== "idle",
     }),
   }))
   mock.module("@/context/language", () => ({
@@ -286,6 +287,7 @@ beforeAll(async () => {
 })
 
 beforeEach(() => {
+  restartPhase = "idle"
   createdClients.length = 0
   createdSessions.length = 0
   sessionCreateInputs.length = 0
@@ -457,6 +459,54 @@ describe("prompt submit worktree selection", () => {
   test("includes the selected variant on optimistic prompts", async () => {
     params = { id: "session-1" }
     variant = "high"
+
+    const submit = createPromptSubmit({
+      prompt,
+      info: () => ({ id: "session-1" }),
+      imageAttachments: () => [],
+      commentCount: () => 0,
+      autoAccept: () => false,
+      mode: () => "normal",
+      working: () => false,
+      editor: () => undefined,
+      queueScroll: () => undefined,
+      promptLength: (value) => value.reduce((sum, part) => sum + ("content" in part ? part.content.length : 0), 0),
+      addToHistory: () => undefined,
+      resetHistoryNavigation: () => undefined,
+      setMode: () => undefined,
+      setPopover: () => undefined,
+      onSubmit: () => undefined,
+    })
+
+    const event = { preventDefault: () => undefined } as unknown as Event
+
+    await submit.handleSubmit(event)
+    await Bun.sleep(0)
+
+    expect(optimistic).toHaveLength(1)
+    expect(optimistic[0]).toMatchObject({
+      message: {
+        agent: "agent",
+        model: { providerID: "provider", modelID: "model", variant: "high" },
+      },
+    })
+    expect(sentPrompts).toEqual(["/repo/main"])
+    expect(promptInputs[0]).toMatchObject({
+      sessionID: "session-1",
+      text: "ls",
+      files: [],
+      agents: [],
+    })
+    expect((promptInputs[0] as { id?: string }).id).toStartWith("msg_")
+    expect((promptInputs[0] as { legacyParts?: { id: string; type: string; text?: string }[] }).legacyParts).toEqual([
+      { id: expect.stringMatching(/^prt_/), type: "text", text: "ls" },
+    ])
+  })
+
+  test.each(["draining", "reconnecting"] as const)("submits immediately despite %s notices", async (phase) => {
+    params = { id: "session-1" }
+    variant = "high"
+    restartPhase = phase
 
     const submit = createPromptSubmit({
       prompt,

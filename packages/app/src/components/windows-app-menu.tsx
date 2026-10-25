@@ -1,3 +1,4 @@
+import { MaintenanceMenu } from "./maintenance-menu"
 import { Show, type JSX } from "solid-js"
 import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -98,6 +99,7 @@ export function WindowsAppMenu(props: {
                   )}
               </DesktopMenuSubmenu>
             ))}
+            <MaintenanceMenu />
           </DropdownMenu.Group>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

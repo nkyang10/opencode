@@ -43,6 +43,7 @@ export function createSessionComposerRegionController(input: {
   const [store, setStore] = createStore({
     ready: input.ready() || input.state.dock(),
     height: 320,
+    dismissedTodo: undefined as string | undefined,
     body: undefined as HTMLDivElement | undefined,
   })
   let timer: number | undefined
@@ -106,7 +107,10 @@ export function createSessionComposerRegionController(input: {
     const id = input.sessionID()
     return id ? sync().session.get(id)?.parentID : undefined
   })
-  const open = createMemo(() => store.ready && input.state.dock() && !input.state.closing())
+  const todoIdentity = createMemo(() => `${input.sessionKey()}:${JSON.stringify(input.state.todos())}`)
+  const open = createMemo(
+    () => store.ready && input.state.dock() && !input.state.closing() && store.dismissedTodo !== todoIdentity(),
+  )
   const progress = useSpring(
     () => (open() ? 1 : 0),
     { visualDuration: 0.3, bounce: 0 },
@@ -121,6 +125,7 @@ export function createSessionComposerRegionController(input: {
 
   return {
     state: input.state,
+    sessionKey: input.sessionKey,
     centered: input.centered,
     todo: input.todo,
     followup: input.followup,
@@ -131,10 +136,11 @@ export function createSessionComposerRegionController(input: {
     setDockRef: input.setDockRef,
     parentID,
     child: () => !!parentID(),
-    showComposer: () => !input.state.blocked() || !!parentID(),
+    showComposer: () => true,
     handoffPrompt: () => getSessionHandoff(input.sessionKey())?.prompt,
     promptReady: () => input.prompt.ready() || promptReady(),
-    dock: () => (store.ready && input.state.dock()) || value() > 0.001,
+    dismissTodo: () => setStore("dismissedTodo", todoIdentity()),
+    dock: () => open() || value() > 0.001,
     dockProgress: value,
     dockHeight: () => Math.max(78, store.height),
     lift: () => (input.revert()?.items.length ? 18 : 36 * value()),

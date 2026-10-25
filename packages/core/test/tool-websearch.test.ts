@@ -118,6 +118,9 @@ const websearchConfig = Layer.succeed(
     get exaApiKey() {
       return config.exaApiKey
     },
+    get serperApiKey() {
+      return config.serperApiKey
+    },
     get parallelApiKey() {
       return config.parallelApiKey
     },
@@ -311,6 +314,28 @@ describe("WebSearchTool registration", () => {
       ).toEqual({ type: "error", value: "Unable to search the web for too much" })
       expect(chunksRead).toBeLessThan(10)
       expect(cancelled).toBe(true)
+    }),
+  )
+  it.effect("uses configured Serper as the built-in websearch with normal permission checks", () =>
+    Effect.gen(function* () {
+      requests.length = 0
+      assertions.length = 0
+      config = { provider: "serper", serperApiKey: "test-secret", enableExa: false, enableParallel: false }
+      responseBody = JSON.stringify({
+        organic: [{ title: "Repo", link: "https://github.com/nkyang10/opencode", snippet: "Source" }],
+      })
+      const registry = yield* ToolRegistry.Service
+      const output = yield* executeTool(registry, {
+        sessionID,
+        ...toolIdentity,
+        call: { type: "tool-call", id: "call-serper", name: "websearch", input: { query: "site:github.com opencode" } },
+      })
+      expect(requests[0]?.url).toBe("https://google.serper.dev/search")
+      expect(requests[0]?.headers["x-api-key"]).toBe("test-secret")
+      expect(requests[0]?.body).toEqual({ q: "site:github.com opencode", num: 8 })
+      expect(assertions[0]?.action).toBe("websearch")
+      expect(output).toEqual({ type: "text", value: "1. Repo\nhttps://github.com/nkyang10/opencode\nSource" })
+      expect(JSON.stringify(output)).not.toContain("test-secret")
     }),
   )
 })

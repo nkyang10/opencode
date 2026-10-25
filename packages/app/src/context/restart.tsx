@@ -3,6 +3,7 @@ import { usePlatform } from "@/context/platform"
 import { ServerConnection, useServer } from "@/context/server"
 import { authTokenFromCredentials } from "@/utils/server"
 import { createEffect, createSignal, onCleanup } from "solid-js"
+import { createStore } from "solid-js/store"
 import { deadlineFrom, phaseAfterPoll, type LifecycleInfo, type Phase } from "./restart-state"
 
 // The client half of the restart window (s100). The server says "I stop in N ms"
@@ -10,10 +11,7 @@ import { deadlineFrom, phaseAfterPoll, type LifecycleInfo, type Phase } from "./
 // clock and survives the server dying, which is the entire point. A countdown that
 // needs the server would end exactly when it matters.
 //
-// The hold covers more than the announced window: a poll failure means the daemon is
-// unreachable, announced or not, and input is held for that too. The one exception is
-// a 404 — an old server that can never announce a window must not hold input forever
-// (see `phaseAfterPoll`).
+// Lifecycle notices are advisory: never defer a user submission or replay it later.
 
 const pollMs = 5_000
 const timeoutMs = 4_000
@@ -36,6 +34,15 @@ export const { use: useRestart, provider: RestartProvider } = createSimpleContex
     const [phase, setPhase] = createSignal<Phase>("idle")
     const [deadlineLocal, setDeadlineLocal] = createSignal(0)
     const [remaining, setRemaining] = createSignal<number | null>(null)
+
+    const [notice, setNotice] = createStore({ dismissed: false })
+    createEffect(() => {
+      server.key
+      setNotice("dismissed", false)
+    })
+    createEffect(() => {
+      if (phase() === "idle") setNotice("dismissed", false)
+    })
 
     // The countdown is a local ticker against a locally-stamped deadline. It runs only
     // while it has a window to count, and never asks the server for the time.
@@ -90,8 +97,8 @@ export const { use: useRestart, provider: RestartProvider } = createSimpleContex
       phase,
       /** Seconds left in the window, or null when there is nothing to count. */
       remaining,
-      /** True while input should be held: an announced window or an unreachable server. */
-      blocking: (): boolean => phase() !== "idle",
+      dismissed: () => notice.dismissed,
+      dismiss: () => setNotice("dismissed", true),
     }
   },
 })

@@ -1,3 +1,4 @@
+import { DismissibleDock } from "../composer/dismissible-dock"
 import {
   createEffect,
   createMemo,
@@ -1243,6 +1244,16 @@ export function MessageTimeline(props: {
       return row._tag === "AssistantPart" && row.previousAssistantPart
     }
 
+    const compactTool = () => {
+      const row = input.row()
+      return (
+        settings.general.newLayoutDesigns() &&
+        row._tag === "AssistantPart" &&
+        row.group.type === "part" &&
+        getMsgPart(row.group.ref.messageID, row.group.ref.partID)?.type === "tool"
+      )
+    }
+
     return (
       <div
         id={anchor() ? props.anchor(input.row().userMessageID) : undefined}
@@ -1252,7 +1263,7 @@ export function MessageTimeline(props: {
           "min-w-0 w-full max-w-full": true,
           "md:max-w-200 2xl:max-w-[1000px]": props.centered,
           "md:mx-auto": props.centered,
-          "pt-3": previousAssistantPart(),
+          "pt-3": previousAssistantPart() && !compactTool(),
         }}
       >
         <div data-component="session-turn" class="min-w-0 w-full relative" style={{ height: "auto" }}>
@@ -2102,18 +2113,20 @@ export function MessageTimeline(props: {
 function SessionInterrupted(props: { onResume: () => void }) {
   const language = useLanguage()
   return (
-    <div data-slot="session-turn-interrupted" class="flex items-center gap-2 py-1.5">
-      <span class="size-2 shrink-0 rounded-full bg-v2-text-text-accent" aria-hidden="true" />
-      <span class="min-w-0 flex-1 truncate text-[13px] leading-4 tracking-[-0.04px] text-v2-text-text-faint">
-        {language.t("ui.message.cutOff")}
-      </span>
-      <button
-        type="button"
-        class="flex h-6 shrink-0 items-center rounded-[6px] border border-v2-border-border-base px-2 text-[13px] leading-none tracking-[-0.04px] text-v2-text-text-base transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
-        onClick={() => props.onResume()}
-      >
-        {language.t("ui.message.cutOff.action")}
-      </button>
-    </div>
+    <DismissibleDock identity="interrupted">
+      <div data-slot="session-turn-interrupted" class="flex items-center gap-2 py-1.5">
+        <span class="size-2 shrink-0 rounded-full bg-v2-text-text-accent" aria-hidden="true" />
+        <span class="min-w-0 flex-1 truncate text-[13px] leading-4 tracking-[-0.04px] text-v2-text-text-faint">
+          {language.t("ui.message.cutOff")}
+        </span>
+        <button
+          type="button"
+          class="flex h-6 shrink-0 items-center rounded-[6px] border border-v2-border-border-base px-2 text-[13px] leading-none tracking-[-0.04px] text-v2-text-text-base transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
+          onClick={() => props.onResume()}
+        >
+          {language.t("ui.message.cutOff.action")}
+        </button>
+      </div>
+    </DismissibleDock>
   )
 }

@@ -1270,4 +1270,11 @@ export const dict = {
   "settings.admin.row.config.active.title": "Active configuration files",
   "settings.admin.row.config.active.description": "Files loaded for the current project, highest priority first. Inline environment settings are not files and may also override these values.",
   "settings.admin.row.config.active.empty": "No file-backed configuration is active for this project.",
+  "restart.window.advisory": "Server restarts in {{seconds}}s — you can keep submitting",
+  "menu.maintenance": "Maintenance",
+  "menu.maintenance.restart": "Restart host server",
+  "menu.maintenance.unsupported": "Restart through the owning application or service manager",
+  "menu.maintenance.confirm": "Restart {{server}} for everyone connected? Running work can finish for up to 60 seconds; any remaining work will be interrupted. You can keep submitting while it drains, but requests may fail during the restart.",
+  "menu.maintenance.accepted": "Host restart requested",
+  "session.child.notice": "This is a child agent session. New messages are sent to this session.",
 }

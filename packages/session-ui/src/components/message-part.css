@@ -1580,3 +1580,38 @@ body:not([data-new-layout]) {
     color: var(--text-weak);
   }
 }
+
+/* V2: adjacent tools share the row rhythm; shell output uses the full viewport width. */
+body[data-new-layout] {
+  [data-component="assistant-message"]:has(> [data-component="tool-part-wrapper"]) {
+    gap: 0;
+  }
+  [data-component="tool-part-wrapper"] {
+    padding: 0;
+    margin: 0;
+    [data-slot="collapsible-trigger"] {
+      height: 24px;
+    }
+    [data-slot="basic-tool-tool-trigger-content"],
+    [data-slot="basic-tool-tool-info-main"],
+    [data-slot="basic-tool-tool-info-structured"] {
+      gap: 4px;
+    }
+  }
+  [data-component="tool-part-wrapper"] [data-component="tool-output"] {
+    margin-bottom: 0;
+  }
+  [data-component="tool-part-wrapper"] > [data-component="collapsible"].tool-collapsible {
+    --tool-content-gap: 0px;
+  }
+  [data-component="tool-part-wrapper"][data-tool="bash"],
+  [data-component="tool-part-wrapper"][data-tool="shell"] {
+    [data-slot="bash-pre"] {
+      padding: 0;
+    }
+    [data-component="bash-output"] {
+      border: 0;
+      border-radius: 0;
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import { DismissibleDock } from "./dismissible-dock"
 import { Show, type JSX } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useSettings } from "@/context/settings"
@@ -38,15 +39,15 @@ export function SessionComposerRegion(props: {
       >
         <Show when={controller.state.questionRequest()} keyed>
           {(request) => (
-            <div>
+            <DismissibleDock identity={`question:${controller.sessionKey()}:${request.id}`}>
               <SessionQuestionDock request={request} onSubmit={controller.onResponseSubmit} />
-            </div>
+            </DismissibleDock>
           )}
         </Show>
 
         <Show when={controller.state.permissionRequest()} keyed>
           {(request) => (
-            <div>
+            <DismissibleDock identity={`permission:${controller.sessionKey()}:${request.id}`}>
               <SessionPermissionDock
                 request={request}
                 responding={controller.state.permissionResponding()}
@@ -55,7 +56,7 @@ export function SessionComposerRegion(props: {
                   controller.state.decide(response)
                 }}
               />
-            </div>
+            </DismissibleDock>
           )}
         </Show>
 
@@ -71,14 +72,19 @@ export function SessionComposerRegion(props: {
               }}
             >
               <div ref={controller.setDockBodyRef}>
-                <SessionTodoDock
-                  todos={controller.state.todos()}
-                  collapsed={controller.todo.collapsed()}
-                  onToggle={controller.todo.onToggle}
-                  collapseLabel={language.t("session.todo.collapse")}
-                  expandLabel={language.t("session.todo.expand")}
-                  dockProgress={controller.dockProgress()}
-                />
+                <DismissibleDock
+                  identity={`todo:${controller.sessionKey()}:${JSON.stringify(controller.state.todos())}`}
+                  onDismiss={controller.dismissTodo}
+                >
+                  <SessionTodoDock
+                    todos={controller.state.todos()}
+                    collapsed={controller.todo.collapsed()}
+                    onToggle={controller.todo.onToggle}
+                    collapseLabel={language.t("session.todo.collapse")}
+                    expandLabel={language.t("session.todo.expand")}
+                    dockProgress={controller.dockProgress()}
+                  />
+                </DismissibleDock>
               </div>
             </div>
           </Show>
@@ -89,12 +95,16 @@ export function SessionComposerRegion(props: {
                 <Show when={rolled()} keyed>
                   {(revert) => (
                     <div class="pb-2">
-                      <SessionRevertDock
-                        items={revert.items}
-                        restoring={revert.restoring}
-                        disabled={revert.disabled}
-                        onRestore={revert.onRestore}
-                      />
+                      <DismissibleDock
+                        identity={`revert:${controller.sessionKey()}:${revert.items.map((x) => x.id).join(",")}`}
+                      >
+                        <SessionRevertDock
+                          items={revert.items}
+                          restoring={revert.restoring}
+                          disabled={revert.disabled}
+                          onRestore={revert.onRestore}
+                        />
+                      </DismissibleDock>
                     </div>
                   )}
                 </Show>
@@ -114,12 +124,16 @@ export function SessionComposerRegion(props: {
                     "margin-top": `${-36 * controller.dockProgress()}px`,
                   }}
                 >
-                  <SessionRevertDock
-                    items={revert.items}
-                    restoring={revert.restoring}
-                    disabled={revert.disabled}
-                    onRestore={revert.onRestore}
-                  />
+                  <DismissibleDock
+                    identity={`revert:${controller.sessionKey()}:${revert.items.map((x) => x.id).join(",")}`}
+                  >
+                    <SessionRevertDock
+                      items={revert.items}
+                      restoring={revert.restoring}
+                      disabled={revert.disabled}
+                      onRestore={revert.onRestore}
+                    />
+                  </DismissibleDock>
                 </div>
               )}
             </Show>
@@ -132,33 +146,40 @@ export function SessionComposerRegion(props: {
               }}
             >
               <Show when={controller.followup()?.items.length}>
-                <SessionFollowupDock
-                  items={controller.followup()!.items}
-                  sending={controller.followup()!.sending}
-                  onSend={controller.followup()!.onSend}
-                  onEdit={controller.followup()!.onEdit}
-                />
-              </Show>
-              <Show
-                when={controller.child()}
-                fallback={<Show when={!controller.state.blocked()}>{props.promptInput}</Show>}
-              >
-                <div
-                  ref={controller.setPromptRef}
-                  class="w-full rounded-[12px] border border-border-weak-base bg-background-base p-3 text-16-regular text-text-weak"
+                <DismissibleDock
+                  identity={`followup:${controller.sessionKey()}:${controller
+                    .followup()!
+                    .items.map((x) => x.id)
+                    .join(",")}`}
                 >
-                  <span>{language.t("session.child.promptDisabled")} </span>
-                  <Show when={controller.parentID()}>
-                    <button
-                      type="button"
-                      class="text-text-base transition-colors hover:text-text-strong"
-                      onClick={controller.openParent}
-                    >
-                      {language.t("session.child.backToParent")}
-                    </button>
-                  </Show>
-                </div>
+                  <SessionFollowupDock
+                    items={controller.followup()!.items}
+                    sending={controller.followup()!.sending}
+                    onSend={controller.followup()!.onSend}
+                    onEdit={controller.followup()!.onEdit}
+                  />
+                </DismissibleDock>
               </Show>
+              <Show when={controller.child()}>
+                <DismissibleDock identity={`child:${controller.sessionKey()}`}>
+                  <div
+                    ref={controller.setPromptRef}
+                    class="w-full rounded-[12px] border border-border-weak-base bg-background-base p-3 text-16-regular text-text-weak"
+                  >
+                    <span>{language.t("session.child.notice")} </span>
+                    <Show when={controller.parentID()}>
+                      <button
+                        type="button"
+                        class="text-text-base transition-colors hover:text-text-strong"
+                        onClick={controller.openParent}
+                      >
+                        {language.t("session.child.backToParent")}
+                      </button>
+                    </Show>
+                  </div>
+                </DismissibleDock>
+              </Show>
+              {props.promptInput}
             </div>
           </Show>
         </Show>

@@ -44,3 +44,18 @@ it.effect("reports the current directory's loaded configuration through HTTP", (
     expect(yield* response.json).toContain(file)
   }),
 )
+
+it.effect("advertises unsupported restart honestly and returns a declared error without stopping the host", () =>
+  Effect.gen(function* () {
+    const status = yield* request("/global/maintenance")
+    expect(status.status).toBe(200)
+    expect(yield* status.json).toEqual({ restartSupported: false, restarting: false })
+    const restart = yield* request("/global/restart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    })
+    expect(restart.status).toBe(409)
+    expect(yield* restart.json).toMatchObject({ _tag: "ServerRestartUnavailable" })
+  }),
+)

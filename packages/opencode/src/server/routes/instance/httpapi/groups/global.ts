@@ -112,6 +112,14 @@ const GlobalLifecycleInput = Schema.Struct({
   reason: Schema.optional(Schema.String),
 })
 
+export class ServerRestartUnavailable extends Schema.TaggedErrorClass<ServerRestartUnavailable>()(
+  "ServerRestartUnavailable",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 409 },
+) {}
+
 export const GlobalApi = HttpApi.make("global").add(
   HttpApiGroup.make("global")
     .add(
@@ -193,6 +201,21 @@ export const GlobalApi = HttpApi.make("global").add(
           description: "Clean up and dispose all OpenCode instances, releasing all resources.",
         }),
       ),
+      HttpApiEndpoint.get("maintenance", "/global/maintenance", {
+        success: Schema.Struct({ restartSupported: Schema.Boolean, restarting: Schema.Boolean }),
+      }),
+      HttpApiEndpoint.post("restart", "/global/restart", {
+        payload: Schema.Struct({}),
+        success: Schema.Struct({ accepted: Schema.Boolean }),
+        error: ServerRestartUnavailable,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.restart",
+          summary: "Restart the standalone CLI host",
+          description:
+            "Request an idempotent server-side restart after a bounded drain. Unsupported on embedded hosts. Requires the same authentication as other global administration routes.",
+        }),
+      ),
       HttpApiEndpoint.get("lifecycle", GlobalPaths.lifecycle, {
         success: described(GlobalLifecycle, "Restart window status"),
       }).annotateMerge(
@@ -211,7 +234,7 @@ export const GlobalApi = HttpApi.make("global").add(
           identifier: "global.lifecycle.arm",
           summary: "Announce a restart window",
           description:
-            "Arm the drain window before stopping the server, so connected clients can count down, stop sending new prompts, and hold what the reader was trying to send.",
+            "Arm the drain window before stopping the server, so connected clients can display an advisory countdown. Clients may still submit prompts.",
         }),
       ),
       HttpApiEndpoint.post("upgrade", GlobalPaths.upgrade, {

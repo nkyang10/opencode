@@ -15,7 +15,7 @@ Baseline: `fda7b9fee39b41896761fbe98b2e5a83427666c4` on `dev`.
 2. **Path input and roots** — accept POSIX, drive, UNC and local `file:` URLs without corrupting slashes. Show a selectable POSIX root; show actual server drives under a Windows computer root. File-mode browsing must remain confined to its supplied base.
 3. **Open with new subdirectory** — separate secondary action alongside Open; ask for one directory name, validate server-side, create under the selected parent, then open only after success. Never silently create on normal Open.
 4. **Active configuration** — Settings v2 > Admin shows actual loaded project/global configuration files, highest precedence first, with a way to reveal each location. Keep global write-target information separate. Do not guess `opencode.json` when JSONC or an override is active; explain that inline environment configuration is not a file.
-5. **Restart notification** — reproduce and fix stuck dismissal without bypassing the safety hold during restart. Current checkout has a non-dismissible restart banner and no literal Skip control; identify the reported surface before changing server safety behavior.
+5. **Restart notification** — initially investigate the reported stuck Skip control. Follow-up requirement supersedes the client-side hold: all notices are advisory and dismissible, and never defer or automatically replay user submissions. Retain the host-side bounded drain.
 6. **Pause / resume** — server-owned pause at the next completed provider/tool boundary, never abort the current tool; resume continues the same session. Sending while paused admits the new prompt with normal interrupt semantics. Cover concurrent requests, disconnect/reconnect, child sessions, tool-result persistence, and duplicate resumes. Record the required production performance baseline before touching session/timeline code.
 
 ## Validation matrix
@@ -45,3 +45,40 @@ Baseline: `fda7b9fee39b41896761fbe98b2e5a83427666c4` on `dev`.
 - Restart scope: the existing server lifecycle regressions pass, including elapsed windows no longer blocking the next arm. No Skip control exists in this checkout's non-dismissible banner. The reported stuck Skip remains unresolved pending its screen/component or screenshot; no restart safety hold was bypassed.
 - Validation limits: no Windows host/native explorer smoke was available. Full legacy-server and workspace typechecks remain unverified due to memory limits. The v2 server package typecheck reports an encoding mismatch in unchanged `core/src/cross-spawn-spawner.ts:235` (`Encoding` vs `BufferEncoding`); that unrelated source was not changed to hide the failure.
 - Final serial typechecks pass for core, protocol, session-ui, app, generated client, and app E2E tests. The server exception above is the only failure in that serial affected-package run.
+
+## Follow-up: advisory UI, host maintenance, compact tools, and built-in search
+
+### Changes
+
+- Restart/reconnect notices now have an explicit close action. Dismissal lasts through the current outage and resets after recovery or a server switch. Removed the composer submission hold and deferred automatic replay. The banner explicitly says users can keep submitting; an actual unavailable server can still reject a request through existing draft-restoring error handling.
+- Permission, question, todo, revert, queued-follow-up, child-session, and interrupted-turn surfaces have local dismiss controls. Permission/question dismissal only hides the surface: it never grants authorization, sends an answer, or rejects a request. Reloading can restore unresolved requests. The composer stays available even while those requests are pending, including in child sessions. Existing toast implementations already expose close controls.
+- Added top-left Maintenance → Restart host server with an explicit confirmation identifying the connected server and impact on other users. Authenticated global capability/restart endpoints delegate to the owning standalone `opencode web` or `opencode serve` process. Duplicate requests coalesce. The host waits for active work for at most 60 seconds, then replaces itself using its fixed executable, launch arguments, environment, working directory, and bound port. No browser-supplied command is executed. Embedded/TUI/desktop autostart hosts and detected systemd/PM2/Supervisor processes leave replacement to their owner and report unsupported. Unknown supervisors are not guaranteed to support self-replacement.
+- V2 tool rows no longer insert the 12px inter-part padding for every tool. Tool trigger/output gaps are reduced, with zero shell output padding and no shell output border. Text, turn, and V1 layout spacing are retained. Checked in a production browser with two consecutive expanded shell calls.
+- Added shared Serper transport to both tool runtimes and exact configuration validation/migration for `search.serper.key`. A configured server-side key enables the existing built-in `websearch` for every model provider, using existing tool permissions and UI provider labeling. Global/project config precedence is retained. Explicit `OPENCODE_WEBSEARCH_PROVIDER` overrides remain authoritative; `SERPER_API_KEY` is also supported. No experimental flag or separate MCP setup is required.
+- Search returns ranked public links/snippets and supports site queries such as `site:wikipedia.org` and `site:github.com`; it does not promise authenticated GitHub content or full-page crawling. Credentials are sent only in the Serper request header, not URLs, tool metadata, or normal output. Requests have bounded response size/output and a timeout; failures are sanitized rather than silently switching to another paid provider.
+
+### Configuration
+
+In the active global or project `opencode.json`/`opencode.jsonc`:
+
+```json
+{
+  "search": {
+    "serper": {
+      "key": "YOUR_SERPER_API_KEY"
+    }
+  }
+}
+```
+
+Keep actual keys out of version control. Alternatively set `SERPER_API_KEY` in the server environment. Examples: `Search Wikipedia for ...` or `Search GitHub for ...`; the agent uses the normal built-in `websearch` tool.
+
+### Validation and limits
+
+- Final app validation: 882 unit tests and 41 browser-condition tests pass; app and E2E typechecks and production build pass.
+- New production-browser regressions pass for restart/permission dismissal without authorizing requests, question dismissal without answering/rejecting, confirmed single-request host restart, and compact consecutive shell calls. Existing pause/reload/resume smoke also passes. The restart endpoint is mocked in browser tests; no live host was restarted.
+- Focused core Serper/websearch suite: 18 passing tests, including effective project-over-global selection, shared schema migration, source links, credentials, missing key, empty results, and sanitized 401/429/500 failures. Core typecheck passes. Earlier related core pause/runner/coordinator suite also passed (126 tests including search at that point).
+- Final affected legacy maintenance/real-HTTP/search tests: 19 pass. Earlier broader config/lifecycle/maintenance/HTTP/search run: 139 pass. Unsupported hosts return typed HTTP 409 rather than stopping an owning application. Compiled and source launch-argument handling is covered; process replacement itself and native Windows behavior remain unverified.
+- Serial affected-package checks also pass for protocol, session-ui, generated client, and E2E tests. Client generation completed without generated-file changes (these new maintenance routes are legacy global API routes). The unchanged v2 server encoding type error documented above remains; full legacy/workspace typechecking remains unverified under the memory limit.
+- Matching production streaming fixture: V2, review closed, 20 history turns, 20 deltas, throttle 1, minimal probes. Baseline completion 5072.2ms, initial content 491.1ms, progress frame-gap p95 16.7ms. After: completion 5048.0ms, initial content 432.8ms, p95 16.8ms. Both delivered all 20 deltas, zero pending, no long tasks or row/markdown replacements. Single runs, not a performance guarantee.
+- No paid live Serper request was made (no Serper key supplied), no deployment was performed, and no Windows/native explorer or translation-review claim is made. New locale keys use English source-copy fallbacks.

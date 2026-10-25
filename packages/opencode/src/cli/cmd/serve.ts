@@ -2,6 +2,7 @@ import { Effect } from "effect"
 import { effectCmd } from "../effect-cmd"
 import { withNetworkOptions, resolveNetworkOptions } from "../network"
 import { Flag } from "@opencode-ai/core/flag/flag"
+import { WebRestart } from "../web-restart"
 import { ServerLifecycle } from "@/server/lifecycle"
 
 export const ServeCommand = effectCmd({
@@ -18,6 +19,7 @@ export const ServeCommand = effectCmd({
     }
     const opts = yield* resolveNetworkOptions(args)
     const server = yield* Effect.promise(() => Server.listen(opts))
+    WebRestart.install(server, opts)
     console.log(`opencode server listening on http://${server.hostname}:${server.port}`)
 
     // s100: same drain as `web` — a headless server is the one most likely to be killed by tooling.

@@ -1,3 +1,4 @@
+import { MaintenanceMenu } from "./maintenance-menu"
 import {
   createEffect,
   createMemo,
@@ -659,6 +660,7 @@ function ChannelIndicator(props: { debugTools?: { visible: boolean; toggle: () =
         <DropdownMenu.Trigger
           type="button"
           class="bg-icon-interactive-base text-[#FFF] font-medium px-2 rounded-sm uppercase font-mono cursor-pointer"
+          data-action="application-menu"
           aria-label="DEV menu"
         >
           DEV
@@ -709,6 +711,7 @@ function ChannelIndicator(props: { debugTools?: { visible: boolean; toggle: () =
             >
               <DropdownMenu.ItemLabel>{language.t("sidebar.logout")}</DropdownMenu.ItemLabel>
             </DropdownMenu.Item>
+            <MaintenanceMenu />
             <DropdownMenu.Item onSelect={openSettings}>
               <DropdownMenu.ItemLabel>{language.t("sidebar.settings")}</DropdownMenu.ItemLabel>
             </DropdownMenu.Item>
@@ -724,12 +727,20 @@ function ChannelIndicator(props: { debugTools?: { visible: boolean; toggle: () =
   }
 
   return (
-    <>
-      {["beta", "dev"].includes(channel) && (
-        <div class="bg-icon-interactive-base text-[#FFF] font-medium px-2 rounded-sm uppercase font-mono">
-          {channel.toUpperCase()}
-        </div>
-      )}
-    </>
+    <DropdownMenu>
+      <DropdownMenu.Trigger
+        type="button"
+        class="titlebar-icon px-2 rounded-sm"
+        data-action="application-menu"
+        aria-label={language.t("desktop.menu.ariaLabel")}
+      >
+        {channel ? channel.toUpperCase() : "OpenCode"}
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content>
+          <MaintenanceMenu />
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu>
   )
 }

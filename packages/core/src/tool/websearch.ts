@@ -14,6 +14,8 @@ import { Tools } from "./tools"
 import { collectBoundedResponseBody } from "./http-body"
 import { checksum } from "../util/encode"
 import { ToolRegistry } from "./registry"
+import { Config as CoreConfig } from "../config"
+import { SerperSearch } from "./serper"
 
 export const name = "websearch"
 export const NO_RESULTS = "No search results found. Please try a different query."
@@ -31,7 +33,7 @@ export const MAX_RESPONSE_BYTES = 256 * 1024
  */
 export const description = `Search the web using the session's local web search provider. Use this for current information beyond knowledge cutoff.
 
-This is a provider-independent local tool backed by Exa or Parallel. Provider-hosted web search tools are separate and execute at the model provider.
+This is a provider-independent local tool backed by Serper (when configured), Exa or Parallel. Search public sites including Wikipedia and GitHub using site:wikipedia.org or site:github.com in the query. Serper returns ranked links and snippets, not full-page crawls; crawl/type controls apply only to Exa. Provider-hosted web search tools are separate and execute at the model provider.
 
 Optional controls support result count, live crawling ('fallback' or 'preferred'), search type ('auto', 'fast', or 'deep'), and maximum context characters.
 
@@ -56,7 +58,7 @@ export const Input = Schema.Struct({
   ),
 })
 
-export const Provider = Schema.Literals(["exa", "parallel"])
+export const Provider = Schema.Literals(["exa", "parallel", "serper"])
 export type Provider = typeof Provider.Type
 
 export interface Config {
@@ -64,26 +66,43 @@ export interface Config {
   readonly enableExa: boolean
   readonly enableParallel: boolean
   readonly exaApiKey?: string
+  readonly serperApiKey?: string
   readonly parallelApiKey?: string
 }
 
 export class ConfigService extends Context.Service<ConfigService, Config>()("@opencode/v2/WebSearchConfig") {}
 
 /** Isolates the retained product environment contract from the generic tool implementation. */
-export const defaultConfigLayer = Layer.sync(ConfigService, () =>
-  ConfigService.of({
-    provider:
-      process.env.OPENCODE_WEBSEARCH_PROVIDER === "exa" || process.env.OPENCODE_WEBSEARCH_PROVIDER === "parallel"
-        ? process.env.OPENCODE_WEBSEARCH_PROVIDER
-        : undefined,
-    enableExa: truthy("OPENCODE_EXPERIMENTAL") || truthy("OPENCODE_ENABLE_EXA") || truthy("OPENCODE_EXPERIMENTAL_EXA"),
-    enableParallel: truthy("OPENCODE_ENABLE_PARALLEL") || truthy("OPENCODE_EXPERIMENTAL_PARALLEL"),
-    exaApiKey: process.env.EXA_API_KEY,
-    parallelApiKey: process.env.PARALLEL_API_KEY,
+export const defaultConfigLayer = Layer.effect(
+  ConfigService,
+  Effect.gen(function* () {
+    const config = yield* CoreConfig.Service
+    const entries = yield* config.entries()
+    const serperApiKey = entries.reduce(
+      (key, entry) => (entry.type === "document" ? (entry.info.search?.serper?.key ?? key) : key),
+      process.env.SERPER_API_KEY,
+    )
+    return ConfigService.of({
+      provider: ["exa", "parallel", "serper"].includes(process.env.OPENCODE_WEBSEARCH_PROVIDER ?? "")
+        ? (process.env.OPENCODE_WEBSEARCH_PROVIDER as Provider)
+        : serperApiKey
+          ? "serper"
+          : undefined,
+      serperApiKey,
+      enableExa:
+        truthy("OPENCODE_EXPERIMENTAL") || truthy("OPENCODE_ENABLE_EXA") || truthy("OPENCODE_EXPERIMENTAL_EXA"),
+      enableParallel: truthy("OPENCODE_ENABLE_PARALLEL") || truthy("OPENCODE_EXPERIMENTAL_PARALLEL"),
+      exaApiKey: process.env.EXA_API_KEY,
+      parallelApiKey: process.env.PARALLEL_API_KEY,
+    })
   }),
 )
 
-export const configNode = makeLocationNode({ service: ConfigService, layer: defaultConfigLayer, deps: [] })
+export const configNode = makeLocationNode({
+  service: ConfigService,
+  layer: defaultConfigLayer,
+  deps: [CoreConfig.node],
+})
 
 export function selectProvider(
   sessionID: string,
@@ -217,30 +236,32 @@ const layer = Layer.effectDiscard(
               })
 
               const text =
-                provider === "exa"
-                  ? yield* callMcp(http, exaUrl(config.exaApiKey), "web_search_exa", ExaArgs, {
-                      query: input.query,
-                      type: input.type || "auto",
-                      numResults: input.numResults || 8,
-                      livecrawl: input.livecrawl || "fallback",
-                      contextMaxCharacters: input.contextMaxCharacters,
-                    })
-                  : yield* callMcp(
-                      http,
-                      PARALLEL_URL,
-                      "web_search",
-                      ParallelArgs,
-                      {
-                        objective: input.query,
-                        search_queries: [input.query],
-                        session_id: context.sessionID,
-                        // V2 invocation context does not safely expose the model yet.
-                      },
-                      {
-                        "User-Agent": `opencode/${InstallationVersion}`,
-                        ...(config.parallelApiKey ? { Authorization: `Bearer ${config.parallelApiKey}` } : {}),
-                      },
-                    )
+                provider === "serper"
+                  ? yield* SerperSearch.search(http, config.serperApiKey, input)
+                  : provider === "exa"
+                    ? yield* callMcp(http, exaUrl(config.exaApiKey), "web_search_exa", ExaArgs, {
+                        query: input.query,
+                        type: input.type || "auto",
+                        numResults: input.numResults || 8,
+                        livecrawl: input.livecrawl || "fallback",
+                        contextMaxCharacters: input.contextMaxCharacters,
+                      })
+                    : yield* callMcp(
+                        http,
+                        PARALLEL_URL,
+                        "web_search",
+                        ParallelArgs,
+                        {
+                          objective: input.query,
+                          search_queries: [input.query],
+                          session_id: context.sessionID,
+                          // V2 invocation context does not safely expose the model yet.
+                        },
+                        {
+                          "User-Agent": `opencode/${InstallationVersion}`,
+                          ...(config.parallelApiKey ? { Authorization: `Bearer ${config.parallelApiKey}` } : {}),
+                        },
+                      )
               return {
                 provider,
                 text: text ?? NO_RESULTS,

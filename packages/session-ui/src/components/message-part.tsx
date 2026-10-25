@@ -461,7 +461,8 @@ function newLayout() {
 }
 
 function webSearchProviderLabel(provider: unknown, i18n: ReturnType<typeof useI18n>) {
-  const name = provider === "parallel" ? "Parallel" : provider === "exa" ? "Exa" : undefined
+  const name =
+    provider === "serper" ? "Serper" : provider === "parallel" ? "Parallel" : provider === "exa" ? "Exa" : undefined
   if (name) return i18n.t("ui.tool.websearch.provider", { provider: name })
   return i18n.t("ui.tool.websearch")
 }
@@ -1569,7 +1570,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
 
   return (
     <Show when={!hideQuestion()}>
-      <div data-component="tool-part-wrapper" data-timeline-part-id={part().id}>
+      <div data-component="tool-part-wrapper" data-tool={part().tool} data-timeline-part-id={part().id}>
         <Switch>
           <Match when={part().state.status === "error" && (part().state as any).error}>
             {(error) => {

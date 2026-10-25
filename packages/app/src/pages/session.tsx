@@ -1105,7 +1105,6 @@ export default function Page() {
     }
 
     if (event.key.length === 1 && event.key !== "Unidentified" && !(event.ctrlKey || event.metaKey)) {
-      if (composer.blocked() || isChildSession()) return
       const input = inputRef
       if (!input) return
       input.focus()

@@ -5,6 +5,7 @@ import { withNetworkOptions, resolveNetworkOptions, hasArg } from "../network"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Global } from "@opencode-ai/core/global"
 import { WebuiAutostart } from "../web-autostart"
+import { WebRestart } from "../web-restart"
 import { ServerLifecycle } from "@/server/lifecycle"
 import open from "open"
 import { networkInterfaces } from "os"
@@ -110,6 +111,7 @@ export const WebCommand = effectCmd({
       UI.println(UI.Style.TEXT_WARNING_BOLD + "!  OPENCODE_SERVER_PASSWORD is not set; server is unsecured.")
     }
     const server = yield* Effect.promise(() => Server.listen(opts))
+    WebRestart.install(server, opts)
     UI.empty()
     UI.println(UI.logo("  "))
     UI.empty()
@@ -142,11 +144,11 @@ export const WebCommand = effectCmd({
       }
 
       // Open localhost in browser
-      open(localhostUrl).catch(() => {})
+      if (!process.env.OPENCODE_MAINTENANCE_RESTART) open(localhostUrl).catch(() => {})
     } else {
       const displayUrl = server.url.toString()
       UI.println(UI.Style.TEXT_INFO_BOLD + "  Web interface:    ", UI.Style.TEXT_NORMAL, displayUrl)
-      open(displayUrl).catch(() => {})
+      if (!process.env.OPENCODE_MAINTENANCE_RESTART) open(displayUrl).catch(() => {})
     }
 
     yield* Effect.never

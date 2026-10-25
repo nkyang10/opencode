@@ -45,6 +45,13 @@ describe("websearch provider", () => {
     expect(webSearchEnabled(ProviderV2.ID.openai, { exa: false, parallel: true })).toBe(true)
   })
 
+  test("configured Serper is available for any provider without experimental flags", () => {
+    expect(selectWebSearchProvider(SESSION_ID, { exa: false, parallel: false }, "test-key")).toBe("serper")
+    expect(webSearchEnabled(ProviderV2.ID.openai, { exa: false, parallel: false }, "test-key")).toBe(true)
+    expect(webSearchEnabled(ProviderV2.ID.make("anthropic"), { exa: false, parallel: false }, "test-key")).toBe(true)
+    expect(webSearchProviderLabel("serper")).toBe("Serper Web Search")
+  })
+
   test("uses branded labels", () => {
     expect(webSearchProviderLabel("parallel")).toBe("Parallel Web Search")
     expect(webSearchProviderLabel("exa")).toBe("Exa Web Search")
