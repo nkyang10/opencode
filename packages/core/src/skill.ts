@@ -28,7 +28,10 @@ export const Info = Skill.Info
 export type Info = Skill.Info
 
 export const available = (skills: ReadonlyArray<Info>, agent: AgentV2.Info) =>
-  skills.filter((skill) => PermissionV2.evaluate("skill", skill.name, agent.permissions).effect !== "deny")
+  skills.filter(
+    (skill) =>
+      skill.enabled !== false && PermissionV2.evaluate("skill", skill.name, agent.permissions).effect !== "deny",
+  )
 
 const Frontmatter = Schema.Struct({
   name: Schema.String.pipe(Schema.optional),
@@ -38,12 +41,15 @@ const Frontmatter = Schema.Struct({
 const decodeFrontmatter = Schema.decodeUnknownOption(Frontmatter)
 
 const DISABLED_SUFFIX = ".disabled"
+// Shared/global skill files can be cached by several Location services in this process.
+let revision = 0
 
 // A skill is "disabled" (marker-file rename) when its on-disk file name has
 // been renamed to a hidden `.disabled` variant, e.g. `SKILL.md` ->
 // `.SKILL.md.disabled`. Such files are no longer discovered by the agent but
 // still surface in management UIs so they can be re-enabled.
-const isDisabledSkillPath = (filepath: string) => path.basename(filepath).startsWith(".") && filepath.endsWith(DISABLED_SUFFIX)
+const isDisabledSkillPath = (filepath: string) =>
+  path.basename(filepath).startsWith(".") && filepath.endsWith(DISABLED_SUFFIX)
 
 export type Data = {
   sources: Types.DeepMutable<Source>[]
@@ -104,30 +110,31 @@ const layer = Layer.effect(
             dot: true,
           })
           .pipe(Effect.catch(() => Effect.succeed([] as string[])))
-      for (const filepath of files.toSorted()) {
-        const content = yield* fs.readFileStringSafe(filepath).pipe(Effect.catch(() => Effect.succeed(undefined)))
-        if (!content) continue
-        const disabled = isDisabledSkillPath(filepath)
-        const markdown = ConfigMarkdown.parseOption(content)
-        if (!markdown) continue
-        const frontmatter = decodeFrontmatter(markdown.data).valueOrUndefined
-        if (!frontmatter) continue
-        const name =
-          frontmatter.name !== undefined
-            ? frontmatter.name
-            : path.dirname(filepath) === directory
-              ? path.basename(filepath, disabled ? ".disabled" : ".md")
-              : undefined
-        if (!name) continue
-        skills.push({
-          name,
-          description: frontmatter.description,
-          slash: frontmatter.slash,
-          location: AbsolutePath.make(filepath),
-          content: markdown.content,
-          enabled: !disabled,
-        })
-      }
+        for (const filepath of files.toSorted()) {
+          const content = yield* fs.readFileStringSafe(filepath).pipe(Effect.catch(() => Effect.succeed(undefined)))
+          if (!content) continue
+          const disabled = isDisabledSkillPath(filepath)
+          const markdown = ConfigMarkdown.parseOption(content)
+          if (!markdown) continue
+          const frontmatter = decodeFrontmatter(markdown.data).valueOrUndefined
+          if (!frontmatter) continue
+          const filename = disabled ? path.basename(filepath, DISABLED_SUFFIX).slice(1) : path.basename(filepath)
+          const name =
+            frontmatter.name !== undefined
+              ? frontmatter.name
+              : path.dirname(filepath) === directory
+                ? path.basename(filename, ".md")
+                : undefined
+          if (!name) continue
+          skills.push({
+            name,
+            description: frontmatter.description,
+            slash: frontmatter.slash,
+            location: AbsolutePath.make(filepath),
+            content: markdown.content,
+            enabled: !disabled,
+          })
+        }
       }
       return skills
     })
@@ -135,7 +142,12 @@ const layer = Layer.effect(
     // QUESTION(Dax): Should local skill sources invalidate on filesystem watch
     // events, following the reload policy chosen for other context sources?
     const cache = new Map<string, Info[]>()
+    let observedRevision = revision
     const list = Effect.fn("SkillV2.list")(function* () {
+      if (observedRevision !== revision) {
+        cache.clear()
+        observedRevision = revision
+      }
       const skills = new Map<string, Info>()
       for (const source of state.get().sources) {
         const key = Source.key(source)
@@ -154,7 +166,15 @@ const layer = Layer.effect(
 
     const activePath = Effect.fn("SkillV2.activePath")(function* (info: Info) {
       const current = info.location
-      if (current.startsWith("<")) {
+      if (
+        current.startsWith("<") ||
+        state
+          .get()
+          .sources.some(
+            (source) =>
+              source.type === "embedded" && source.skill.name === info.name && source.skill.location === current,
+          )
+      ) {
         return yield* new InvalidError({ name: info.name, reason: "Embedded skill cannot be edited." })
       }
       if (isDisabledSkillPath(current)) {
@@ -173,6 +193,7 @@ const layer = Layer.effect(
     }
 
     const refresh = Effect.fn("SkillV2.refresh")(function* (name: string) {
+      revision++
       cache.clear()
       return yield* get(name)
     })
@@ -180,18 +201,31 @@ const layer = Layer.effect(
     const update = Effect.fn("SkillV2.update")(function* (name: string, content: string) {
       const info = yield* get(name)
       const target = yield* activePath(info)
+      // The management editor receives the body, not the original YAML header.
+      // Preserve arbitrary frontmatter (including comments) for body-only edits.
+      const previous = yield* fs.readFileStringSafe(info.location)
+      const header = previous?.match(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/)?.[0] ?? ""
+      const document = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.test(content)
+        ? content
+        : header + (header && !header.endsWith("\n") ? "\n" : "") + content
+      const parsed = ConfigMarkdown.parseOption(document)
+      const frontmatter = parsed && decodeFrontmatter(parsed.data).valueOrUndefined
+      if (!frontmatter || (frontmatter.name ?? path.basename(target, ".md")) !== name)
+        return yield* new InvalidError({ name, reason: "Invalid frontmatter or changed skill name." })
       if (info.enabled === false && info.location !== target) {
         // Re-enable (restore original name) while writing new content.
         yield* fs.rename(info.location, target)
       }
-      yield* fs.writeFileString(target, content)
+      yield* fs.writeFileString(target, document)
       return yield* refresh(name)
     })
 
     const setEnabled = Effect.fn("SkillV2.setEnabled")(function* (name: string, enabled: boolean) {
       const info = yield* get(name)
       if (info.enabled === enabled) return info
-      if (info.enabled) {
+      // Validate embedded/read-only locations before either rename direction.
+      yield* activePath(info)
+      if (info.enabled !== false) {
         const target = disabledPath(info)
         yield* fs.rename(info.location, target)
       } else {
@@ -203,10 +237,9 @@ const layer = Layer.effect(
 
     const remove = Effect.fn("SkillV2.remove")(function* (name: string) {
       const info = yield* get(name)
-      if (info.location.startsWith("<")) {
-        return yield* new InvalidError({ name, reason: "Embedded skill cannot be deleted." })
-      }
+      yield* activePath(info)
       yield* fs.remove(info.location, { force: true })
+      revision++
       cache.clear()
     })
 

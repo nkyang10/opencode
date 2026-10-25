@@ -29,7 +29,11 @@ const keys = new Set([
 
 export function isV1(input: unknown) {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return false
-  return Object.keys(input).some((key) => keys.has(key))
+  const skills = "skills" in input ? input.skills : undefined
+  return (
+    Object.keys(input).some((key) => keys.has(key)) ||
+    (typeof skills === "object" && skills !== null && !Array.isArray(skills))
+  )
 }
 
 export function migrate(info: typeof ConfigV1.Info.Type) {

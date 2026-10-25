@@ -5,7 +5,7 @@ import { Persist, persisted } from "@/utils/persist"
 import { pathKey } from "@/utils/path-key"
 import { ServerScope } from "@/utils/server-scope"
 
-type StoredProject = { worktree: string; expanded: boolean }
+type StoredProject = { worktree: string; expanded: boolean; lastUsed?: number }
 type StoredServer = string | ServerConnection.HttpBase | ServerConnection.Http
 type ServerProjectState = {
   projects: Record<string, StoredProject[]>
@@ -140,7 +140,12 @@ export function createServerProjects<T extends ServerProjectState>(input: {
       return input.store.lastProject[input.scope()]
     },
     touch(directory: string) {
-      setStore("lastProject", input.scope(), directory)
+      const scope = input.scope()
+      const index = current().findIndex((project) => pathKey(project.worktree) === pathKey(directory))
+      batch(() => {
+        setStore("lastProject", scope, directory)
+        if (index !== -1) setStore("projects", scope, index, "lastUsed", Date.now())
+      })
     },
   }
 }

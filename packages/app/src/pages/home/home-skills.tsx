@@ -1,4 +1,5 @@
-import { createSignal, For, Show } from "solid-js"
+import { createEffect, For, Show } from "solid-js"
+import { createStore } from "solid-js/store"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { useLanguage } from "@/context/language"
 import { showToast } from "@/utils/toast"
@@ -10,21 +11,56 @@ export type HomeSkillsProps = {
 }
 
 export function HomeSkills(props: HomeSkillsProps) {
-  const editing = createSignal<{ name: string; content: string } | null>(null)
-  const [confirmDelete, setConfirmDelete] = createSignal<string | null>(null)
+  const [state, setState] = createStore({
+    editing: null as { name: string; content: string } | null,
+    confirmDelete: null as string | null,
+  })
+  createEffect(() => {
+    props.skills.scope()
+    setState({ editing: null, confirmDelete: null })
+  })
 
   async function copySkill(content: string) {
     try {
-      await navigator.clipboard.writeText(content)
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(content)
+      else {
+        const textarea = document.createElement("textarea")
+        textarea.value = content
+        textarea.style.position = "fixed"
+        textarea.style.opacity = "0"
+        document.body.appendChild(textarea)
+        textarea.select()
+        const copied = document.execCommand("copy")
+        textarea.remove()
+        if (!copied) throw new Error("Clipboard unavailable")
+      }
       showToast({ variant: "success", title: props.language.t("home.skills.copy") })
     } catch {
-      // ignore clipboard failures
+      showToast({ title: props.language.t("common.requestFailed") })
     }
   }
 
   return (
     <div class="flex h-full min-w-0 flex-col gap-0.5 p-3">
+      <div
+        data-component="home-skills-location"
+        class="truncate px-2 pb-2 text-xs text-v2-text-text-faint"
+        title={props.skills.directory()}
+      >
+        {props.skills.directory()}
+      </div>
       <div class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto py-1">
+        <Show when={props.skills.loading()}>
+          <div role="status">{props.language.t("common.loading")}</div>
+        </Show>
+        <Show when={props.skills.error()}>
+          <div role="alert" class="flex items-center gap-2">
+            <span>{props.language.t("common.requestFailed")}</span>
+            <button type="button" onClick={() => void props.skills.refresh()}>
+              {props.language.t("common.reload")}
+            </button>
+          </div>
+        </Show>
         <For each={props.skills.skills()}>
           {(skill) => (
             <SkillRow
@@ -32,34 +68,46 @@ export function HomeSkills(props: HomeSkillsProps) {
               location={skill.location}
               content={skill.content}
               enabled={skill.enabled ?? true}
-              editing={editing[0]()?.name === skill.name}
-              editingContent={editing[0]()?.content ?? ""}
-              onEditContent={(content) => editing[1]({ name: skill.name, content })}
+              editing={state.editing?.name === skill.name}
+              editingContent={state.editing?.content ?? ""}
+              onEditContent={(content) => setState("editing", { name: skill.name, content })}
               onToggle={(enabled) => {
                 if (props.skills.enabled.isPending) return
                 props.skills.enabled.mutate({ name: skill.name, enabled })
               }}
               onCopy={() => copySkill(skill.content)}
-              onOpenEditor={() => editing[1]({ name: skill.name, content: skill.content })}
-              onCancelEditor={() => editing[1](null)}
+              onOpenEditor={() => setState("editing", { name: skill.name, content: skill.content })}
+              onCancelEditor={() => setState("editing", null)}
               onSave={(content) => {
                 if (props.skills.update.isPending) return
-                props.skills.update.mutate({ name: skill.name, content })
-                editing[1](null)
+                const scope = props.skills.scope()
+                props.skills.update.mutate(
+                  { name: skill.name, content },
+                  {
+                    onSuccess: () => {
+                      if (
+                        props.skills.scope() === scope &&
+                        state.editing?.name === skill.name &&
+                        state.editing.content === content
+                      )
+                        setState("editing", null)
+                    },
+                  },
+                )
               }}
-              onRequestDelete={() => setConfirmDelete(skill.name)}
+              onRequestDelete={() => setState("confirmDelete", skill.name)}
               onConfirmDelete={() => {
                 if (props.skills.remove.isPending) return
-                setConfirmDelete(null)
+                setState("confirmDelete", null)
                 props.skills.remove.mutate({ name: skill.name })
               }}
-              confirmDelete={confirmDelete() === skill.name}
-              onCancelDelete={() => setConfirmDelete(null)}
+              confirmDelete={state.confirmDelete === skill.name}
+              onCancelDelete={() => setState("confirmDelete", null)}
               t={props.language.t}
             />
           )}
         </For>
-        <Show when={props.skills.skills().length === 0 && !props.skills.loading}>
+        <Show when={props.skills.skills().length === 0 && !props.skills.loading() && !props.skills.error()}>
           <div class="flex flex-1 flex-col items-center justify-center gap-1 text-center text-v2-text-text-faint [font-weight:440]">
             <span>{props.language.t("home.skills.empty")}</span>
             <span class="text-xs">{props.language.t("home.skills.empty.description")}</span>
@@ -126,6 +174,8 @@ function SkillRow(props: {
           />
           <IconButton
             data-component="home-skill-toggle"
+            aria-pressed={props.enabled}
+            aria-label={props.enabled ? props.t("home.skills.disabled") : props.t("home.skills.enabled")}
             title={props.enabled ? props.t("home.skills.disabled") : props.t("home.skills.enabled")}
             onClick={() => props.onToggle(!props.enabled)}
             icon="eye"

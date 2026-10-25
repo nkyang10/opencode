@@ -124,6 +124,16 @@ describe("SkillTool", () => {
               }),
             ).toEqual({ type: "error", value: "Unable to load skill effect" })
             deny = false
+            current = [{ ...info, enabled: false }]
+            const checks = assertions.length
+            expect(
+              yield* executeTool(registry, {
+                sessionID,
+                ...toolIdentity,
+                call: { type: "tool-call", id: "call-disabled-skill", name: "skill", input: { name: "effect" } },
+              }),
+            ).toEqual({ type: "error", value: "Unable to load skill effect" })
+            expect(assertions).toHaveLength(checks)
             const flat = SkillV2.Info.make({
               name: "public",
               description: "Public guidance",

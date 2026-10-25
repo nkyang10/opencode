@@ -1,5 +1,6 @@
 import {
   createEffect,
+  createMemo,
   createSignal,
   For,
   onCleanup,
@@ -18,10 +19,12 @@ import { useLanguage } from "@/context/language"
 import { displayName, getProjectAvatarSource } from "@/pages/layout/helpers"
 import { pathKey } from "@/utils/path-key"
 import { handleDocumentSearchKeydown } from "@/utils/search-keydown"
+import { sortPromptProjects } from "./prompt-project-sort"
 import { createMenuDismissController } from "@/utils/menu-dismiss-controller"
 
 export type PromptProject = {
   name?: string
+  lastUsed?: number
   id?: string
   worktree: string
   sandboxes?: string[]
@@ -67,10 +70,11 @@ export function createPromptProjectController(input: {
       )
   }
   const selected = () => current() ?? input.controls().available[0]
+  const sortedProjects = createMemo(() => sortPromptProjects(input.controls().available))
   const projects = () => {
     const search = store.search.trim().toLowerCase()
-    if (!search) return input.controls().available
-    return input.controls().available.filter((project) => displayName(project).toLowerCase().includes(search))
+    if (!search) return sortedProjects()
+    return sortedProjects().filter((project) => !search || displayName(project).toLowerCase().includes(search))
   }
   const servers = () =>
     input
@@ -115,9 +119,7 @@ export function createPromptProjectController(input: {
   }
   const setSearch = (value: string) => {
     const search = value.trim().toLowerCase()
-    const first = input
-      .controls()
-      .available.find((project) => !search || displayName(project).toLowerCase().includes(search))
+    const first = sortedProjects().find((project) => !search || displayName(project).toLowerCase().includes(search))
     setStore({
       search: value,
       active: first ? projectKey(first) : actionKey(servers().length > 1 ? undefined : servers()[0]?.key),

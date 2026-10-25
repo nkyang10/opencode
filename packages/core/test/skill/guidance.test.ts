@@ -39,7 +39,7 @@ describe("SkillGuidance", () => {
       ...AgentV2.Info.empty(build),
       permissions: [{ action: "skill", resource: "denied", effect: "deny" }],
     })
-    let skills = [hidden, denied, effect]
+    let skills = [hidden, denied, effect, { ...effect, name: "disabled", enabled: false }]
     return Effect.gen(function* () {
       const guidance = yield* SkillGuidance.Service
       const initialized = yield* guidance

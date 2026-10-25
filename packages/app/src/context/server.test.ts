@@ -243,3 +243,20 @@ describe("migrateCanonicalLocalServerState", () => {
     })
   })
 })
+
+test("records project recency per server without changing the sidebar order", () => {
+  createRoot((dispose) => {
+    const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {} })
+    const local = createServerProjects({ scope: () => ServerScope.local, store, setStore })
+    const remote = createServerProjects({ scope: () => "https://remote.example" as ServerScope, store, setStore })
+    local.open("C:/work/alpha")
+    local.open("C:/work/beta")
+    remote.open("C:/work/alpha")
+    local.touch("C:\\work\\alpha\\")
+    expect(local.last()).toBe("C:\\work\\alpha\\")
+    expect(local.list().map((item) => item.worktree)).toEqual(["C:/work/beta", "C:/work/alpha"])
+    expect(local.list()[1].lastUsed).toBeGreaterThan(0)
+    expect(remote.list()[0].lastUsed).toBeUndefined()
+    dispose()
+  })
+})

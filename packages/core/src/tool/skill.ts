@@ -70,7 +70,7 @@ const layer = Layer.effectDiscard(
           execute: (input, context) =>
             Effect.gen(function* () {
               const current = yield* skills.list()
-              const skill = current.find((skill) => skill.name === input.name)
+              const skill = current.find((skill) => skill.name === input.name && skill.enabled !== false)
               if (!skill) return yield* unableToLoad(input.name)
               return yield* Effect.gen(function* () {
                 yield* permission.assert({

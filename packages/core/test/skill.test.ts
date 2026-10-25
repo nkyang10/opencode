@@ -147,7 +147,30 @@ describe("SkillV2", () => {
           const updated = yield* skill.update("review", "---\nname: review\ndescription: Edited\n---\n# Edited")
           expect(updated.content).toBe("# Edited")
           expect(updated.enabled).toBe(true)
-          expect(yield* Effect.promise(() => fs.readFile(path.join(tmp.path, "review", "SKILL.md"), "utf8"))).toContain("# Edited")
+          expect(yield* Effect.promise(() => fs.readFile(path.join(tmp.path, "review", "SKILL.md"), "utf8"))).toContain(
+            "# Edited",
+          )
+
+          const body = yield* skill.update("review", "# Body-only edit")
+          expect(body.content).toBe("# Body-only edit")
+          expect(body.description).toBe("Edited")
+          const saved = yield* Effect.promise(() => fs.readFile(path.join(tmp.path, "review", "SKILL.md"), "utf8"))
+          expect(saved).toContain("name: review")
+          expect(saved).toContain("description: Edited")
+          expect(saved).toContain("# Body-only edit")
+          expect(yield* skill.update("review", "---\nname: renamed\n---\nWrong").pipe(Effect.flip)).toBeInstanceOf(
+            SkillV2.InvalidError,
+          )
+          expect(yield* Effect.promise(() => fs.readFile(path.join(tmp.path, "review", "SKILL.md"), "utf8"))).toBe(
+            saved,
+          )
+
+          expect(
+            yield* skill.update("review", "---\ndescription: Missing name\n---\nWrong").pipe(Effect.flip),
+          ).toBeInstanceOf(SkillV2.InvalidError)
+          expect(yield* Effect.promise(() => fs.readFile(path.join(tmp.path, "review", "SKILL.md"), "utf8"))).toBe(
+            saved,
+          )
 
           const disabled = yield* skill.setEnabled("review", false)
           expect(disabled.enabled).toBe(false)
@@ -157,12 +180,31 @@ describe("SkillV2", () => {
           expect(disabledList[0].name).toBe("review")
           expect(disabledList[0].enabled).toBe(false)
 
+          expect(SkillV2.available(disabledList, AgentV2.Info.empty(AgentV2.ID.make("build")))).toEqual([])
           const reenabled = yield* skill.setEnabled("review", true)
           expect(reenabled.enabled).toBe(true)
           expect(reenabled.location.endsWith("SKILL.md")).toBe(true)
 
+          yield* Effect.promise(() => fs.writeFile(path.join(tmp.path, "flat.md"), "# Flat"))
           yield* skill.remove("review")
-          expect(yield* list()).toHaveLength(0)
+          expect((yield* list()).map((item) => item.name)).toEqual(["flat"])
+          expect((yield* list()).map((item) => item.name)).toContain("flat")
+          expect((yield* skill.setEnabled("flat", false)).name).toBe("flat")
+          expect((yield* skill.setEnabled("flat", true)).name).toBe("flat")
+          yield* skill.transform((editor) =>
+            editor.source({
+              type: "embedded",
+              skill: SkillV2.Info.make({
+                name: "embedded",
+                location: AbsolutePath.make(path.join(tmp.path, "flat.md")),
+                content: "Built in",
+              }),
+            }),
+          )
+          expect(yield* skill.setEnabled("embedded", false).pipe(Effect.flip)).toBeInstanceOf(SkillV2.InvalidError)
+          expect(yield* skill.update("embedded", "Changed").pipe(Effect.flip)).toBeInstanceOf(SkillV2.InvalidError)
+          expect(yield* skill.remove("embedded").pipe(Effect.flip)).toBeInstanceOf(SkillV2.InvalidError)
+          expect(yield* Effect.promise(() => fs.readFile(path.join(tmp.path, "flat.md"), "utf8"))).toBe("# Flat")
         }),
       ),
     ),
