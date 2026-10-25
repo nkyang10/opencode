@@ -22,6 +22,7 @@ import { useLayout } from "@/context/layout"
 import { usePermission } from "@/context/permission"
 import { type ImageAttachmentPart, usePrompt } from "@/context/prompt"
 import { usePlatform } from "@/context/platform"
+import { useSessionPause } from "@/context/session-pause"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { createSessionTabs } from "@/pages/session/helpers"
@@ -42,6 +43,7 @@ export type PromptInputV2ComposerProps = {
 export type PromptInputV2ControllerProps = Omit<PromptInputProps, "class" | "submission">
 export type PromptInputV2ComposerController = PromptInputV2Interaction & {
   readonly model: PromptInputProps["controls"]["model"]
+  readonly pause: ReturnType<typeof useSessionPause>
 }
 
 export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
@@ -56,6 +58,28 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
         borderUnderlay={props.borderUnderlay}
         class={props.class}
         variantControlVisible={!props.controller.model.loading}
+        submitExtra={
+          <Show when={props.controller.pause.visible}>
+            <TooltipV2
+              value={
+                props.controller.pause.paused && !props.controller.pause.waiting
+                  ? language.t("prompt.pause.pending")
+                  : language.t(props.controller.pause.paused ? "prompt.action.resume" : "prompt.action.pause")
+              }
+            >
+              <ButtonV2
+                type="button"
+                variant="ghost"
+                size="small"
+                disabled={props.controller.pause.pending}
+                aria-pressed={props.controller.pause.paused}
+                onClick={() => void props.controller.pause.toggle()}
+              >
+                {language.t(props.controller.pause.paused ? "prompt.action.resume" : "prompt.action.pause")}
+              </ButtonV2>
+            </TooltipV2>
+          </Show>
+        }
         attachKeybind={command.keybindParts("file.attach")}
         attachShortcut={command.keybind("file.attach")}
         modelControl={
@@ -127,6 +151,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
       .join("")
     return text.trim().length === 0 && attachments().length === 0 && commentCount() === 0
   })
+  const pause = useSessionPause({ sessionID: () => props.controls.session.id, working })
   const stopping = createMemo(() => working() && blank())
   const placeholder = createMemo(() =>
     promptPlaceholder({
@@ -214,7 +239,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     },
     newSessionWorktree: () => props.newSessionWorktree,
     onNewSessionWorktreeReset: props.onNewSessionWorktreeReset,
-    shouldQueue: props.shouldQueue,
+    shouldQueue: () => !pause.paused && !!props.shouldQueue?.(),
     onQueue: props.onQueue,
     onAbort: props.onAbort,
     onSubmit: props.onSubmit,
@@ -409,6 +434,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     },
   })
   Object.defineProperty(controller, "model", { get: () => props.controls.model })
+  Object.defineProperty(controller, "pause", { get: () => pause })
 
   command.register("prompt-input", () => [
     {

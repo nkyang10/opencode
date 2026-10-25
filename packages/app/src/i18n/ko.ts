@@ -1273,4 +1273,10 @@ export const dict = {
   "settings.admin.row.config.description": "Global settings are merged from these files, highest priority first. Project and environment settings may override them. Click a path to browse its location.",
   "settings.admin.row.config.missing": "No global file exists yet. Saving an Admin setting creates {{path}}.",
   "settings.admin.row.config.browse": "Browse configuration location: {{path}}",
+  "prompt.action.pause": "Pause",
+  "prompt.action.resume": "Resume",
+  "prompt.pause.pending": "Pause requested. Current tools will finish before the next model request is held.",
+  "settings.admin.row.config.active.title": "Active configuration files",
+  "settings.admin.row.config.active.description": "Files loaded for the current project, highest priority first. Inline environment settings are not files and may also override these values.",
+  "settings.admin.row.config.active.empty": "No file-backed configuration is active for this project.",
 }

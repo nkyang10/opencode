@@ -31,6 +31,7 @@ import { SessionMessage } from "@opencode-ai/core/session/message"
 import { Prompt } from "@opencode-ai/core/session/prompt"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { SessionExecution } from "@opencode-ai/core/session/execution"
+import { SessionPause } from "@opencode-ai/core/session/pause"
 import { SessionRunCoordinator } from "@opencode-ai/core/session/run-coordinator"
 import { SessionRunner } from "@opencode-ai/core/session/runner"
 import * as SessionRunnerLLM from "@opencode-ai/core/session/runner/llm"
@@ -273,6 +274,7 @@ const it = testEffect(
       SessionRunnerLLM.node,
       SessionExecution.node,
       SessionV2.node,
+      SessionPause.node,
     ]),
     [
       [LayerNodePlatform.llmClient, client],
@@ -608,6 +610,76 @@ describe("SessionRunnerLLM", () => {
           ],
         },
       ])
+    }),
+  )
+
+  it.effect("finishes current tools and holds the next provider request until resumed", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* SessionV2.Service
+      const pause = yield* SessionPause.Service
+      yield* session.prompt({ sessionID, prompt: Prompt.make({ text: "Finish this tool" }), resume: false })
+      requests.length = 0
+      toolExecutionGate = yield* Deferred.make<void>()
+      toolExecutionsStarted = yield* Deferred.make<void>()
+      toolExecutionsReady = 1
+      responses = [
+        [
+          LLMEvent.stepStart({ index: 0 }),
+          LLMEvent.toolCall({ id: "call-pause", name: "echo", input: { text: "settled" } }),
+          LLMEvent.stepFinish({ index: 0, reason: "tool-calls" }),
+          LLMEvent.finish({ reason: "tool-calls" }),
+        ],
+        fragmentFixture("text", "pause-final", ["Done"]).completeEvents,
+      ]
+      const run = yield* session.resume(sessionID).pipe(Effect.forkChild)
+      yield* Deferred.await(toolExecutionsStarted)
+      yield* pause.set(sessionID, true)
+      expect(activeToolExecutions).toBe(1)
+      expect(requests).toHaveLength(1)
+      yield* Deferred.succeed(toolExecutionGate, undefined)
+      while (!(yield* pause.state(sessionID)).waiting) yield* Effect.yieldNow
+      expect(activeToolExecutions).toBe(0)
+      expect(requests).toHaveLength(1)
+      expect(yield* session.context(sessionID)).toMatchObject([
+        { type: "user" },
+        {
+          type: "assistant",
+          content: [
+            { type: "tool", id: "call-pause", state: { status: "completed", structured: { text: "settled" } } },
+          ],
+        },
+      ])
+      yield* pause.set(sessionID, false)
+      yield* Fiber.join(run)
+      expect(requests).toHaveLength(2)
+    }),
+  )
+
+  it.effect("admitting a new prompt while paused interrupts the old waiter and immediately schedules the input", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* SessionV2.Service
+      const pause = yield* SessionPause.Service
+      yield* session.prompt({ sessionID, prompt: Prompt.make({ text: "Original instruction" }), resume: false })
+      requests.length = 0
+      yield* pause.set(sessionID, true)
+      const original = yield* session.resume(sessionID).pipe(Effect.forkChild)
+      while (!(yield* pause.state(sessionID)).waiting) yield* Effect.yieldNow
+      expect(requests).toHaveLength(0)
+      streamStarted = yield* Deferred.make<void>()
+      streamGate = yield* Deferred.make<void>()
+      response = fragmentFixture("text", "pause-new", ["New reply"]).completeEvents
+      yield* session.prompt({ sessionID, prompt: Prompt.make({ text: "New instruction" }) })
+      yield* Deferred.await(streamStarted)
+      const joined = yield* session.resume(sessionID).pipe(Effect.forkChild)
+      yield* Effect.yieldNow
+      yield* Deferred.succeed(streamGate, undefined)
+      yield* Fiber.join(joined)
+      expect(Exit.isFailure(yield* Fiber.await(original))).toBeTrue()
+      expect(yield* pause.state(sessionID)).toEqual({ paused: false, waiting: false })
+      expect(requests).toHaveLength(1)
+      expect(userTexts(requests[0])).toContain("New instruction")
     }),
   )
 

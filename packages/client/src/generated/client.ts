@@ -15,6 +15,10 @@ import type {
   SessionsSwitchAgentOutput,
   SessionsSwitchModelInput,
   SessionsSwitchModelOutput,
+  SessionsPauseGetInput,
+  SessionsPauseGetOutput,
+  SessionsPauseSetInput,
+  SessionsPauseSetOutput,
   SessionsPromptInput,
   SessionsPromptOutput,
   SessionsCompactInput,
@@ -370,6 +374,29 @@ export function make(options: ClientOptions) {
             successStatus: 204,
             declaredStatuses: [404, 400, 401],
             empty: true,
+          },
+          requestOptions,
+        ),
+      pauseGet: (input: SessionsPauseGetInput, requestOptions?: RequestOptions) =>
+        request<SessionsPauseGetOutput>(
+          {
+            method: "GET",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/pause`,
+            successStatus: 200,
+            declaredStatuses: [404, 400, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      pauseSet: (input: SessionsPauseSetInput, requestOptions?: RequestOptions) =>
+        request<SessionsPauseSetOutput>(
+          {
+            method: "POST",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/pause`,
+            body: { paused: input["paused"] },
+            successStatus: 200,
+            declaredStatuses: [404, 400, 401],
+            empty: false,
           },
           requestOptions,
         ),

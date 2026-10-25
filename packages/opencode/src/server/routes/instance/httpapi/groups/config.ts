@@ -1,3 +1,4 @@
+import { Schema } from "effect"
 import { Config } from "@/config/config"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
 import { Provider } from "@/provider/provider"
@@ -33,6 +34,17 @@ export const ConfigApi = HttpApi.make("config")
             identifier: "config.update",
             summary: "Update configuration",
             description: "Update OpenCode configuration settings and preferences.",
+          }),
+        ),
+        HttpApiEndpoint.get("sources", `${root}/sources`, {
+          query: WorkspaceRoutingQuery,
+          success: Schema.Array(Schema.String),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "config.sources",
+            summary: "List active configuration files",
+            description:
+              "List existing file-backed configuration sources loaded for this directory, highest precedence first. Inline environment configuration is not a file.",
           }),
         ),
         HttpApiEndpoint.get("providers", `${root}/providers`, {

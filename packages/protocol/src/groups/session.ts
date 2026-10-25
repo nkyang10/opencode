@@ -202,6 +202,39 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S>(sessionLo
         ),
     )
     .add(
+      HttpApiEndpoint.get("session.pauseGet", "/api/session/:sessionID/pause", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({ paused: Schema.Boolean, waiting: Schema.Boolean }),
+        error: SessionNotFoundError,
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "v2.session.pause.get",
+            summary: "Get pause state",
+            description:
+              "Read this process's session pause request and whether it reached a safe provider-turn boundary.",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.post("session.pauseSet", "/api/session/:sessionID/pause", {
+        params: { sessionID: Session.ID },
+        payload: Schema.Struct({ paused: Schema.Boolean }),
+        success: Schema.Struct({ paused: Schema.Boolean, waiting: Schema.Boolean }),
+        error: SessionNotFoundError,
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "v2.session.pause.set",
+            summary: "Pause or resume a session",
+            description:
+              "Idempotently request pause before the next provider turn without interrupting current tools, or release that pause. Inactive sessions cannot be paused.",
+          }),
+        ),
+    )
+    .add(
       HttpApiEndpoint.post("session.prompt", "/api/session/:sessionID/prompt", {
         params: { sessionID: Session.ID },
         payload: Schema.Struct({

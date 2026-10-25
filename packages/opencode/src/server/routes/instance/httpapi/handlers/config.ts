@@ -29,6 +29,10 @@ export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (h
       }
     })
 
-    return handlers.handle("get", get).handle("update", update).handle("providers", providers)
+    return handlers
+      .handle("get", get)
+      .handle("update", update)
+      .handle("providers", providers)
+      .handle("sources", () => configSvc.sources())
   }),
 )

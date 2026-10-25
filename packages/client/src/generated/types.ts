@@ -381,6 +381,17 @@ export type SessionsSwitchModelInput = {
 
 export type SessionsSwitchModelOutput = void
 
+export type SessionsPauseGetInput = { readonly sessionID: { readonly sessionID: string }["sessionID"] }
+
+export type SessionsPauseGetOutput = { readonly paused: boolean; readonly waiting: boolean }
+
+export type SessionsPauseSetInput = {
+  readonly sessionID: { readonly sessionID: string }["sessionID"]
+  readonly paused: { readonly paused: boolean }["paused"]
+}
+
+export type SessionsPauseSetOutput = { readonly paused: boolean; readonly waiting: boolean }
+
 export type SessionsPromptInput = {
   readonly sessionID: { readonly sessionID: string }["sessionID"]
   readonly id?: {

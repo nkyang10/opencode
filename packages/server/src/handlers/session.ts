@@ -1,3 +1,4 @@
+import { SessionPause } from "@opencode-ai/core/session/pause"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { DateTime, Effect, Stream } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
@@ -19,8 +20,16 @@ const DefaultSessionHistoryLimit = 50
 export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handlers) =>
   Effect.gen(function* () {
     const session = yield* SessionV2.Service
+    const pause = yield* SessionPause.Service
 
     return handlers
+      .handle("session.pauseGet", (ctx) => pause.state(ctx.params.sessionID))
+      .handle("session.pauseSet", (ctx) =>
+        Effect.gen(function* () {
+          const active = yield* session.active
+          return yield* pause.set(ctx.params.sessionID, ctx.payload.paused && active.has(ctx.params.sessionID))
+        }),
+      )
       .handle(
         "session.list",
         Effect.fn(function* (ctx) {

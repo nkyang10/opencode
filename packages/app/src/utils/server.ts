@@ -138,6 +138,26 @@ export async function fetchWebuiStatus(input: {
   return (await response.json()) as WebuiStatus
 }
 
+/** Paths come from the actual per-instance config loader, never client-side filename guesses. */
+export async function fetchConfigSources(input: {
+  server: ServerConnection.HttpBase
+  directory: string
+  fetch?: typeof globalThis.fetch
+}): Promise<string[] | undefined> {
+  const response = await (input.fetch ?? globalThis.fetch)(
+    `${input.server.url.replace(/\/+$/, "")}/config/sources?${new URLSearchParams({ directory: input.directory })}`,
+    {
+      headers: input.server.password
+        ? {
+            Authorization: `Basic ${authTokenFromCredentials({ username: input.server.username, password: input.server.password })}`,
+          }
+        : undefined,
+    },
+  ).catch(() => undefined)
+  if (!response?.ok) return
+  return (await response.json()) as string[]
+}
+
 // FE-028: the commentary routes are called with a hand-rolled fetch rather than the generated client, the
 // same way `fetchWebuiStatus` does it — the lease has to be refreshable from a timer and released with
 // `navigator.sendBeacon` on pagehide, neither of which the generated client makes convenient.

@@ -289,6 +289,24 @@ async function check(map: (dir: string) => string) {
   }
 }
 
+it.effect("reports loaded config files in effective precedence order without inventing missing paths", () =>
+  withConfigTree(
+    { global: { username: "global" }, project: { username: "project" }, local: { username: "local" } },
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const sources = yield* Config.use.sources()
+      expect(sources.slice(0, 2)).toEqual([
+        path.join(test.directory, ".opencode", "opencode.json"),
+        path.join(test.directory, "opencode.json"),
+      ])
+      expect(sources).toContain(path.join(Global.Path.config, "opencode.json"))
+      expect(sources).not.toContain(path.join(test.directory, ".opencode", "opencode.jsonc"))
+      expect(new Set(sources).size).toBe(sources.length)
+      expect((yield* Config.use.get()).username).toBe("local")
+    }),
+  ),
+)
+
 it.instance("loads config with defaults when no files exist", () =>
   Effect.gen(function* () {
     const config = yield* Config.use.get()

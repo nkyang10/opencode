@@ -564,6 +564,26 @@ describe("session HttpApi", () => {
   )
 
   it.instance(
+    "does not strand idle v2 sessions when pause is requested and supports idempotent resume",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const session = yield* createSession()
+        const headers = { "x-opencode-directory": test.directory, "content-type": "application/json" }
+        const url = `/api/session/${session.id}/pause`
+        const initial = yield* request(url, { headers })
+        expect(initial.status).toBe(200)
+        expect(yield* responseJson(initial)).toEqual({ paused: false, waiting: false })
+        for (const paused of [true, false, false]) {
+          const response = yield* request(url, { method: "POST", headers, body: JSON.stringify({ paused }) })
+          expect(response.status).toBe(200)
+          expect(yield* responseJson(response)).toEqual({ paused: false, waiting: false })
+        }
+      }),
+    { git: true, config: { formatter: false, lsp: false } },
+  )
+
+  it.instance(
     "returns v2 public not found errors for missing sessions",
     () =>
       Effect.gen(function* () {
@@ -575,6 +595,10 @@ describe("session HttpApi", () => {
           sessionID: missing,
           message: `Session not found: ${missing}`,
         }
+
+        const pause = yield* request(`/api/session/${missing}/pause`, { headers })
+        expect(pause.status).toBe(404)
+        expect(yield* responseJson(pause)).toEqual(expected)
 
         const messages = yield* request(`/api/session/${missing}/message`, { headers })
         expect(messages.status).toBe(404)

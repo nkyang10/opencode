@@ -117,6 +117,7 @@ type Info = ConfigV1.Info & {
 
 type State = {
   config: Info
+  sources: string[]
   directories: string[]
   deps: Fiber.Fiber<void>[]
   consoleState: ConsoleState
@@ -124,6 +125,7 @@ type State = {
 
 export interface Interface {
   readonly get: () => Effect.Effect<Info>
+  readonly sources: () => Effect.Effect<string[]>
   readonly getGlobal: () => Effect.Effect<Info>
   readonly getConsoleState: () => Effect.Effect<ConsoleState>
   readonly update: (config: Info) => Effect.Effect<void>
@@ -330,6 +332,7 @@ const layer = Layer.effect(
         const auth = yield* authSvc.all().pipe(Effect.orDie)
 
         let result: Info = {}
+        const sources: string[] = []
         const authEnv: Record<string, string> = {}
         const consoleManagedProviders = new Set<string>()
         let activeOrgName: string | undefined
@@ -363,6 +366,7 @@ const layer = Layer.effect(
         })
 
         const merge = (source: string, next: Info, kind?: ConfigPlugin.Scope) => {
+          if (source !== Global.Path.config && path.isAbsolute(source) && existsSync(source)) sources.push(source)
           result = mergeConfigConcatArrays(result, next)
           return mergePluginOrigins(source, next.plugin, kind)
         }
@@ -410,9 +414,12 @@ const layer = Layer.effect(
         }
 
         const global = Object.keys(authEnv).length ? yield* loadGlobal(authEnv) : yield* getGlobal()
+        sources.push(...globalConfigFiles().toReversed())
         yield* merge(Global.Path.config, global, "global")
 
         if (Flag.OPENCODE_CONFIG) {
+          if (!path.isAbsolute(Flag.OPENCODE_CONFIG) && existsSync(Flag.OPENCODE_CONFIG))
+            sources.push(path.resolve(Flag.OPENCODE_CONFIG))
           yield* merge(Flag.OPENCODE_CONFIG, yield* loadFile(Flag.OPENCODE_CONFIG, authEnv))
           yield* Effect.logDebug("loaded custom config", { path: Flag.OPENCODE_CONFIG })
         }
@@ -538,6 +545,7 @@ const layer = Layer.effect(
         // macOS managed preferences (.mobileconfig deployed via MDM) override everything
         const managed = yield* Effect.promise(() => ConfigManaged.readManagedPreferences())
         if (managed) {
+          if (path.isAbsolute(managed.source) && existsSync(managed.source)) sources.push(managed.source)
           result = mergeConfigConcatArrays(
             result,
             yield* loadConfig(managed.text, {
@@ -599,6 +607,7 @@ const layer = Layer.effect(
 
         return {
           config: result,
+          sources,
           directories,
           deps,
           consoleState: {
@@ -619,6 +628,10 @@ const layer = Layer.effect(
 
     const get = Effect.fn("Config.get")(function* () {
       return yield* InstanceState.use(state, (s) => s.config)
+    })
+
+    const sources = Effect.fn("Config.sources")(function* () {
+      return yield* InstanceState.use(state, (s) => Array.from(new Set(s.sources.toReversed())))
     })
 
     const directories = Effect.fn("Config.directories")(function* () {
@@ -682,6 +695,7 @@ const layer = Layer.effect(
     return Service.of({
       get,
       getGlobal,
+      sources,
       getConsoleState,
       update,
       updateGlobal,

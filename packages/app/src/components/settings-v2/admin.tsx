@@ -10,7 +10,7 @@ import { useLanguage } from "@/context/language"
 import { useServer } from "@/context/server"
 import { useServerSync } from "@/context/server-sync"
 import type { Config } from "@opencode-ai/sdk/v2/client"
-import { fetchWebuiStatus, type WebuiStatus } from "@/utils/server"
+import { fetchConfigSources, fetchWebuiStatus, type WebuiStatus } from "@/utils/server"
 import { showToast } from "@/utils/toast"
 import { SettingsListV2 } from "./parts/list"
 import { SettingsRowV2 } from "./parts/row"
@@ -25,7 +25,7 @@ import "./settings-v2.css"
 // The port is read once when the process starts, so a saved port shows up here as
 // "running on X, restart to apply Y" until the next start. `GET /global/webui`
 // reports both, which is the only reason this tab can tell the truth about it.
-export const SettingsAdminV2: Component = () => {
+export const SettingsAdminV2: Component<{ directory?: () => string | undefined }> = (props) => {
   const dialog = useDialog()
   const platform = usePlatform()
   const language = useLanguage()
@@ -38,6 +38,15 @@ export const SettingsAdminV2: Component = () => {
   const [status, { refetch }] = createResource(
     () => server.current?.http,
     (http) => fetchWebuiStatus({ server: http }),
+  )
+
+  const [activeSources] = createResource(
+    () => {
+      const http = server.current?.http
+      const directory = props.directory?.()
+      return http && directory ? { http, directory } : undefined
+    },
+    ({ http, directory }) => fetchConfigSources({ server: http, directory, fetch: platform.fetch }),
   )
 
   createEffect(() => {
@@ -161,6 +170,35 @@ export const SettingsAdminV2: Component = () => {
             <div class="settings-v2-section">
               <h3 class="settings-v2-section-title">{language.t("settings.admin.section.config")}</h3>
               <SettingsListV2>
+                <Show when={activeSources()}>
+                  {(files) => (
+                    <SettingsRowV2
+                      title={language.t("settings.admin.row.config.active.title")}
+                      description={language.t("settings.admin.row.config.active.description")}
+                    >
+                      <div
+                        class="flex flex-col items-start gap-2 min-w-0"
+                        data-action="settings-admin-active-config-files"
+                      >
+                        <For
+                          each={files()}
+                          fallback={<span>{language.t("settings.admin.row.config.active.empty")}</span>}
+                        >
+                          {(file) => (
+                            <ButtonV2
+                              variant="ghost"
+                              disabled={activeSources.loading}
+                              onClick={() => void browseConfig(file)}
+                              aria-label={language.t("settings.admin.row.config.browse", { path: file })}
+                            >
+                              <span class="break-all whitespace-normal text-left">{file}</span>
+                            </ButtonV2>
+                          )}
+                        </For>
+                      </div>
+                    </SettingsRowV2>
+                  )}
+                </Show>
                 <SettingsRowV2
                   title={language.t("settings.admin.row.config.title")}
                   description={language.t("settings.admin.row.config.description")}

@@ -5,7 +5,7 @@ import { Effect, Layer } from "effect"
 import path from "path"
 import { tmpdirScoped } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
-import { httpApiLayer, request } from "./httpapi-layer"
+import { httpApiLayer, request, requestInDirectory } from "./httpapi-layer"
 
 const it = testEffect(Layer.mergeAll(LayerNode.compile(FSUtil.node), httpApiLayer))
 
@@ -31,5 +31,16 @@ it.effect("creates a single selected child and returns typed failures for invali
     expect(yield* created.json).toEqual({ directory: path.join(directory, "new project") })
     expect((yield* create("new project")).status).toBe(400)
     expect((yield* create("../escape")).status).toBe(400)
+  }),
+)
+
+it.effect("reports the current directory's loaded configuration through HTTP", () =>
+  Effect.gen(function* () {
+    const directory = yield* tmpdirScoped()
+    const file = path.join(directory, "opencode.json")
+    yield* FSUtil.use.writeWithDirs(file, JSON.stringify({ username: "config-source-test" }))
+    const response = yield* requestInDirectory("/config/sources", directory)
+    expect(response.status).toBe(200)
+    expect(yield* response.json).toContain(file)
   }),
 )

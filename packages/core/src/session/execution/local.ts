@@ -5,12 +5,14 @@ import { SessionRunCoordinator } from "../run-coordinator"
 import { SessionRunner } from "../runner"
 import { SessionSchema } from "../schema"
 import { SessionStore } from "../store"
+import { SessionPause } from "../pause"
 import { SessionExecution } from "../execution"
 
 /** Current-process routing for implicit-local Locations. Future remote placement belongs here. */
 const layer = Layer.effect(
   SessionExecution.Service,
   Effect.gen(function* () {
+    const pause = yield* SessionPause.Service
     const store = yield* SessionStore.Service
     const locations = yield* LocationServiceMap.Service
     const coordinator = yield* SessionRunCoordinator.make<SessionSchema.ID, SessionRunner.RunError>({
@@ -19,6 +21,7 @@ const layer = Layer.effect(
         if (!session) return yield* Effect.die(`Session not found: ${sessionID}`)
         return yield* SessionRunner.Service.use((runner) => runner.run({ sessionID, force })).pipe(
           Effect.provide(locations.get(session.location)),
+          Effect.ensuring(pause.clear(sessionID)),
           Effect.tapCause((cause) =>
             Cause.hasInterruptsOnly(cause)
               ? Effect.void
@@ -40,7 +43,7 @@ const layer = Layer.effect(
 export const node = makeGlobalNode({
   service: SessionExecution.Service,
   layer,
-  deps: [SessionStore.node, LocationServiceMap.node],
+  deps: [SessionStore.node, LocationServiceMap.node, SessionPause.node],
 })
 
 export * as SessionExecutionLocal from "./local"

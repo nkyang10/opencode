@@ -108,7 +108,7 @@ export const DialogSettings: Component<{
           <SettingsModelsV2 />
         </TabsV2.Content>
         <TabsV2.Content value="admin" class="settings-v2-panel">
-          <SettingsAdminV2 />
+          <SettingsAdminV2 directory={directory} />
         </TabsV2.Content>
       </TabsV2>
     </Dialog>

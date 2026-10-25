@@ -26,6 +26,7 @@ import path from "path"
 import { fromRow } from "./session/info"
 import { SessionRunner } from "./session/runner/index"
 import { SessionStore } from "./session/store"
+import { SessionPause } from "./session/pause"
 import { SessionExecution } from "./session/execution"
 import { makeGlobalNode } from "./effect/app-node"
 import { LocationServiceMap } from "./location-service-map"
@@ -189,6 +190,7 @@ const layer = Layer.effect(
     const events = yield* EventV2.Service
     const projects = yield* ProjectV2.Service
     const execution = yield* SessionExecution.Service
+    const pause = yield* SessionPause.Service
     const store = yield* SessionStore.Service
     const locations = yield* LocationServiceMap.Service
     const decodeMessage = Schema.decodeUnknownEffect(SessionMessage.Message)
@@ -383,7 +385,15 @@ const layer = Layer.effect(
             )
             if (!SessionInput.equivalent(admitted, expected))
               return yield* new PromptConflictError({ sessionID: input.sessionID, messageID })
-            if (input.resume !== false) yield* execution.wake(admitted.sessionID)
+            if (input.resume !== false) {
+              // Admit first, then use normal interrupt cleanup before waking the new input.
+              // An exact retry of an already-promoted prompt must not release a later pause.
+              if (admitted.promotedSeq === undefined && (yield* pause.state(admitted.sessionID)).paused) {
+                yield* execution.interrupt(admitted.sessionID)
+                yield* pause.clear(admitted.sessionID)
+              }
+              yield* execution.wake(admitted.sessionID)
+            }
             return admitted
           }),
         ),
@@ -432,7 +442,7 @@ const layer = Layer.effect(
         yield* execution.resume(sessionID)
       }),
       interrupt: Effect.fn("V2Session.interrupt")((sessionID) =>
-        Effect.uninterruptible(execution.interrupt(sessionID)),
+        Effect.uninterruptible(execution.interrupt(sessionID).pipe(Effect.ensuring(pause.clear(sessionID)))),
       ),
       revert: {
         stage: Effect.fn("V2Session.revert.stage")(function* (input) {
@@ -483,6 +493,7 @@ export const node = makeGlobalNode({
     EventV2.node,
     ProjectV2.node,
     SessionExecution.node,
+    SessionPause.node,
     SessionStore.node,
     LocationServiceMap.node,
     SessionProjector.node,
