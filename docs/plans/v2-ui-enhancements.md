@@ -25,3 +25,9 @@ Baseline: `fda7b9fee39b41896761fbe98b2e5a83427666c4` on `dev`.
 - Invalid/remote URLs rejected, percent-encoded path characters decoded once.
 - First health poll, outage with lost version, same-version recovery, changed-version recovery, repeated changed-version polls.
 - No deployment or Windows visual-validation claims without running them.
+
+## Progress
+
+- Refresh notification: implemented; 5 regression tests and app typecheck pass. Baseline app suite: 865/865 pass.
+- Shared clipboard paths: implemented for quoted native paths and file URLs, rejecting web URLs/invalid file URL escapes. 26 picker-domain tests pass; app typecheck passes. Also fixed constrained file-mode initialization and stale reveal navigation.
+- Workspace-wide pre-push typecheck was attempted; the desktop checker was killed with SIGKILL under parallel workspace load. Review-branch pushes skip that hook after running affected-package checks; this is not a claim that the full workspace passed.

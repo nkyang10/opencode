@@ -21,6 +21,7 @@ import {
   pickerRoot,
   pickerRootSelection,
   pickerAbsoluteInput,
+  pickerInputPath,
 } from "./directory-picker-domain"
 
 test("maps server directory entries into Pierre paths", () => {
@@ -311,4 +312,37 @@ test("returns absolute directories and relative files", () => {
   expect(selectedTreePath("/home/luke/repo", "src/index.ts", "file")).toBe("src/index.ts")
   expect(selectedTreePath("/home/luke/repo/src", "index.ts", "file", "/home/luke/repo")).toBe("src/index.ts")
   expect(selectedTreePath("/home/luke/repo", "src/", "file")).toBeUndefined()
+})
+
+test("accepts clipboard file URLs and quoted native paths without losing roots", () => {
+  expect(pickerAbsoluteInput("file:///home/luke/my%20project/", "/home/luke", "/")).toBe("/home/luke/my project")
+  expect(pickerAbsoluteInput("file:///C:/Users/luke/my%20project", "C:/Users/luke", "C:/")).toBe(
+    "C:/Users/luke/my project",
+  )
+  expect(pickerAbsoluteInput("file://server/share/my%20project", "C:/Users/luke", "C:/")).toBe(
+    "//server/share/my project",
+  )
+  expect(pickerAbsoluteInput('"C:\\Users\\luke\\repo"', "C:/Users/luke", "C:/")).toBe("C:/Users/luke/repo")
+  expect(pickerAbsoluteInput("file://localhost/home/luke", "/home/luke", "/")).toBe("/home/luke")
+  expect(pickerAbsoluteInput("file:///tmp/percent%2520literal", "/home/luke", "/")).toBe("/tmp/percent%20literal")
+  expect(pickerAbsoluteInput("C:\\", "C:/Users/luke", "C:/Users/luke")).toBe("C:/")
+})
+
+test("rejects web URLs, invalid escaping and control characters in file URLs", () => {
+  for (const input of [
+    "https://example.com/repo",
+    "file:///tmp/%ZZ",
+    "file:///tmp/%00bad",
+    "file:///tmp/repo?query",
+    "file:///tmp/repo#fragment",
+  ]) {
+    expect(pickerInputPath(input)).toBeUndefined()
+    expect(pickerAbsoluteInput(input, "/home/luke", "/home/luke/repo")).toBe("")
+  }
+})
+
+test("file URLs cannot escape a constrained file picker", () => {
+  const file = pickerMode("file", "C:/Repo")
+  expect(file.navigation(pickerAbsoluteInput("file:///C:/Repo/../Other", "C:/Users/luke", "C:/Repo"))).toBeUndefined()
+  expect(pickerFileSearchQuery("C:/Repo", "file:///C:/Repo/src/my%20file", "C:/Users/luke")).toBe("src/my file")
 })

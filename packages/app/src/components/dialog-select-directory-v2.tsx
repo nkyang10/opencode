@@ -176,6 +176,7 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
     if (!activeTreeNavigation(token, navigation)) return
     setRootValid(valid)
     setLoading(false)
+    return valid ? token : undefined
   }
 
   // Reveals a possibly-deep absolute path inside the tree that is rooted at the
@@ -183,31 +184,29 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
   // still sees the tree listing from "/" (or "X:") instead of jumping into it.
   async function reveal(path: string) {
     const absolute = pickerAbsoluteInput(cleanPickerInput(path), home(), root() || start() || home())
-    const fileTreeRoot = pickerRoot(absolute)
+    if (!absolute) return
+    const fileTreeRoot = policy.includeFiles ? props.start : pickerRoot(absolute)
     if (!fileTreeRoot) return navigate(absolute)
     const rel = pickerRelativePath(fileTreeRoot, absolute)
+    if (rel === undefined) return
+    const token = await navigate(fileTreeRoot)
+    if (!token || !activeTreeNavigation(token, navigation)) return
     if (!rel) {
-      // Target is the root itself.
-      if (root() !== fileTreeRoot) return navigate(fileTreeRoot)
-      setSelected(policy.selection(fileTreeRoot, "") ?? "")
+      if (!policy.includeFiles) setSelected(pickerRootSelection(fileTreeRoot) ?? "")
       return
     }
     setLoading(true)
-    setError(false)
-    // Make sure the tree is rooted at the filesystem root, then reveal downward.
-    if (root() !== fileTreeRoot) {
-      await navigate(fileTreeRoot)
-    }
     const segments = rel.split("/").filter(Boolean)
     const targets: string[] = []
     let acc = ""
     let revealed = true
     for (let i = 0; i < segments.length; i++) {
       // Directory rows in the tree store a trailing slash.
-      const lookup = acc ? `${acc}/${segments[i]}/` : `${segments[i]}/`
+      const suffix = policy.includeFiles && i === segments.length - 1 ? "" : "/"
+      const lookup = (acc ? `${acc}/${segments[i]}` : segments[i]) + suffix
       targets.push(lookup)
-      const valid = await load(acc, navigation)
-      if (!activeTreeNavigation(navigation, navigation)) return
+      const valid = await load(acc, token)
+      if (!activeTreeNavigation(token, navigation)) return
       if (!valid) {
         revealed = false
         break
@@ -302,7 +301,9 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
 
   function listDirectory(relative: string): Promise<Array<{ name: string; type: "file" | "directory" }> | undefined> {
     const key = relative.replace(/\/+$/, "")
-    return load(key, navigation).then((valid) => (valid ? listings.get(key)?.then((nodes) => nodes ?? undefined) : undefined))
+    return load(key, navigation).then((valid) =>
+      valid ? listings.get(key)?.then((nodes) => nodes ?? undefined) : undefined,
+    )
   }
 
   function handleTreeSelect(path: string) {
@@ -319,7 +320,7 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
   createEffect(() => {
     const path = start()
     if (!path || root()) return
-    void navigate(pickerRoot(path) || path)
+    void navigate(policy.includeFiles ? path : pickerRoot(path) || path)
   })
 
   return (

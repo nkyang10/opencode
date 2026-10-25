@@ -82,7 +82,7 @@ export function pickerMode(mode: "directory" | "file", base?: string) {
 }
 
 export function pickerFileSearchQuery(root: string, input: string, home: string) {
-  const value = input
+  const value = (pickerInputPath(input) ?? "")
     .replace(/\\/g, "/")
     .replace(/^~(?=\/|$)/, home)
     .replace(/\/+$/, "")
@@ -93,7 +93,9 @@ export function pickerFileSearchQuery(root: string, input: string, home: string)
 }
 
 export function pickerAbsoluteInput(input: string, home: string, current: string) {
-  const value = normalizePickerDrive(input).replace(/^~(?=\/|$)/, normalizePickerDrive(home))
+  const parsed = pickerInputPath(input)
+  if (parsed === undefined) return ""
+  const value = normalizePickerDrive(parsed).replace(/^~(?=\/|$)/, normalizePickerDrive(home))
   const absolute = pickerRoot(value) ? value : joinPickerPath(current, value)
   return canonicalPickerPath(absolute)
 }
@@ -272,6 +274,23 @@ export function cleanPickerInput(value: string) {
   return first.replace(/[\u0000-\u001F\u007F]/g, "").trim()
 }
 
+/** Clipboard paths may be quoted native paths or local file URLs, never web URLs. */
+export function pickerInputPath(input: string) {
+  const value = cleanPickerInput(input).replace(/^("|')(.*)\1$/, "$2")
+  if (/^[A-Za-z]:[\\/]/.test(value)) return value
+  if (!/^file:/i.test(value)) return /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? undefined : value
+  try {
+    const url = new URL(value.replaceAll("\\", "/"))
+    if (url.protocol !== "file:" || url.search || url.hash || url.username || url.password || url.port) return
+    const path = decodeURIComponent(url.pathname)
+    if (/[\u0000-\u001F\u007F]/.test(path)) return
+    if (url.hostname && url.hostname !== "localhost") return `//${url.hostname}${path}`
+    return /^\/[A-Za-z]:\//.test(path) ? path.slice(1) : path
+  } catch {
+    return undefined
+  }
+}
+
 export function normalizePickerPath(input: string) {
   const value = input.replaceAll("\\", "/")
   if (value.startsWith("//") && !value.startsWith("///")) return "//" + value.slice(2).replace(/\/+/g, "/")
@@ -385,7 +404,8 @@ export function createDirectorySearch(args: { sdk: ServerSDK; base: () => string
   return async (filter: string) => {
     const token = ++current
     const active = () => token === current
-    const value = cleanPickerInput(filter)
+    const value = pickerInputPath(filter)
+    if (value === undefined) return [] as string[]
     const input = scoped(value)
     if (!input) return [] as string[]
     const raw = normalizePickerDrive(value)
