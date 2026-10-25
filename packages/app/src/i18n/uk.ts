@@ -1363,4 +1363,13 @@ export const dict = {
   "workspace.reset.archived.one": "1 сесію буде заархівовано.",
   "workspace.reset.archived.many": "{{count}} сесій буде заархівовано.",
   "workspace.reset.note": "Це скине робочу область, щоб вона відповідала гілці за замовчуванням.",
+  "dialog.directory.computer": "This PC",
+  "dialog.directory.subdirectory.open": "Open with new subdirectory",
+  "dialog.directory.subdirectory.name": "New subdirectory name",
+  "dialog.directory.subdirectory.error": "Could not create the folder. Check the name, permissions, and whether it already exists.",
+  "settings.admin.section.config": "Configuration",
+  "settings.admin.row.config.title": "Global configuration files",
+  "settings.admin.row.config.description": "Global settings are merged from these files, highest priority first. Project and environment settings may override them. Click a path to browse its location.",
+  "settings.admin.row.config.missing": "No global file exists yet. Saving an Admin setting creates {{path}}.",
+  "settings.admin.row.config.browse": "Browse configuration location: {{path}}",
 }

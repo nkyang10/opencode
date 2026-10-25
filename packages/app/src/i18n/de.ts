@@ -1282,4 +1282,13 @@ export const dict = {
   "help.tabs.persistence": "Wenn Sie die App erneut öffnen, sind Ihre Tabs weiterhin geöffnet.",
   "help.tabs.worktrees":
     "Das neue Design unterstützt Git-Worktrees noch nicht. Diese Funktion folgt in Kürze. Wenn Sie das bisherige Layout vorerst weiterverwenden möchten, können Sie in den Einstellungen zwischen den Layouts wechseln. Beachten Sie jedoch, dass das neue Layout in einigen Wochen dauerhaft verwendet wird.",
+  "dialog.directory.computer": "This PC",
+  "dialog.directory.subdirectory.open": "Open with new subdirectory",
+  "dialog.directory.subdirectory.name": "New subdirectory name",
+  "dialog.directory.subdirectory.error": "Could not create the folder. Check the name, permissions, and whether it already exists.",
+  "settings.admin.section.config": "Configuration",
+  "settings.admin.row.config.title": "Global configuration files",
+  "settings.admin.row.config.description": "Global settings are merged from these files, highest priority first. Project and environment settings may override them. Click a path to browse its location.",
+  "settings.admin.row.config.missing": "No global file exists yet. Saving an Admin setting creates {{path}}.",
+  "settings.admin.row.config.browse": "Browse configuration location: {{path}}",
 } satisfies Partial<Record<Keys, string>>

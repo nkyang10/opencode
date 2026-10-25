@@ -3,6 +3,9 @@ import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { createStore } from "solid-js/store"
+import { usePlatform } from "@/context/platform"
+import { createPickerDirectory, fetchDirectoryRoots } from "@/utils/directory-picker"
 import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
 import { ServerConnection, useServer } from "@/context/server"
@@ -41,6 +44,7 @@ interface DialogSelectDirectoryV2Props {
 }
 
 export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
+  const platform = usePlatform()
   const global = useGlobal()
   const { sync, sdk } = global.ensureServerCtx(props.server)
   const server = useServer()
@@ -51,6 +55,16 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
     file: language.t("dialog.directory.action.selectFile"),
     directory: language.t("dialog.directory.action.selectFolder"),
   }
+  const [folder, setFolder] = createStore({ computer: false, naming: false, name: "", busy: false, error: false })
+  const [roots] = createResource(
+    () => props.server.http,
+    (http) => fetchDirectoryRoots({ server: http, fetch: platform.fetch }),
+  )
+  createEffect(() => {
+    if (!roots()?.windows || policy.includeFiles) return
+    setFolder("computer", true)
+    setSelected("")
+  })
   const [root, setRoot] = createSignal("")
   const [input, setInput] = createSignal("")
   // The textbox shows the current path; only what the user actually typed drives the
@@ -69,6 +83,10 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
   let treeApi: DirectoryTreeZagApi | undefined
   let pathArea: HTMLDivElement | undefined
   let navigation = 0
+  let disposed = false
+  onCleanup(() => {
+    disposed = true
+  })
 
   const missingBase = createMemo(() => !(sync.data.path.home || sync.data.path.directory))
   const [fallbackPath] = createResource(
@@ -159,8 +177,9 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
 
   async function navigate(path: string) {
     const value = policy.navigation(pickerAbsoluteInput(cleanPickerInput(path), home(), root() || start() || home()))
-    if (!value) return
+    if (!value || folder.busy) return
     const token = ++navigation
+    setFolder({ computer: false, naming: false, error: false })
     setLoading(true)
     setRootValid(false)
     setSelected("")
@@ -284,9 +303,34 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
 
   function resolve() {
     const path = policy.result(selected(), rootValid())
-    if (!path) return
+    if (!path || folder.busy) return
     props.onSelect(props.multiple ? [path] : path)
     dialog.close()
+  }
+
+  async function openSubdirectory() {
+    const parent = policy.result(selected(), rootValid())
+    if (!parent || folder.busy || !folder.name.trim()) return
+    setFolder({ busy: true, error: false })
+    await createPickerDirectory({ server: props.server.http, fetch: platform.fetch, parent, name: folder.name })
+      .then((directory) => {
+        if (disposed) return
+        props.onSelect(props.multiple ? [directory] : directory)
+        dialog.close()
+      })
+      .catch(() => setFolder("error", true))
+      .finally(() => setFolder("busy", false))
+  }
+
+  function showRoot() {
+    if (!roots()?.windows || policy.includeFiles) {
+      void navigate(policy.includeFiles ? props.start || root() : pickerRoot(root()) || root())
+      return
+    }
+    navigation++
+    setSelected("")
+    setLoading(false)
+    setFolder({ computer: true, naming: false, error: false })
   }
 
   onMount(() => {
@@ -358,10 +402,14 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
             <ButtonV2 size="small" variant="ghost" onClick={() => void navigate(home())}>
               ~
             </ButtonV2>
-            <ButtonV2 size="small" variant="ghost" onClick={() => void navigate(pickerRoot(root()) || root())}>
+            <ButtonV2 size="small" variant="ghost" onClick={showRoot}>
               {language.t("dialog.directory.root")}
             </ButtonV2>
-            <ButtonV2 size="small" variant="ghost" onClick={() => void navigate(pickerParent(root()))}>
+            <ButtonV2
+              size="small"
+              variant="ghost"
+              onClick={() => (root() === pickerRoot(root()) ? showRoot() : void navigate(pickerParent(root())))}
+            >
               {language.t("dialog.directory.parent")}
             </ButtonV2>
           </div>
@@ -386,30 +434,90 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
             </div>
           </Show>
         </div>
-        <div class="directory-picker-v2-browser">
-          <Show when={loading()}>
-            <div class="directory-picker-v2-state">{language.t("common.loading")}</div>
+        <div class="directory-picker-v2-browser" aria-busy={folder.busy}>
+          <Show when={folder.computer}>
+            <div class="directory-picker-v2-locations">
+              <div class="directory-picker-v2-state">{language.t("dialog.directory.computer")}</div>
+              <For each={roots()?.roots}>
+                {(directory) => (
+                  <ButtonV2 variant="ghost" onClick={() => void navigate(directory)}>
+                    {directory}
+                  </ButtonV2>
+                )}
+              </For>
+            </div>
           </Show>
-          <Show when={!loading() && error()}>
-            <div class="directory-picker-v2-state">{language.t("dialog.directory.readError")}</div>
+          <Show when={!folder.computer}>
+            <ButtonV2
+              variant="ghost"
+              disabled={policy.includeFiles || !rootValid() || folder.busy}
+              onClick={() => {
+                setSelected(pickerRootSelection(root()) ?? "")
+                setInput(displayPickerPath(root(), root(), home()))
+                setSearchInput("")
+                setSuggestionsOpen(false)
+              }}
+            >
+              {displayPickerPath(root(), root(), "")}
+            </ButtonV2>
+            <Show when={loading()}>
+              <div class="directory-picker-v2-state">{language.t("common.loading")}</div>
+            </Show>
+            <Show when={!loading() && error()}>
+              <div class="directory-picker-v2-state">{language.t("dialog.directory.readError")}</div>
+            </Show>
+            <DirectoryTreeZag
+              root={root}
+              policy={policy}
+              list={listDirectory}
+              onSelect={handleTreeSelect}
+              ref={(api) => {
+                treeApi = api
+              }}
+            />
           </Show>
-          <DirectoryTreeZag
-            root={root}
-            policy={policy}
-            list={listDirectory}
-            onSelect={handleTreeSelect}
-            ref={(api) => {
-              treeApi = api
-            }}
-          />
         </div>
         <div class="directory-picker-v2-selection">{policy.result(selected(), rootValid())}</div>
+        <Show when={folder.naming}>
+          <TextInputV2
+            value={folder.name}
+            autofocus
+            disabled={folder.busy}
+            placeholder={language.t("dialog.directory.subdirectory.name")}
+            aria-label={language.t("dialog.directory.subdirectory.name")}
+            onInput={(event) => setFolder({ name: event.currentTarget.value, error: false })}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault()
+                void openSubdirectory()
+              }
+            }}
+          />
+          <Show when={folder.error}>
+            <p role="alert">{language.t("dialog.directory.subdirectory.error")}</p>
+          </Show>
+        </Show>
       </DialogBody>
       <DialogFooter>
-        <ButtonV2 variant="neutral" onClick={() => dialog.close()}>
+        <ButtonV2 variant="neutral" disabled={folder.busy} onClick={() => dialog.close()}>
           {language.t("common.cancel")}
         </ButtonV2>
-        <ButtonV2 variant="contrast" disabled={!policy.result(selected(), rootValid())} onClick={resolve}>
+        <Show when={!policy.includeFiles && roots()}>
+          <ButtonV2
+            variant="neutral"
+            disabled={folder.busy || !policy.result(selected(), rootValid()) || (folder.naming && !folder.name.trim())}
+            onClick={() =>
+              folder.naming ? void openSubdirectory() : setFolder({ naming: true, name: "", error: false })
+            }
+          >
+            {language.t("dialog.directory.subdirectory.open")}
+          </ButtonV2>
+        </Show>
+        <ButtonV2
+          variant="contrast"
+          disabled={folder.busy || !policy.result(selected(), rootValid())}
+          onClick={resolve}
+        >
           {action[policy.action]}
         </ButtonV2>
       </DialogFooter>

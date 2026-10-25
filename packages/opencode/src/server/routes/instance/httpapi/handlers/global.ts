@@ -6,6 +6,7 @@ import { Installation } from "@/installation"
 import { disposeAllInstancesAndEmitGlobalDisposed } from "@/server/global-lifecycle"
 import { ServerLifecycle } from "@/server/lifecycle"
 import { Webui } from "@/server/webui"
+import { DirectoryPicker } from "@/server/directory-picker"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { Effect, Queue } from "effect"
 import * as Stream from "effect/Stream"
@@ -13,7 +14,7 @@ import { HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import * as Sse from "effect/unstable/encoding/Sse"
 import { RootHttpApi } from "../api"
-import { GlobalUpgradeInput } from "../groups/global"
+import { DirectoryPickerRequestError, GlobalUpgradeInput } from "../groups/global"
 
 function eventData(data: unknown): Sse.Event {
   return {
@@ -95,6 +96,8 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       const runningPort = url ? Number(url.port) : null
       return {
         configuredPort,
+        configFiles: Config.globalConfigFiles(),
+        configWritePath: Config.globalConfigFile(),
         defaultPort: Webui.DefaultPort,
         runningPort,
         runningHostname: url?.hostname ?? null,
@@ -147,6 +150,12 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
     })
 
     return handlers
+      .handle("directoryRoots", () => DirectoryPicker.roots)
+      .handle("directoryCreate", (ctx) =>
+        DirectoryPicker.create(ctx.payload.parent, ctx.payload.name).pipe(
+          Effect.mapError((error) => new DirectoryPickerRequestError({ message: error.message })),
+        ),
+      )
       .handle("health", health)
       .handleRaw("event", event)
       .handle("configGet", configGet)

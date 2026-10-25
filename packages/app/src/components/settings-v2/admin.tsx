@@ -1,7 +1,11 @@
-import { Component, Show, createEffect, createResource, createSignal } from "solid-js"
+import { Component, For, Show, createEffect, createResource, createSignal } from "solid-js"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { Switch } from "@opencode-ai/ui/v2/switch-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { usePlatform } from "@/context/platform"
+import { pickerParent } from "../directory-picker-domain"
+import { DialogSelectDirectoryV2 } from "../dialog-select-directory-v2"
 import { useLanguage } from "@/context/language"
 import { useServer } from "@/context/server"
 import { useServerSync } from "@/context/server-sync"
@@ -22,6 +26,8 @@ import "./settings-v2.css"
 // "running on X, restart to apply Y" until the next start. `GET /global/webui`
 // reports both, which is the only reason this tab can tell the truth about it.
 export const SettingsAdminV2: Component = () => {
+  const dialog = useDialog()
+  const platform = usePlatform()
   const language = useLanguage()
   const server = useServer()
   const serverSync = useServerSync()
@@ -99,7 +105,9 @@ export const SettingsAdminV2: Component = () => {
         showToast({
           variant: "success",
           icon: "circle-check",
-          title: language.t(autoStart ? "settings.admin.row.autoStart.on.title" : "settings.admin.row.autoStart.off.title"),
+          title: language.t(
+            autoStart ? "settings.admin.row.autoStart.on.title" : "settings.admin.row.autoStart.off.title",
+          ),
         })
       })
       .catch((err: unknown) => {
@@ -124,6 +132,23 @@ export const SettingsAdminV2: Component = () => {
     return language.t("settings.admin.note.running", { running: current.runningPort })
   }
 
+  const browseConfig = async (file: string) => {
+    const current = server.current
+    if (!current) return
+    if (platform.platform === "desktop" && server.isLocal() && platform.revealPath) {
+      if (await platform.revealPath(file).catch(() => false)) return
+    }
+    dialog.show(() => (
+      <DialogSelectDirectoryV2
+        server={current}
+        mode="file"
+        start={pickerParent(file)}
+        title={language.t("settings.admin.row.config.title")}
+        onSelect={() => undefined}
+      />
+    ))
+  }
+
   return (
     <>
       <div class="settings-v2-tab-header">
@@ -131,6 +156,41 @@ export const SettingsAdminV2: Component = () => {
       </div>
 
       <div class="settings-v2-tab-body">
+        <Show when={status()?.configFiles}>
+          {(files) => (
+            <div class="settings-v2-section">
+              <h3 class="settings-v2-section-title">{language.t("settings.admin.section.config")}</h3>
+              <SettingsListV2>
+                <SettingsRowV2
+                  title={language.t("settings.admin.row.config.title")}
+                  description={language.t("settings.admin.row.config.description")}
+                >
+                  <div class="flex flex-col items-start gap-2 min-w-0" data-action="settings-admin-config-files">
+                    <For
+                      each={files()}
+                      fallback={
+                        <span>
+                          {language.t("settings.admin.row.config.missing", { path: status()?.configWritePath ?? "" })}
+                        </span>
+                      }
+                    >
+                      {(file) => (
+                        <ButtonV2
+                          variant="ghost"
+                          disabled={status.loading}
+                          onClick={() => void browseConfig(file)}
+                          aria-label={language.t("settings.admin.row.config.browse", { path: file })}
+                        >
+                          <span class="break-all whitespace-normal text-left">{file}</span>
+                        </ButtonV2>
+                      )}
+                    </For>
+                  </div>
+                </SettingsRowV2>
+              </SettingsListV2>
+            </div>
+          )}
+        </Show>
         <div class="settings-v2-section">
           <h3 class="settings-v2-section-title">{language.t("settings.admin.section.webui")}</h3>
           <SettingsListV2>
@@ -187,9 +247,7 @@ export const SettingsAdminV2: Component = () => {
           </SettingsListV2>
 
           <Show when={portError()}>{(error) => <p class="settings-v2-server-dialog-error">{error()}</p>}</Show>
-          <Show when={status()}>
-            {(current) => <p class="settings-v2-note">{runningLine(current())}</p>}
-          </Show>
+          <Show when={status()}>{(current) => <p class="settings-v2-note">{runningLine(current())}</p>}</Show>
         </div>
       </div>
     </>

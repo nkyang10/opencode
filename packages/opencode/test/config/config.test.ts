@@ -472,6 +472,29 @@ it.effect("logs global update diagnostics once without exposing values", () =>
   ),
 )
 
+it.effect("reports existing global config files in the same precedence as the write target", () =>
+  withGlobalConfig({}, ({ dir }) =>
+    Effect.gen(function* () {
+      const fs = yield* FSUtil.Service
+      for (const name of ["config.json", "opencode.json", "opencode.jsonc"])
+        yield* fs.remove(path.join(dir, name), { force: true })
+      expect(Config.globalConfigFiles()).toEqual([])
+      expect(Config.globalConfigFile()).toBe(path.join(dir, "opencode.jsonc"))
+      yield* fs.writeFileString(path.join(dir, "config.json"), "{}")
+      yield* fs.writeFileString(path.join(dir, "opencode.json"), "{}")
+      expect(Config.globalConfigFiles()).toEqual([path.join(dir, "opencode.json"), path.join(dir, "config.json")])
+      expect(Config.globalConfigFile()).toBe(path.join(dir, "opencode.json"))
+      yield* fs.writeFileString(path.join(dir, "opencode.jsonc"), "{}")
+      expect(Config.globalConfigFiles()).toEqual([
+        path.join(dir, "opencode.jsonc"),
+        path.join(dir, "opencode.json"),
+        path.join(dir, "config.json"),
+      ])
+      expect(Config.globalConfigFile()).toBe(path.join(dir, "opencode.jsonc"))
+    }),
+  ),
+)
+
 const updateFixtures = path.join(import.meta.dir, "fixtures/v2-compat")
 const globalInputs = [...new Bun.Glob("update-global/*-input.{json,jsonc}").scanSync({ cwd: updateFixtures })].sort()
 const projectInputs = [...new Bun.Glob("update-project/*-input.json").scanSync({ cwd: updateFixtures })].sort()

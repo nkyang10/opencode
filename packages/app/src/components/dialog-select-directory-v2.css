@@ -182,3 +182,10 @@
     border-radius: 0 !important;
   }
 }
+
+.directory-picker-v2-locations {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 4px;
+}

@@ -24,7 +24,16 @@ const GlobalWebui = Schema.Struct({
   runningHostname: Schema.NullOr(Schema.String),
   autoStart: Schema.Boolean,
   restartRequired: Schema.Boolean,
+  configFiles: Schema.Array(Schema.String),
+  configWritePath: Schema.String,
 })
+
+class DirectoryPickerRequestError extends Schema.TaggedErrorClass<DirectoryPickerRequestError>()(
+  "DirectoryPickerRequestError",
+  { message: Schema.String },
+  { httpApiStatus: 400 },
+) {}
+export { DirectoryPickerRequestError }
 
 const SyncEventSchemas = EventManifest.Latest.values()
   .flatMap((definition) => {
@@ -85,6 +94,8 @@ export const GlobalPaths = {
   dispose: "/global/dispose",
   upgrade: "/global/upgrade",
   lifecycle: "/global/lifecycle",
+  directoryRoots: "/global/directory/roots",
+  directoryCreate: "/global/directory",
 } as const
 
 // s100: the restart window. `remainingMs` is a duration rather than a timestamp so a client with a
@@ -104,6 +115,27 @@ const GlobalLifecycleInput = Schema.Struct({
 export const GlobalApi = HttpApi.make("global").add(
   HttpApiGroup.make("global")
     .add(
+      HttpApiEndpoint.get("directoryRoots", GlobalPaths.directoryRoots, {
+        success: Schema.Struct({ windows: Schema.Boolean, roots: Schema.Array(Schema.String) }),
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.directory.roots",
+          summary: "List server filesystem roots",
+          description: "List accessible drive roots on Windows, or the POSIX filesystem root.",
+        }),
+      ),
+      HttpApiEndpoint.post("directoryCreate", GlobalPaths.directoryCreate, {
+        payload: Schema.Struct({ parent: Schema.String, name: Schema.String }),
+        success: Schema.Struct({ directory: Schema.String }),
+        error: DirectoryPickerRequestError,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.directory.create",
+          summary: "Create one subdirectory",
+          description:
+            "Create a new directory directly inside an absolute server parent, without recursive creation or overwriting.",
+        }),
+      ),
       HttpApiEndpoint.get("health", GlobalPaths.health, {
         success: described(GlobalHealth, "Health information"),
       }).annotateMerge(

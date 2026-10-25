@@ -84,11 +84,11 @@ export async function fetchProjectDirectories(input: {
     {
       headers: input.server.password
         ? {
-          Authorization: `Basic ${authTokenFromCredentials({
-            username: input.server.username,
-            password: input.server.password,
-          })}`,
-        }
+            Authorization: `Basic ${authTokenFromCredentials({
+              username: input.server.username,
+              password: input.server.password,
+            })}`,
+          }
         : undefined,
     },
   )
@@ -109,6 +109,9 @@ export type WebuiStatus = {
   autoStart: boolean
   /** A configured port that only differs from the running one — a restart applies it. */
   restartRequired: boolean
+  /** Existing global config sources, highest precedence first. Absent on older servers. */
+  configFiles?: string[]
+  configWritePath?: string
 }
 
 /**
