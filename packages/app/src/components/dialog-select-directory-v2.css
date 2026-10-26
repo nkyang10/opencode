@@ -189,3 +189,14 @@
   align-items: flex-start;
   padding: 4px;
 }
+
+.directory-picker-v2-drives {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding-left: 12px;
+}
+
+.directory-picker-v2-drives [aria-current="location"] {
+  background: var(--v2-overlay-simple-overlay-selected);
+}

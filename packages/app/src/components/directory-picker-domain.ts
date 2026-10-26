@@ -450,3 +450,8 @@ export function createDirectorySearch(args: { sdk: ServerSDK; base: () => string
     return Array.from(new Set([base, ...matches, ...children].filter(Boolean))).slice(0, 50)
   }
 }
+
+/** Keep enumerated drives visible while browsing; include non-enumerated UNC roots. */
+export function pickerLocationRoots(roots: readonly string[], current: string) {
+  return [...new Set([...roots, pickerRoot(current)].filter(Boolean).map(canonicalPickerPath))]
+}

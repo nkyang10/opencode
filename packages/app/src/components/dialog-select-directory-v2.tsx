@@ -28,6 +28,7 @@ import {
   pickerRoot,
   pickerRootSelection,
   pickerRelativePath,
+  pickerLocationRoots,
 } from "./directory-picker-domain"
 import { DirectoryTreeZag, type DirectoryTreeZagApi } from "./directory-tree-zag"
 import "./dialog-select-directory-v2.css"
@@ -60,12 +61,8 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
     () => props.server.http,
     (http) => fetchDirectoryRoots({ server: http, fetch: platform.fetch }),
   )
-  createEffect(() => {
-    if (!roots()?.windows || policy.includeFiles) return
-    setFolder("computer", true)
-    setSelected("")
-  })
-  const [root, setRoot] = createSignal("")
+  const [location, setLocation] = createStore({ root: "", revision: 0 })
+  const root = () => location.root
   const [input, setInput] = createSignal("")
   // The textbox shows the current path; only what the user actually typed drives the
   // suggestion search. A tree click or a navigation moves the path without searching,
@@ -186,11 +183,10 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
     setSuggestionsOpen(false)
     setActiveSuggestion(-1)
     setSearchInput("")
-    setRoot(value)
+    setLocation({ root: value, revision: token })
     setInput(displayPickerPath(value, value, home()))
     listings.clear()
     advanced.clear()
-    treeApi?.reset()
     const valid = await load("", token)
     if (!activeTreeNavigation(token, navigation)) return
     setRootValid(valid)
@@ -323,7 +319,7 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
   }
 
   function showRoot() {
-    if (!roots()?.windows || policy.includeFiles) {
+    if (!roots() || policy.includeFiles) {
       void navigate(policy.includeFiles ? props.start || root() : pickerRoot(root()) || root())
       return
     }
@@ -435,17 +431,27 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
           </Show>
         </div>
         <div class="directory-picker-v2-browser" aria-busy={folder.busy}>
-          <Show when={folder.computer}>
-            <div class="directory-picker-v2-locations">
-              <div class="directory-picker-v2-state">{language.t("dialog.directory.computer")}</div>
-              <For each={roots()?.roots}>
-                {(directory) => (
-                  <ButtonV2 variant="ghost" onClick={() => void navigate(directory)}>
-                    {directory}
-                  </ButtonV2>
-                )}
-              </For>
-            </div>
+          <Show when={!policy.includeFiles}>
+            <nav class="directory-picker-v2-locations" aria-label={language.t("dialog.directory.root")}>
+              <ButtonV2 variant="ghost" disabled={folder.busy} onClick={showRoot}>
+                {language.t(roots()?.windows ? "dialog.directory.computer" : "dialog.directory.root")}
+              </ButtonV2>
+              <div class="directory-picker-v2-drives">
+                <For each={pickerLocationRoots(roots()?.roots ?? [], root())}>
+                  {(directory) => (
+                    <ButtonV2
+                      variant="ghost"
+                      data-root-path={directory}
+                      aria-current={!folder.computer && pickerRoot(root()) === directory ? "location" : undefined}
+                      disabled={folder.busy}
+                      onClick={() => void navigate(directory)}
+                    >
+                      {directory}
+                    </ButtonV2>
+                  )}
+                </For>
+              </div>
+            </nav>
           </Show>
           <Show when={!folder.computer}>
             <ButtonV2
@@ -466,15 +472,19 @@ export function DialogSelectDirectoryV2(props: DialogSelectDirectoryV2Props) {
             <Show when={!loading() && error()}>
               <div class="directory-picker-v2-state">{language.t("dialog.directory.readError")}</div>
             </Show>
-            <DirectoryTreeZag
-              root={root}
-              policy={policy}
-              list={listDirectory}
-              onSelect={handleTreeSelect}
-              ref={(api) => {
-                treeApi = api
-              }}
-            />
+            <Show when={location.revision} keyed>
+              {(_revision) => (
+                <DirectoryTreeZag
+                  root={root}
+                  policy={policy}
+                  list={listDirectory}
+                  onSelect={handleTreeSelect}
+                  ref={(api) => {
+                    treeApi = api
+                  }}
+                />
+              )}
+            </Show>
           </Show>
         </div>
         <div class="directory-picker-v2-selection">{policy.result(selected(), rootValid())}</div>
