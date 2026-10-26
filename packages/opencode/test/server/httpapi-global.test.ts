@@ -7,6 +7,7 @@ import { Auth } from "../../src/auth"
 import { Config } from "../../src/config/config"
 import { Installation } from "../../src/installation"
 import { MoveSession } from "@opencode-ai/core/control-plane/move-session"
+import { SessionV2 } from "@opencode-ai/core/session"
 import { ServerAuth } from "../../src/server/auth"
 import { RootHttpApi } from "../../src/server/routes/instance/httpapi/api"
 import { GlobalPaths } from "../../src/server/routes/instance/httpapi/groups/global"
@@ -30,6 +31,19 @@ const apiLayer = HttpRouter.serve(
   Layer.provideMerge(NodeHttpServer.layerTest),
   Layer.provide(Layer.mock(Auth.Service)({})),
   Layer.provide(Layer.mock(Config.Service)({})),
+  // globalHandlers yields SessionV2 for the whole group, so the route tree cannot be built
+  // without it even when the test only exercises upgrade or move-session. `revert` is spelled
+  // out because its return type is not effect-shaped enough for Layer.mock to treat it as
+  // optional; nothing in these tests reaches it.
+  Layer.provide(
+    Layer.mock(SessionV2.Service)({
+      revert: {
+        stage: () => Effect.die("revert is not used here"),
+        clear: () => Effect.die("revert is not used here"),
+        commit: () => Effect.die("revert is not used here"),
+      },
+    }),
+  ),
   Layer.provide(Layer.mock(MoveSession.Service)({})),
   Layer.provide(
     Layer.mock(Installation.Service)({

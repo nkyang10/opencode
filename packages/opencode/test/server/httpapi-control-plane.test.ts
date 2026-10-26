@@ -39,6 +39,19 @@ const apiLayer = HttpRouter.serve(
   Layer.provide(Layer.mock(Auth.Service)({})),
   Layer.provide(Layer.mock(Config.Service)({})),
   Layer.provide(Layer.mock(Installation.Service)({})),
+  // globalHandlers yields SessionV2 for the whole group, so the route tree cannot be built
+  // without it even when the test only exercises upgrade or move-session. `revert` is spelled
+  // out because its return type is not effect-shaped enough for Layer.mock to treat it as
+  // optional; nothing in these tests reaches it.
+  Layer.provide(
+    Layer.mock(SessionV2.Service)({
+      revert: {
+        stage: () => Effect.die("revert is not used here"),
+        clear: () => Effect.die("revert is not used here"),
+        commit: () => Effect.die("revert is not used here"),
+      },
+    }),
+  ),
   Layer.provide(
     Layer.mock(MoveSession.Service)({
       moveSession: (value) => Ref.set(called, value),
