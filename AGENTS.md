@@ -65,17 +65,45 @@ Rule: when touching a notifications/settings row, check BOTH `settings-general.t
 This fork serves its web UI on **port 4447** (NOT the upstream default 4446). Source-of-truth scripts
 live in `fork-root/scripts/` (one level above the `opencode/` clone):
 
-- `deploy-web-4447.sh` — one-shot rebuild + redeploy. Kills whatever listens on `:4447`, runs
-  `build-linux.sh`, then `run-web.sh 4447`. Safe to re-run; writes a pidfile `testing/.web-4447.pid`.
+- `deploy-web-4447.sh` — one-shot rebuild + redeploy. **Builds first**, then stops the listener through a
+  drain window, then refuses to report success until `/login` answers 200 (see the successor rules below).
+  Safe to re-run; writes a pidfile `testing/.web-4447.pid`. `--detach` re-runs it as a *transient systemd
+  unit*: the agent that triggers a deploy lives inside the unit being restarted, so a `setsid` child is
+  SIGKILLed with the server and the deploy dies with the port left dead (that happened twice).
 - `build-linux.sh` — compiles the fork (pins **bun 1.3.14**) into
   `opencode/packages/opencode/dist/opencode-linux-arm64/bin/opencode`.
 - `run-web.sh` — `setsid nohup <binary> web --port 4447 --hostname 0.0.0.0`, working dir `testing/`.
   If `OPENCODE_SERVER_PASSWORD` is set, any URL redirects to `/login` (FE-001 login page); the server
-  otherwise stays open.
+  otherwise stays open. This is the **fallback** start; when a unit owns the port the unit restarts itself.
+
+### The deployed :4447 is a systemd user unit, and a clean exit used to mean "stays dead"
+
+`opencode web` on :4447 runs as `~/.config/systemd/user/opencode-fork.service`
+(`Restart=always` since 2026-10-26 — it was `on-failure`, and a drained deploy exits with **status 0**, so
+systemd never restarted it and a human had to run `systemctl --user restart` twice). Rules now:
+
+- **A drained server asks for its own replacement** — `packages/opencode/src/server/successor.ts`, called
+  from `ServerLifecycle`'s exit paths via `WebRestart.installSuccessor` (`packages/opencode/src/cli/`).
+  It only acts when the unit still reads `ActiveState=active`, i.e. the SIGTERM came from *outside*
+  systemd (a deploy `kill`); if systemd is already running a stop/restart job for us it stays out of the
+  way, because fighting that job is worse than doing nothing.
+- **`JobType` cannot tell those two cases apart** (it reads empty even during our own stop job);
+  `ActiveState` can (`active/running` = external kill, `deactivating/stop-sigterm` = systemd's job).
+  Measured with a probe unit, not guessed.
+- **`--no-block` is load-bearing**, and a self-spawned successor is not an option: `KillMode` defaults to
+  `control-group`, so systemd SIGKILLs any child left in the cgroup when the main process exits. That is
+  also why the draining process cannot *wait* for the successor — the start job waits for its exit. The
+  confirmation ("do not finish while the port is dead") therefore lives in the deploy script, which can
+  block; measured downtime for the handoff path is ~30 ms.
+- **The desktop's `web --autostart` child must not install the successor hook** (`cli/cmd/web.ts` installs
+  it after the autostart branch): the desktop owns that child.
+- `ServerMaintenance.restartable()` (not `standalone()`) gates the Admin ▸ Restart row, because
+  `standalone()` is false under systemd (`INVOCATION_ID` is set) even though a unit *can* be restarted —
+  through the unit.
 
 Gate: whenever a change touches `packages/app` (the web UI), the embedded app must be REBUILT into the
 binary or the running server serves stale assets. Deploy log: `fork-root/testing/deploy-4447.log`;
-server log: `fork-root/testing/web-4447.log`.
+server log: `fork-root/testing/web-4447.log`; journald: `journalctl --user -u opencode-fork.service`.
 
 **RSS origin (2026-09-26):** the feed's `originOf` in `packages/opencode/src/server/rss/route.ts` now uses
 `HttpServerRequest.toURL(request)` (honors the request **Host** header / `x-forwarded-proto`), so the `<link>`
