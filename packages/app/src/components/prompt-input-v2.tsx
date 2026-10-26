@@ -2,6 +2,7 @@ import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
+import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { Icon } from "@opencode-ai/ui/v2/icon"
 import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
@@ -67,16 +68,18 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
                   : language.t(props.controller.pause.paused ? "prompt.action.resume" : "prompt.action.pause")
               }
             >
-              <ButtonV2
+              <IconButtonV2
+                data-action="prompt-pause"
                 type="button"
-                variant="ghost"
-                size="small"
+                variant="contrast"
+                size="large"
                 disabled={props.controller.pause.pending}
+                aria-busy={props.controller.pause.pending}
+                aria-label={language.t(props.controller.pause.paused ? "prompt.action.resume" : "prompt.action.pause")}
                 aria-pressed={props.controller.pause.paused}
+                icon={() => <Icon name={props.controller.pause.paused ? "play" : "pause"} />}
                 onClick={() => void props.controller.pause.toggle()}
-              >
-                {language.t(props.controller.pause.paused ? "prompt.action.resume" : "prompt.action.pause")}
-              </ButtonV2>
+              />
             </TooltipV2>
           </Show>
         }
