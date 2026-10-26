@@ -112,6 +112,9 @@ export const WebCommand = effectCmd({
     }
     const server = yield* Effect.promise(() => Server.listen(opts))
     WebRestart.install(server, opts)
+    // Not the autostart branch above: a desktop-spawned `web --autostart` child is owned by the desktop,
+    // so only this host — the one a deploy stops — is allowed to ask for its own replacement.
+    WebRestart.installSuccessor()
     UI.empty()
     UI.println(UI.logo("  "))
     UI.empty()

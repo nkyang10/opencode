@@ -47,3 +47,12 @@ test("leaves supervised process replacement to its service manager", () => {
   expect(ServerMaintenance.standalone({ pm_id: "0" })).toBe(false)
   expect(ServerMaintenance.standalone({ SUPERVISOR_ENABLED: "1" })).toBe(false)
 })
+
+test("a systemd unit is supervised but still restartable, through the unit", () => {
+  const unmanaged = () => undefined
+  const unit = () => "opencode-fork.service"
+  expect(ServerMaintenance.restartable({}, unmanaged)).toBe(true)
+  expect(ServerMaintenance.restartable({ INVOCATION_ID: "systemd-unit" }, unmanaged)).toBe(false)
+  expect(ServerMaintenance.restartable({ pm_id: "0" }, unmanaged)).toBe(false)
+  expect(ServerMaintenance.restartable({ INVOCATION_ID: "systemd-unit" }, unit)).toBe(true)
+})

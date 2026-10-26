@@ -1,6 +1,7 @@
 export * as ServerMaintenance from "./maintenance"
 
 import { ServerLifecycle } from "./lifecycle"
+import { ServerSuccessor } from "./successor"
 
 let restart: ((active: () => Promise<number>) => Promise<void>) | undefined
 let pending = false
@@ -8,6 +9,21 @@ let pending = false
 /** Known process managers must retain ownership of process replacement. */
 export function standalone(env: NodeJS.ProcessEnv = process.env) {
   return !env.INVOCATION_ID && env.pm_id === undefined && env.SUPERVISOR_ENABLED !== "1"
+}
+
+/**
+ * A systemd user service is supervised, so `standalone()` is false for it (`INVOCATION_ID` is set) —
+ * but it can still be restarted, through the unit rather than by spawning a child. Reporting
+ * `restartSupported: false` there would mean the deployed fork could never restart from the Admin tab,
+ * which is exactly where an operator asks for it.
+ */
+export function restartable(
+  env: NodeJS.ProcessEnv = process.env,
+  // A detection callback rather than a string: an explicit `undefined` argument is indistinguishable
+  // from an absent one in JS, and "detected nothing" has to be expressible by a test.
+  findUnit: () => string | undefined = ServerSuccessor.unit,
+) {
+  return standalone(env) || findUnit() !== undefined
 }
 
 /** Only a standalone CLI host opts in; a sidecar/TUI must not exit its owning application. */

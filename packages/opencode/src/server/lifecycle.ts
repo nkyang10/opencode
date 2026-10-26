@@ -118,6 +118,7 @@ export function installSignalDrain(label = "opencode") {
   const handler = (signal: NodeJS.Signals) => {
     if (draining) {
       process.stderr.write(`[${label}] ${signal} again — exiting now\n`)
+      requestSuccessor()
       process.exit(0)
     }
     draining = true
@@ -131,6 +132,7 @@ export function installSignalDrain(label = "opencode") {
           ? `[${label}] drain complete — exiting\n`
           : `[${label}] drain window elapsed — exiting\n`,
       )
+      requestSuccessor()
       process.exit(0)
     }, 500)
   }
@@ -138,5 +140,34 @@ export function installSignalDrain(label = "opencode") {
   process.on("SIGINT", () => handler("SIGINT"))
 }
 
+/**
+ * Register the process that has to be replaced when this one drains. Only a host that owns its own
+ * process installs one — see `WebRestart.installSuccessor`: a desktop sidecar or a TUI worker that
+ * exits is meant to stay exited, because its owning application starts the next one.
+ *
+ * It runs on both exit paths, including the second signal, because a deploy that gives up on the drain
+ * still expects a new version on the same port. It is also fire-and-forget by necessity: this process
+ * cannot wait for the successor to bind the port it is still holding (or, under systemd, for the start
+ * job that is waiting for this exit). Confirmation belongs to whoever is outside — see the deploy flow.
+ */
+export function installSuccessor(handler: () => void) {
+  successor = handler
+  return () => {
+    if (successor === handler) successor = undefined
+  }
+}
+
+function requestSuccessor() {
+  if (!successor) return
+  try {
+    successor()
+  } catch (error) {
+    // A handoff that throws must not keep this process serving: whatever is waiting on a new version
+    // would wait forever on a server that has already been told to stop. Log and exit as before.
+    process.stderr.write(`[opencode] successor request failed: ${error instanceof Error ? error.message : String(error)}\n`)
+  }
+}
+
 let installed = false
 let draining = false
+let successor: (() => void) | undefined
