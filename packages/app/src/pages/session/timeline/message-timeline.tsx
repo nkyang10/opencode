@@ -1249,8 +1249,8 @@ export function MessageTimeline(props: {
       return (
         settings.general.newLayoutDesigns() &&
         row._tag === "AssistantPart" &&
-        row.group.type === "part" &&
-        getMsgPart(row.group.ref.messageID, row.group.ref.partID)?.type === "tool"
+        (row.group.type === "context" ||
+          getMsgPart(row.group.ref.messageID, row.group.ref.partID)?.type === "tool")
       )
     }
 

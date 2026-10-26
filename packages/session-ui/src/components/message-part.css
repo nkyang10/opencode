@@ -642,6 +642,18 @@
   [data-slot="context-tool-group-title"] {
     flex-shrink: 1;
     min-width: 0;
+    gap: 8px;
+    color: var(--text-strong);
+    font-family: var(--font-family-sans);
+    font-size: var(--font-size-base);
+    font-style: normal;
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-large);
+    letter-spacing: var(--letter-spacing-normal);
+  }
+
+  [data-slot="context-tool-group-summary"] {
+    color: var(--text-base);
   }
 
   [data-slot="collapsible-arrow"] {
@@ -1613,5 +1625,75 @@ body[data-new-layout] {
       border: 0;
       border-radius: 0;
     }
+  }
+}
+
+/* Secondary V2 activity is quieter than the assistant's actual answer. */
+body[data-new-layout] {
+  [data-component="tool-part-wrapper"]:not(:has([data-kind="tool-error-card"])):is(
+      [data-tool="bash"],
+      [data-tool="shell"],
+      [data-tool="read"],
+      [data-tool="glob"],
+      [data-tool="grep"],
+      [data-tool="list"],
+      [data-tool="websearch"],
+      [data-tool="webfetch"],
+      [data-tool="skill"]
+    ),
+  [data-component="context-tool-group-list"] {
+    [data-slot="basic-tool-tool-info"],
+    [data-slot="basic-tool-tool-title"],
+    [data-slot="basic-tool-tool-subtitle"],
+    [data-slot="basic-tool-tool-arg"] {
+      color: var(--v2-text-text-muted);
+      font-size: 12px;
+      line-height: 16px;
+    }
+    [data-slot="basic-tool-tool-trigger-content"],
+    [data-slot="basic-tool-tool-info-structured"],
+    [data-slot="basic-tool-tool-info-main"] {
+      gap: 4px;
+    }
+  }
+
+  [data-component="tool-part-wrapper"]:not(:has([data-kind="tool-error-card"])):is(
+      [data-tool="bash"],
+      [data-tool="shell"]
+    ) {
+    [data-slot="collapsible-trigger"] {
+      height: 20px;
+    }
+    [data-slot="bash-pre"] code {
+      color: var(--v2-text-text-muted);
+      font-size: 11px;
+      line-height: 16px;
+    }
+  }
+
+  [data-component="collapsible"].tool-collapsible:has([data-component="context-tool-group-trigger"]) {
+    --tool-content-gap: 0px;
+    [data-slot="collapsible-trigger"] {
+      height: 20px;
+    }
+  }
+
+  [data-component="context-tool-group-trigger"] {
+    min-height: 20px;
+    [data-slot="tool-status-done"] {
+      color: inherit;
+    }
+    [data-slot="context-tool-group-title"],
+    [data-slot="context-tool-group-summary"] {
+      color: var(--v2-text-text-muted);
+      font-size: 12px;
+      line-height: 16px;
+      gap: 4px;
+    }
+  }
+
+  [data-component="context-tool-group-list"] {
+    padding: 0;
+    gap: 0;
   }
 }

@@ -6,7 +6,7 @@ const directory = "C:/OpenCode/NoticeRegression"
 const sessionID = "ses_notice_regression"
 const projectID = "proj_notice_regression"
 
-async function setup(page: Page, permission = false, question = false, tools = false) {
+async function setup(page: Page, permission = false, question = false, tools = false, activity = false) {
   await mockOpenCodeServer(page, {
     protocol: "v2",
     directory,
@@ -61,20 +61,60 @@ async function setup(page: Page, permission = false, question = false, tools = f
                 tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
                 cost: 0,
               },
-              parts: ["one", "two"].map((value, index) => ({
-                id: `prt_shell_${index}`,
-                sessionID,
-                messageID: "msg_notice_assistant",
-                type: "tool",
-                tool: "shell",
-                state: {
-                  status: "completed",
-                  input: { command: `echo ${value}` },
-                  output: value,
-                  metadata: {},
-                  time: { start: 2, end: 4 },
-                },
-              })),
+              parts: [
+                ...["one", "two"].map((value, index) => ({
+                  id: `prt_shell_${index}`,
+                  sessionID,
+                  messageID: "msg_notice_assistant",
+                  type: "tool",
+                  tool: "shell",
+                  state: {
+                    status: "completed",
+                    input: { command: `echo ${value}` },
+                    output: value,
+                    metadata: {},
+                    time: { start: 2, end: 4 },
+                  },
+                })),
+                ...(activity
+                  ? [
+                      ...["read", "glob", "grep", "list"].map((tool, index) => ({
+                        id: `prt_context_${index}`,
+                        sessionID,
+                        messageID: "msg_notice_assistant",
+                        type: "tool",
+                        tool,
+                        state: {
+                          status: "completed",
+                          input: { filePath: `${directory}/README.md`, path: directory, pattern: "needle" },
+                          output: "Found context",
+                          metadata: {},
+                          time: { start: 4, end: 5 },
+                        },
+                      })),
+                      {
+                        id: "prt_error",
+                        sessionID,
+                        messageID: "msg_notice_assistant",
+                        type: "tool",
+                        tool: "shell",
+                        state: {
+                          status: "error",
+                          input: { command: "denied" },
+                          error: "Permission denied: preserved error emphasis",
+                          time: { start: 4, end: 5 },
+                        },
+                      },
+                      {
+                        id: "prt_final_answer",
+                        sessionID,
+                        messageID: "msg_notice_assistant",
+                        type: "text",
+                        text: "The assistant's final answer stays readable and unchanged.",
+                      },
+                    ]
+                  : []),
+              ],
             },
           ]
         : [],
@@ -195,4 +235,41 @@ test("consecutive shell calls have no row or output padding in V2", async ({ pag
     await expect(tool.locator('[data-slot="bash-pre"]')).toContainText(index === 0 ? "echo one" : "echo two")
   }
   await page.screenshot({ path: "/data/opencode-compact-tools.png" })
+})
+
+test("secondary tools and exploration are compact and muted without shrinking answers or errors", async ({
+  page,
+}, testInfo) => {
+  await setup(page, false, false, true, true)
+  const shell = page.locator('[data-component="tool-part-wrapper"][data-timeline-part-id="prt_shell_0"]')
+  const shellTitle = shell.locator('[data-slot="basic-tool-tool-title"]')
+  await expect(shellTitle).toHaveCSS("font-size", "12px")
+  await expect(shell.locator('[data-slot="bash-pre"] code')).toHaveCSS("font-size", "11px")
+  await expect(shell.locator('[data-slot="bash-pre"] code')).toHaveCSS("line-height", "16px")
+  const trigger = page.locator('[data-component="context-tool-group-trigger"]')
+  await expect(trigger).toHaveCount(1)
+  await expect(trigger.locator('[data-slot="context-tool-group-title"]')).toHaveCSS("font-size", "12px")
+  const row = page.locator('[data-timeline-row="AssistantPart"]').filter({ has: trigger })
+  await expect(row).toHaveCSS("padding-top", "0px")
+  await trigger.click()
+  const list = page.locator('[data-component="context-tool-group-list"]')
+  await expect(list).toBeVisible()
+  await expect(list).toHaveCSS("gap", "0px")
+  await expect(list).toHaveCSS("padding-left", "0px")
+  const titles = list.locator('[data-slot="basic-tool-tool-title"]')
+  await expect(titles).toHaveCount(4)
+  for (let index = 0; index < 4; index++) await expect(titles.nth(index)).toHaveCSS("font-size", "12px")
+  const muted = await shellTitle.evaluate((element) => getComputedStyle(element).color)
+  await expect(trigger.locator('[data-slot="context-tool-group-summary"]')).toHaveCSS("color", muted)
+  await expect(trigger.locator('[data-slot="tool-status-done"]')).toHaveCSS("color", muted)
+  const answer = page
+    .locator('[data-component="markdown"]')
+    .filter({ hasText: "The assistant's final answer stays readable and unchanged." })
+  await expect(answer).toBeVisible()
+  expect(await answer.evaluate((element) => parseFloat(getComputedStyle(element).fontSize))).toBeGreaterThan(12)
+  expect(await answer.evaluate((element) => getComputedStyle(element).color)).not.toBe(muted)
+  const errorTitle = page.locator('[data-kind="tool-error-card"] [data-slot="basic-tool-tool-title"]')
+  await expect(errorTitle).toHaveCSS("font-size", "14px")
+  expect(await errorTitle.evaluate((element) => getComputedStyle(element).color)).not.toBe(muted)
+  await page.screenshot({ path: testInfo.outputPath("compact-secondary-tools.png") })
 })

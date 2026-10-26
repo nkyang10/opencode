@@ -9,7 +9,9 @@ import {
 } from "../performance/timeline-stability/fixture"
 
 for (const deviceScaleFactor of [1.25, 1.5]) {
-  test(`keeps the shell outline inside a fractionally short virtual row at ${deviceScaleFactor}x`, async ({ page }) => {
+  test(`keeps compact shell output borderless inside a fractionally short virtual row at ${deviceScaleFactor}x`, async ({
+    page,
+  }) => {
     const shellID = "prt_shell_outline"
     const timeline = await setupTimeline(page, {
       messages: [userMessage(), assistantMessage([shell(shellID, "completed", "shell output")])],
@@ -37,7 +39,8 @@ for (const deviceScaleFactor of [1.25, 1.5]) {
       return {
         outputWidth: outputRect.width,
         outputHeight: outputRect.height,
-        borderColor: style.borderTopColor,
+        borderWidth: style.borderTopWidth,
+        borderStyle: style.borderTopStyle,
         boxShadow: style.boxShadow,
         clipMargin: getComputedStyle(element).overflowClipMargin,
       }
@@ -55,12 +58,14 @@ for (const deviceScaleFactor of [1.25, 1.5]) {
 
     expect(edges.box.width).toBeCloseTo(geometry.outputWidth, 2)
     expect(edges.box.height).toBeCloseTo(geometry.outputHeight, 2)
-    expect(geometry.borderColor).toBe("rgb(255, 0, 255)")
+    // V2 shell framing was deliberately removed by the earlier compact-tool milestone.
+    expect(geometry.borderWidth).toBe("0px")
+    expect(geometry.borderStyle).toBe("none")
     expect(geometry.boxShadow).toBe("none")
     expect(geometry.clipMargin).toBe("0.5px")
-    expect(edges.magenta.top).toBeGreaterThan(0.75)
-    expect(edges.magenta.bottom).toBeGreaterThan(0.75)
-    expect(edges.magenta.vertical).toBeGreaterThanOrEqual(2)
+    expect(edges.magenta.top).toBe(0)
+    expect(edges.magenta.bottom).toBe(0)
+    expect(edges.magenta.vertical).toBe(0)
   })
 }
 
