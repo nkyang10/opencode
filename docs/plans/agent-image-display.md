@@ -316,10 +316,13 @@ Body:
 
 ### M10: hardening (one commit per item)
 
-- Prune estimates include images (dimension-based token estimate).
-- Image-heavy measurements: session load time, event payload size, memory at 390 px; switch rendered images to blob URLs if memory is high.
-- Windows restore without a visible flash (temporarily near-transparent layered window), only if reliable.
-- Optional: honor MCP `annotations.audience`; plugin tool attachments (#21383).
+- Done: prune estimates include images (dimension-based token estimate).
+- Pending: image-heavy measurements: session load time, event payload size, memory at 390 px; switch rendered images to
+  blob URLs if memory is high. A browser/host that can measure memory and timeline behavior is required.
+- Pending: Windows restore without a visible flash (temporarily near-transparent layered window), only if reliable. A
+  real interactive Windows host is required.
+- Pending: optional: honor MCP `annotations.audience`; plugin tool attachments (#21383). A product decision is required
+  for how user-only tool content is shown while keeping it out of model context.
 
 ### M11: deferred unless data justifies it
 
@@ -577,4 +580,6 @@ Definition of done for every milestone:
   excluded from image-token estimation. The ambient `*.jxa` declaration is referenced from `macos.ts` so
   `packages/opencode` typechecks include it when it resolves the core source. Validation: opencode targeted
   58 pass / 1 skip in `test/session/compaction.test.ts` and core targeted 71/71 across screenshot/detect/tool/agent
-  location tests; core and opencode typechecks pass. Commit: `fix: include image tokens in prune estimates`.
+  location tests; core and opencode typechecks pass. Commit: `fix: include image tokens in prune estimates`. The other
+  M10 items remain pending: image-heavy measurements need a measurable browser host, the Windows no-flash restore needs
+  an interactive Windows host, and MCP `annotations.audience` needs a decision about user-only tool-content visibility.
