@@ -4,10 +4,10 @@ import { ChildProcess } from "effect/unstable/process"
 import { AppProcess } from "@opencode-ai/core/process"
 import { ScreenCaptureX11 } from "@opencode-ai/core/screen-capture/x11"
 import { ScreenCaptureSelect } from "@opencode-ai/core/screen-capture/select"
-import { CaptureError, type Backend, type Input, type Window } from "@opencode-ai/core/screen-capture/schema"
+import { CaptureError, type Input, type Window, type X11Backend } from "@opencode-ai/core/screen-capture/schema"
 import { createPng } from "./fixture/png"
 
-const backend = (capture: "import" | "xwd" = "import"): Backend => ({
+const backend = (capture: "import" | "xwd" = "import"): X11Backend => ({
   kind: "x11",
   display: ":99",
   capture,

@@ -64,6 +64,7 @@ const locationLayer = Layer.succeed(
 const screenCapture = Layer.succeed(
   ScreenCapture.Service,
   ScreenCapture.Service.of({
+    available: () => Effect.succeed(true),
     list: (input) =>
       Effect.sync(() => listInputs.push(input)).pipe(
         Effect.flatMap(() => (listError ? Effect.fail(listError) : Effect.succeed(listResult))),

@@ -178,13 +178,13 @@ export const CaptureResult = Schema.Struct({
   window: Schema.optional(CaptureWindow),
   restored: Schema.Boolean,
   focusChanged: Schema.Boolean,
-  backend: Schema.Literal("x11"),
-  platform: Schema.Literal("linux"),
+  backend: Schema.Literals(["x11", "windows", "wsl"]),
+  platform: Schema.Literals(["linux", "darwin", "win32", "unknown"]),
   others: Schema.optional(Schema.Array(Schema.String)),
 })
 export type CaptureResult = typeof CaptureResult.Type
 
-export const Backend = Schema.Struct({
+export const X11Backend = Schema.Struct({
   kind: Schema.Literal("x11"),
   display: Schema.String,
   capture: Schema.Literals(["import", "xwd"]),
@@ -193,4 +193,15 @@ export const Backend = Schema.Struct({
   xprop: Schema.Boolean,
   xdotool: Schema.Boolean,
 })
+export type X11Backend = typeof X11Backend.Type
+
+export const WindowsBackend = Schema.Struct({
+  kind: Schema.Literal("windows"),
+  transport: Schema.Literals(["native", "wsl"]),
+  program: Schema.String,
+  wslpath: Schema.optional(Schema.String),
+})
+export type WindowsBackend = typeof WindowsBackend.Type
+
+export const Backend = Schema.Union([X11Backend, WindowsBackend])
 export type Backend = typeof Backend.Type

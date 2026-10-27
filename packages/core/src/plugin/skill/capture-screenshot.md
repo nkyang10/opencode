@@ -52,11 +52,12 @@ Web pages work through a headless browser on a machine without a display. For de
 under Xvfb, start `xvfb-run -a` or `Xvfb :99`, then capture with `screenshot` using
 `x_display: ":99"` when that tool is available.
 
-On X11, the tool needs a reachable `DISPLAY` and capture tools. Use `delay_ms` only after starting
-an app or changing window state. If `window_not_found` lists candidate windows, choose one explicitly
-rather than guessing. If the result is `blank_capture`, the screen may be locked, remote, protected,
-or capture may lack permission; report the likely cause instead of retrying the same target
-repeatedly.
+On Linux X11, the tool needs a reachable `DISPLAY` and capture tools. On Windows it uses Windows
+PowerShell and an interactive desktop session. In WSL it captures the Windows desktop through
+`powershell.exe` and `wslpath`. Use `delay_ms` only after starting an app or changing window state.
+If `window_not_found` lists candidate windows, choose one explicitly rather than guessing. If the
+result is `blank_capture`, the screen may be locked, remote, protected, elevated, or capture may lack
+permission; report the likely cause instead of retrying the same target repeatedly.
 
 ## 5. Privacy
 

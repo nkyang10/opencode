@@ -5,7 +5,16 @@ import { ChildProcess } from "effect/unstable/process"
 import { AppProcess } from "../process"
 import { imageDimensions } from "../image/dimensions"
 import { orderFrontToBack, sameWindowId, selectWindow, summarize } from "./select"
-import { CaptureError, type Backend, type Bounds, type CaptureResult, type Display, type Input, type ListResult, type Window } from "./schema"
+import {
+  CaptureError,
+  type Bounds,
+  type CaptureResult,
+  type Display,
+  type Input,
+  type ListResult,
+  type Window,
+  type X11Backend,
+} from "./schema"
 
 const LIST_OUTPUT_BYTES = 2 * 1024 * 1024
 const CAPTURE_OUTPUT_BYTES = 25 * 1024 * 1024
@@ -42,7 +51,7 @@ type Collected = {
 
 type RestoreResult = { ok: boolean; focusChanged: boolean }
 
-export function list(process: AppProcess.Interface, backend: Backend, display: string) {
+export function list(process: AppProcess.Interface, backend: X11Backend, display: string) {
   return Effect.gen(function* () {
     const collected = yield* collect(process, backend, display)
     const ordered = orderFrontToBack(collected.windows.filter(listable), collected.activeID)
@@ -59,7 +68,7 @@ export function list(process: AppProcess.Interface, backend: Backend, display: s
 
 export function capture(
   process: AppProcess.Interface,
-  backend: Backend,
+  backend: X11Backend,
   display: string,
   input: Input,
 ): Effect.Effect<CaptureResult, CaptureError> {
@@ -236,7 +245,7 @@ function classifyFailure(text: string): CaptureError["code"] {
 
 function collect(
   process: AppProcess.Interface,
-  backend: Backend,
+  backend: X11Backend,
   display: string,
 ): Effect.Effect<Collected, CaptureError> {
   return Effect.gen(function* () {
@@ -340,7 +349,7 @@ function listable(window: Window & Detail) {
 
 function captureScreen(
   process: AppProcess.Interface,
-  backend: Backend,
+  backend: X11Backend,
   display: string,
   input: Input,
 ): Effect.Effect<CaptureResult, CaptureError> {
@@ -372,7 +381,7 @@ function screenBounds(
 
 function captureWindow(
   process: AppProcess.Interface,
-  backend: Backend,
+  backend: X11Backend,
   display: string,
   input: Input,
 ): Effect.Effect<CaptureResult, CaptureError> {
@@ -419,7 +428,7 @@ type CaptureTarget = { kind: "root"; crop?: Bounds } | { kind: "window"; id: str
 
 function capturePng(
   process: AppProcess.Interface,
-  backend: Backend,
+  backend: X11Backend,
   display: string,
   target: CaptureTarget,
 ): Effect.Effect<Uint8Array, CaptureError> {

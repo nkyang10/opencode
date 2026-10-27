@@ -44,8 +44,9 @@ type Output = typeof Output.Type
 
 const layer = Layer.effectDiscard(
   Effect.gen(function* () {
-    const tools = yield* Tools.Service
     const capture = yield* ScreenCapture.Service
+    if (!(yield* capture.available())) return
+    const tools = yield* Tools.Service
     const storage = yield* ScreenshotStorage.Service
     const image = yield* Image.Service
     const permission = yield* PermissionV2.Service
@@ -118,7 +119,7 @@ const layer = Layer.effectDiscard(
                 if (isLikelyBlank(result.data))
                   return yield* new ToolFailure({
                     message:
-                      "blank_capture: uniform frame: this can happen on a locked screen, disconnected RDP session, protected window, or when X11 capture lacks permission",
+                      "blank_capture: uniform frame: this can happen on a locked screen, disconnected RDP session, protected window, or when the capture backend lacks permission",
                   })
 
                 const rawContent: FileSystem.Content & { readonly encoding: "base64" } = {

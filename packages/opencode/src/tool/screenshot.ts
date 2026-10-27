@@ -71,7 +71,7 @@ export const ScreenshotTool = Tool.define<
       if (isLikelyBlank(result.data)) {
         return yield* Effect.fail(
           new Error(
-            "blank_capture: uniform frame: this can happen on a locked screen, disconnected RDP session, protected window, or when X11 capture lacks permission",
+            "blank_capture: uniform frame: this can happen on a locked screen, disconnected RDP session, protected window, or when the capture backend lacks permission",
           ),
         )
       }

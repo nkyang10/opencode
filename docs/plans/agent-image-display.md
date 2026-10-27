@@ -529,3 +529,16 @@ Definition of done for every milestone:
   session-UI typechecks pass. No app Playwright run was needed. Real X11 and gated Xvfb integration checks were not
   performed: this headless host lacks `Xvfb`, `xvfb-run` and a test-window tool. Commit:
   `feat: add screenshot tool with X11 backend`.
+- M7: Windows and WSL screenshot backends implemented. `Backend` is now the `X11Backend | WindowsBackend` union; native
+  Windows reports backend `windows` and platform `win32`, while WSL reports backend `wsl` and platform `linux`. Detection
+  selects `powershell.exe` on Windows, requires `powershell.exe` plus `wslpath` and a WSL environment marker on Linux, and
+  prefers an explicit X11 display when one is available. Windows and WSL send a small `-EncodedCommand` bootstrap whose
+  JSON stdin carries the embedded PowerShell source plus the operation, avoiding the Windows command-line length limit;
+  PowerShell returns JSON on stdout and a coded JSON error on stderr. `ScreenCapture.available()` was added so the core
+  tool is registered only when a backend is detected, matching the legacy registry. The generic blank-capture message no
+  longer names only X11. Validation: core targeted 45/45 (157 assertions across Windows, detection, X11, screenshot tool,
+  agent and location tools), legacy targeted 149/149 (302 assertions across screenshot, permission, agent and registry),
+  and core plus opencode typechecks pass. Full core is 1203 pass / 16 fail, matching the unchanged environment baseline:
+  15 cross-spawn tests plus one worktree assertion require the absent `node` binary. The manual Windows 10/11 and WSL 2
+  matrices, and therefore PowerShell 5.1 runtime behavior, were not performed because this Linux host has no
+  `powershell.exe`. Commit: `feat: add Windows screenshot backend`.
