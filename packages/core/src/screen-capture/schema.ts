@@ -178,7 +178,7 @@ export const CaptureResult = Schema.Struct({
   window: Schema.optional(CaptureWindow),
   restored: Schema.Boolean,
   focusChanged: Schema.Boolean,
-  backend: Schema.Literals(["x11", "windows", "wsl", "macos"]),
+  backend: Schema.Literals(["x11", "wayland", "windows", "wsl", "macos"]),
   platform: Schema.Literals(["linux", "darwin", "win32", "unknown"]),
   others: Schema.optional(Schema.Array(Schema.String)),
 })
@@ -210,5 +210,14 @@ export const MacOSBackend = Schema.Struct({
 })
 export type MacOSBackend = typeof MacOSBackend.Type
 
-export const Backend = Schema.Union([X11Backend, WindowsBackend, MacOSBackend])
+export const WaylandBackend = Schema.Struct({
+  kind: Schema.Literal("wayland"),
+  compositor: Schema.Literals(["sway", "hyprland"]),
+  program: Schema.String,
+  lister: Schema.String,
+  display: Schema.String,
+})
+export type WaylandBackend = typeof WaylandBackend.Type
+
+export const Backend = Schema.Union([X11Backend, WindowsBackend, MacOSBackend, WaylandBackend])
 export type Backend = typeof Backend.Type

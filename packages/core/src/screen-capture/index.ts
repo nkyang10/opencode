@@ -5,6 +5,7 @@ import { makeGlobalNode } from "../effect/app-node"
 import { AppProcess } from "../process"
 import { ScreenCaptureDetect } from "./detect"
 import { ScreenCaptureMacos } from "./macos"
+import { ScreenCaptureWayland } from "./wayland"
 import { CaptureError, type CaptureResult, type Input, type ListResult } from "./schema"
 import { ScreenCaptureWindows } from "./windows"
 import { ScreenCaptureWsl } from "./wsl"
@@ -48,7 +49,9 @@ const layer = Layer.effect(
             ? ScreenCaptureWindows.list(app, selected)
             : selected.kind === "macos"
               ? ScreenCaptureMacos.list(app, selected)
-              : ScreenCaptureX11.list(app, selected, selected.display),
+              : selected.kind === "wayland"
+                ? ScreenCaptureWayland.list(app, selected)
+                : ScreenCaptureX11.list(app, selected, selected.display),
       )
     })
 
@@ -62,7 +65,9 @@ const layer = Layer.effect(
             ? ScreenCaptureWindows.capture(app, selected, input)
             : selected.kind === "macos"
               ? ScreenCaptureMacos.capture(app, selected, input)
-              : ScreenCaptureX11.capture(app, selected, selected.display, input),
+              : selected.kind === "wayland"
+                ? ScreenCaptureWayland.capture(app, selected, input)
+                : ScreenCaptureX11.capture(app, selected, selected.display, input),
       )
     })
 
@@ -85,7 +90,7 @@ function noBackend(input: Pick<Input, "x_display">): CaptureError {
     code: "no_display",
     reason:
       `No screenshot backend was detected${input.x_display ? ` for DISPLAY=${input.x_display}` : ""}. ` +
-      "Linux needs an X server plus xwininfo and import or xwd/convert; WSL needs powershell.exe and wslpath.",
+      "Linux needs an X server plus xwininfo and import or xwd/convert, or Wayland plus grim with swaymsg or hyprctl; WSL needs powershell.exe and wslpath.",
   })
 }
 

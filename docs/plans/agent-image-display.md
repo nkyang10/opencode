@@ -153,7 +153,7 @@ Availability: register the tool on Windows, macOS and WSL, and on Linux when `DI
 
 Module layout:
 
-- `packages/core/src/screen-capture/`: `index.ts` (Effect service `list` and `capture`, platform dispatch, mutex, timeout), `schema.ts` (parameters, displays, windows, results, error codes), `detect.ts` (platform, WSL, session type, desktop, available tools), `select.ts` (window matching), `blank.ts`, `storage.ts`, `x11.ts`, `windows.ts` with `windows.ps1`, `wsl.ts`, `macos.ts` with `macos.js` (JXA), `wayland.ts`. Scripts are imported as text, like the skill markdown.
+- `packages/core/src/screen-capture/`: `index.ts` (Effect service `list` and `capture`, platform dispatch, mutex, timeout), `schema.ts` (parameters, displays, windows, results, error codes), `detect.ts` (platform, WSL, session type, desktop, available tools), `select.ts` (window matching), `blank.ts`, `storage.ts`, `x11.ts`, `windows.ts` with `windows.ps1`, `wsl.ts`, `macos.ts` with `macos.jxa` (JXA), `wayland.ts` (Sway/Hyprland IPC list plus `grim` capture). Scripts are imported as text, like the skill markdown.
 - Thin tools: `packages/opencode/src/tool/screenshot.ts` with `screenshot.txt` (legacy registry) and `packages/core/src/tool/screenshot.ts` (core `builtins.ts`).
 - UI: the shown-image card from `show_image`, titled with the window app or display.
 
@@ -311,7 +311,7 @@ Body:
 ### M9: Wayland backends
 
 - Files: `packages/core/src/screen-capture/wayland.ts`.
-- Tests: unit tests for detection and command selection; the manual matrix on GNOME, KDE Plasma and Sway or Hyprland.
+- Tests: unit tests for Sway/Hyprland detection, IPC parsing, `grim` command selection, unsupported window targets and error mapping; the manual matrix on GNOME, KDE Plasma and Sway or Hyprland.
 - Commit: `feat: add Wayland screenshot backends`.
 
 ### M10: hardening (one commit per item)
@@ -555,3 +555,18 @@ Definition of done for every milestone:
   core 1216 pass / 16 fail matching the unchanged environment baseline (15 cross-spawn tests plus one worktree assertion
   require the absent `node` binary). The real macOS Screen Recording and Accessibility matrices were not performed because
   this Linux host has no `osascript` or `screencapture`. Commit: `feat: add macOS screenshot backend`.
+- M9: Wayland screenshot backend implemented for Sway and Hyprland. `Backend` is now the
+  `X11Backend | WindowsBackend | MacOSBackend | WaylandBackend` union, and Wayland detection requires a Wayland session
+  marker plus `grim` and a supported compositor IPC client (`swaymsg` for Sway, `hyprctl` for Hyprland). WSL still wins
+  over Wayland, and an explicit `x_display` still wins over both. `list` parses `swaymsg -t get_outputs` and `get_tree`
+  or `hyprctl monitors -j` and `clients -j`, assigns windows to outputs from their centers, and puts the focused window
+  first. `capture` uses `grim -o <output>` for primary or numeric displays and `grim -g <WxH+X+Y>` for the union bounds of
+  all outputs. Wayland window targets list compositor windows for candidate output, then fail `window_not_capturable`
+  (or `window_not_found` when the selector is missing) without invoking `grim`, because generic Wayland cannot capture or
+  restore arbitrary other-client windows. GNOME screenshot-portal and KDE Spectacle capture paths remain undetected for
+  now: the screenshot portal needs an async portal token flow, and Spectacle would need a separate KWin enumeration path
+  before `list` could be trustworthy. Validation: core targeted 71/71 (245 assertions across Wayland, detection, macOS,
+  Windows, X11, screenshot tool, agent, and location tools), core typecheck, and full core 1229 pass / 16 fail matching
+  the unchanged environment baseline (15 cross-spawn tests plus one worktree assertion require the absent `node` binary).
+  The real GNOME, KDE Plasma, Sway, and Hyprland matrices were not performed because this Linux host has no Wayland
+  compositor, `grim`, `swaymsg`, or `hyprctl`. Commit: `feat: add Wayland screenshot backends`.
