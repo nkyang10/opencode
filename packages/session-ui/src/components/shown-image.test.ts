@@ -98,6 +98,33 @@ describe("shownImage", () => {
     expect(shownImage(part)).toBeUndefined()
   })
 
+  test("reuses the shown card for the screenshot tool", () => {
+    const image = shownImage(
+      completed(
+        {
+          action: "capture",
+          path: "/data/screenshots/window-firefox.png",
+          name: "window-firefox.png",
+          width: 1280,
+          height: 900,
+          bytes: 8192,
+          shown: true,
+        },
+        [attachment({ filename: "window-firefox.png" })],
+        "screenshot",
+      ),
+    )
+
+    expect(image).toMatchObject({
+      name: "window-firefox.png",
+      filename: "window-firefox.png",
+      path: "/data/screenshots/window-firefox.png",
+      width: 1280,
+      height: 900,
+      bytes: 8192,
+    })
+  })
+
   test("excludes remote, SVG and PDF attachments", () => {
     const attachments = [
       attachment({ mime: "image/png", url: "https://example.com/a.png" }),

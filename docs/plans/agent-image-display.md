@@ -516,3 +516,16 @@ Definition of done for every milestone:
   rerun 20/20; `packages/opencode` typecheck still reports only the two pre-existing `httpapi-*` test-layer errors. No app
   change, benchmark or Playwright run; manual phone smoke not performed. Commit:
   `feat: add screenshot storage and capture-screenshot skill`.
+- M6: `screenshot` tool foundation and X11 backend implemented. `packages/core/src/screen-capture/` adds the capture
+  schema/service, X11 display/window selection, X11 parsing, blank-frame rejection, backend detection and a one-at-a-time
+  capture mutex; `packages/core/src/tool/screenshot.ts` registers the core built-in, and `packages/opencode/src/tool/screenshot.ts`
+  plus the legacy registry provide the same tool when an X11 backend is detected. `list` exposes displays and windows;
+  `capture` saves the full-resolution PNG through M5 storage and returns a normalized `shown: true` attachment with
+  `savedBytes` and optional `capturedFrom`. Permission defaults are `ask` in both runtimes, the config key is
+  discoverable, and resources are `list`, `screen` or lowercased `window:<selector>`; `deny` hides the tool. The skill,
+  tool and permission docs describe the X11 behavior and the shared shown-image card plus TUI line render screenshot
+  metadata. Validation: core targeted 29/29 (101 assertions across X11/screenshot tool/agent), legacy targeted 149/149
+  (302 assertions across screenshot tool/permission/agent/registry), TUI 8/8, session UI 12/12, and core, opencode, TUI and
+  session-UI typechecks pass. No app Playwright run was needed. Real X11 and gated Xvfb integration checks were not
+  performed: this headless host lacks `Xvfb`, `xvfb-run` and a test-window tool. Commit:
+  `feat: add screenshot tool with X11 backend`.

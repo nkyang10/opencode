@@ -126,6 +126,7 @@ const layer = Layer.effect(
             "*": "ask",
             ...Object.fromEntries(whitelistedDirs.map((dir) => [dir, "allow"])),
           },
+          screenshot: "ask",
           question: "deny",
           plan_enter: "deny",
           plan_exit: "deny",

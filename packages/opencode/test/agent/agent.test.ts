@@ -508,6 +508,13 @@ it.instance("webfetch is allowed by default", () =>
   }),
 )
 
+it.instance("screenshot is ask by default", () =>
+  Effect.gen(function* () {
+    const build = yield* load((svc) => svc.get("build"))
+    expect(evalPerm(build, "screenshot")).toBe("ask")
+  }),
+)
+
 it.instance(
   "legacy tools config converts to permissions",
   () =>

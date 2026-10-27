@@ -11,9 +11,12 @@ target that answers the request, save the result outside the repository, and sho
   diagram — call `show_image` with its path.
 - **Chart or diagram that does not exist yet** — render it to a PNG first, then call `show_image`.
 - **Desktop or application window** — only if the `screenshot` tool is available in this session.
-  When it is available, run `screenshot` with `action: "list"` first if the user names an
-  application, then capture that window or display. If the tool is not available, say that desktop
-  capture is unavailable here and offer the web-page or artifact route instead.
+  Run `screenshot` with `action: "list"` first when the target is unknown, the user names an
+  application, or more than one window may match. Use `target: "window"` with a window id, app name,
+  or title substring when the user wants one app; otherwise capture the requested display. The tool
+  saves the PNG and shows it directly, so do not call `show_image` again. If the tool is not
+  available, say that desktop capture is unavailable here and offer the web-page or artifact route
+  instead.
 
 ## 2. Capture web pages
 
@@ -48,6 +51,12 @@ assets or visual test baselines), and never stage or commit an image unless aske
 Web pages work through a headless browser on a machine without a display. For desktop applications
 under Xvfb, start `xvfb-run -a` or `Xvfb :99`, then capture with `screenshot` using
 `x_display: ":99"` when that tool is available.
+
+On X11, the tool needs a reachable `DISPLAY` and capture tools. Use `delay_ms` only after starting
+an app or changing window state. If `window_not_found` lists candidate windows, choose one explicitly
+rather than guessing. If the result is `blank_capture`, the screen may be locked, remote, protected,
+or capture may lack permission; report the likely cause instead of retrying the same target
+repeatedly.
 
 ## 5. Privacy
 

@@ -1783,6 +1783,9 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
         <Match when={display() === "show_image"}>
           <ShowImage {...toolprops} />
         </Match>
+        <Match when={display() === "screenshot"}>
+          <Screenshot {...toolprops} />
+        </Match>
         <Match when={true}>
           <GenericTool {...toolprops} />
         </Match>
@@ -2604,6 +2607,38 @@ export function showImageLine(input: { path?: string; width?: number; height?: n
   return `${text} (${input.width}×${input.height})`
 }
 
+function Screenshot(props: ToolProps) {
+  const { theme } = useTheme()
+
+  return (
+    <InlineTool icon="▨" pending="Taking screenshot…" complete={screenshotLine(props.metadata)} color={theme.text} part={props.part}>
+      {screenshotLine(props.metadata)}
+    </InlineTool>
+  )
+}
+
+export function screenshotLine(metadata: Record<string, unknown>) {
+  if (stringValue(metadata.action) === "list") {
+    const displays = Array.isArray(metadata.displays) ? metadata.displays.length : 0
+    const windows = Array.isArray(metadata.windows) ? metadata.windows.length : 0
+    return `Screenshot list: ${displays} display${displays === 1 ? "" : "s"}, ${windows} window${windows === 1 ? "" : "s"}`
+  }
+
+  const target = recordValue(metadata.window)
+  const display =
+    stringValue(metadata.display) ?? (numberValue(metadata.display) === undefined ? undefined : String(numberValue(metadata.display)))
+  const label =
+    stringValue(target?.app) ??
+    stringValue(target?.title) ??
+    stringValue(target?.id) ??
+    `display ${display ?? "primary"}`
+  const text = `Screenshot: ${label}`
+  const width = numberValue(metadata.width)
+  const height = numberValue(metadata.height)
+  if (width === undefined || height === undefined) return text
+  return `${text} (${width}×${height})`
+}
+
 function Diagnostics(props: { diagnostics: unknown; filePath: string }) {
   const { theme } = useTheme()
   const terminalEnvironment = useTuiTerminalEnvironment()
@@ -2662,6 +2697,7 @@ const toolDisplays = new Set([
   "question",
   "skill",
   "show_image",
+  "screenshot",
   "execute",
 ])
 

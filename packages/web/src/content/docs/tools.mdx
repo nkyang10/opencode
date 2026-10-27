@@ -117,6 +117,23 @@ This tool reads files and returns their contents. It supports reading specific l
 
 ---
 
+### screenshot
+
+Capture the current desktop or an application window.
+
+```json title="opencode.json" {4}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "screenshot": "ask"
+  }
+}
+```
+
+This tool lists displays and windows, or captures one target and shows the image in the conversation. Use `action: "list"` when the user names an application or the display is unknown. Window targets accept a window id, app name, or case-insensitive title substring. The full-resolution PNG is saved under the default screenshots directory (`~/.local/share/opencode/screenshots/`), while the attachment may be normalized for display. The tool is available when a supported desktop capture backend is detected; `screenshot: "deny"` hides it. Load the `capture-screenshot` skill for target selection and headless-host recipes.
+
+---
+
 ### show_image
 
 Show an image to the user.

@@ -155,4 +155,26 @@ describe("AgentV2", () => {
       expect(PermissionV2.evaluate("external_directory", "/outside/example.png", build.permissions).effect).toBe("ask")
     }),
   )
+
+  it.effect("asks for screenshot by default", () =>
+    Effect.gen(function* () {
+      const agent = yield* AgentV2.Service
+      yield* AgentPlugin.Plugin.effect(
+        host({
+          agent: agentHost(agent),
+        }),
+      ).pipe(
+        Effect.provideService(
+          Location.Service,
+          Location.Service.of(location({ directory: AbsolutePath.make("/project") })),
+        ),
+      )
+
+      const build = yield* agent.get(AgentV2.ID.make("build"))
+      if (!build) throw new Error("expected build agent")
+
+      expect(PermissionV2.evaluate("screenshot", "screen", build.permissions).effect).toBe("ask")
+      expect(PermissionV2.evaluate("screenshot", "list", build.permissions).effect).toBe("ask")
+    }),
+  )
 })
