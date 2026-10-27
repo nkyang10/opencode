@@ -42,6 +42,8 @@ import { FileIcon } from "@opencode-ai/ui/file-icon"
 import { Icon } from "@opencode-ai/ui/icon"
 import { ToolErrorCard } from "./tool-error-card"
 import { ToolMedia } from "./tool-media-view"
+import { ShownImageCard } from "./shown-image-card"
+import { shownImage } from "./shown-image"
 import { ImageActionsContext, ImageActionsDropdown, useImageGallery } from "./image-actions-menu"
 import { userImageViewerItem } from "./image-gallery"
 import { Checkbox } from "@opencode-ai/ui/checkbox"
@@ -1561,6 +1563,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   const i18n = useI18n()
   const part = () => props.part as ToolPart
   if (part().tool === "todowrite") return null
+  const shown = createMemo(() => shownImage(part()))
 
   const hideQuestion = createMemo(
     () => part().tool === "question" && (part().state.status === "pending" || part().state.status === "running"),
@@ -1595,6 +1598,9 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   return (
     <Show when={!hideQuestion()}>
       <div data-component="tool-part-wrapper" data-tool={part().tool} data-timeline-part-id={part().id}>
+        <Show when={shown()}>
+          <ShownImageCard part={part()} />
+        </Show>
         <Switch>
           <Match when={part().state.status === "error" && (part().state as any).error}>
             {(error) => {
@@ -1650,7 +1656,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
               virtualizeDiff={props.virtualizeDiff}
               onContentRendered={props.onContentRendered}
             />
-            <Show when={part().state.status === "completed"}>
+            <Show when={part().state.status === "completed" && !shown()}>
               <ToolMedia part={part()} />
             </Show>
           </Match>

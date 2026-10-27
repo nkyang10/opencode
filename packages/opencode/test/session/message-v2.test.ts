@@ -1727,3 +1727,114 @@ describe("session.message-v2.latest", () => {
     expect(state.tasks[0]).toMatchObject({ type: "subtask", prompt: "inspect" })
   })
 })
+
+describe("session.message-v2 shown image conversion", () => {
+  function shownImageInput(metadata?: Record<string, unknown>) {
+    const userID = "m-user-shown-image"
+    const assistantID = "m-assistant-shown-image"
+    return {
+      userID,
+      assistantID,
+      input: [
+        {
+          info: userInfo(userID),
+          parts: [
+            {
+              ...basePart(userID, "u1-shown-image"),
+              type: "text",
+              text: "show me the screenshot",
+            },
+          ] as SessionV1.Part[],
+        },
+        {
+          info: assistantInfo(assistantID, userID),
+          parts: [
+            {
+              ...basePart(assistantID, "a1-shown-image"),
+              type: "tool",
+              callID: "call-shown-image",
+              tool: "show_image",
+              state: {
+                status: "completed",
+                input: { path: "/tmp/shot.png" },
+                output: "Shown to the user: shot.png (PNG, 1x1, 70 B).",
+                title: "shot.png",
+                metadata,
+                time: { start: 0, end: 1 },
+                attachments: [
+                  {
+                    ...basePart(assistantID, "file-shown-image"),
+                    type: "file",
+                    mime: "image/png",
+                    filename: "shot.png",
+                    url: "data:image/png;base64,Zm9v",
+                  },
+                ],
+              },
+            },
+          ] as SessionV1.Part[],
+        },
+      ] as SessionV1.WithParts[],
+    }
+  }
+
+  function anthropicModel(image: boolean): Provider.Model {
+    return {
+      ...model,
+      id: ModelV2.ID.make("anthropic/claude-opus-4-7"),
+      providerID: ProviderV2.ID.make("anthropic"),
+      api: {
+        id: "claude-opus-4-7-20250805",
+        url: "https://api.anthropic.com",
+        npm: "@ai-sdk/anthropic",
+      },
+      capabilities: {
+        ...model.capabilities,
+        attachment: true,
+        input: {
+          ...model.capabilities.input,
+          image,
+          pdf: true,
+        },
+      },
+    }
+  }
+
+  test("drops shown image media and appends the note for Anthropic text-only models", async () => {
+    const { input } = shownImageInput({ shown: true })
+    const result = await MessageV2.toModelMessages(input, anthropicModel(false))
+    const serialized = JSON.stringify(result)
+
+    expect(serialized).toContain(MessageV2.SHOWN_IMAGE_TEXT_ONLY_NOTE)
+    expect(serialized).not.toContain("mediaType")
+    expect(serialized).not.toContain(MessageV2.SYNTHETIC_ATTACHMENT_PROMPT)
+  })
+
+  test("drops shown image media and appends the note for OpenAI-compatible text-only models", async () => {
+    const { input } = shownImageInput({ shown: true })
+    const result = await MessageV2.toModelMessages(input, model)
+    const serialized = JSON.stringify(result)
+
+    expect(serialized).toContain(MessageV2.SHOWN_IMAGE_TEXT_ONLY_NOTE)
+    expect(serialized).not.toContain("mediaType")
+    expect(serialized).not.toContain(MessageV2.SYNTHETIC_ATTACHMENT_PROMPT)
+  })
+
+  test("keeps shown image media for vision models", async () => {
+    const { input } = shownImageInput({ shown: true })
+    const result = await MessageV2.toModelMessages(input, anthropicModel(true))
+    const serialized = JSON.stringify(result)
+
+    expect(serialized).toContain("mediaType")
+    expect(serialized).not.toContain(MessageV2.SHOWN_IMAGE_TEXT_ONLY_NOTE)
+  })
+
+  test("keeps non-shown image media for text-only models", async () => {
+    const { input } = shownImageInput({})
+    const result = await MessageV2.toModelMessages(input, model)
+    const serialized = JSON.stringify(result)
+
+    expect(serialized).toContain("mediaType")
+    expect(serialized).not.toContain(MessageV2.SHOWN_IMAGE_TEXT_ONLY_NOTE)
+  })
+})

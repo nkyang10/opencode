@@ -1780,6 +1780,9 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
         <Match when={display() === "skill"}>
           <Skill {...toolprops} />
         </Match>
+        <Match when={display() === "show_image"}>
+          <ShowImage {...toolprops} />
+        </Match>
         <Match when={true}>
           <GenericTool {...toolprops} />
         </Match>
@@ -2580,6 +2583,27 @@ function Skill(props: ToolProps) {
   )
 }
 
+function ShowImage(props: ToolProps) {
+  const { theme } = useTheme()
+  const path = createMemo(() => stringValue(props.metadata.path) ?? stringValue(props.input.path))
+
+  return (
+    <InlineTool icon="▨" pending="Showing image…" complete={path()} color={theme.text} part={props.part}>
+      {showImageLine({
+        path: path(),
+        width: numberValue(props.metadata.width),
+        height: numberValue(props.metadata.height),
+      })}
+    </InlineTool>
+  )
+}
+
+export function showImageLine(input: { path?: string; width?: number; height?: number }) {
+  const text = input.path ? `Image shown: ${input.path}` : "Image shown"
+  if (input.width === undefined || input.height === undefined) return text
+  return `${text} (${input.width}×${input.height})`
+}
+
 function Diagnostics(props: { diagnostics: unknown; filePath: string }) {
   const { theme } = useTheme()
   const terminalEnvironment = useTuiTerminalEnvironment()
@@ -2637,6 +2661,7 @@ const toolDisplays = new Set([
   "todowrite",
   "question",
   "skill",
+  "show_image",
   "execute",
 ])
 

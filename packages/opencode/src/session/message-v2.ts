@@ -44,6 +44,8 @@ interface FetchDecompressionError extends Error {
 }
 
 export const SYNTHETIC_ATTACHMENT_PROMPT = "Attached media from tool result:"
+export const SHOWN_IMAGE_TEXT_ONLY_NOTE =
+  "The image was shown to the user; the current model cannot view images, so do not describe it."
 export { isMedia }
 
 function truncateToolOutput(text: string, maxChars?: number) {
@@ -295,22 +297,32 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
               : truncateToolOutput(part.state.output, options?.toolOutputMaxChars)
             const attachments = part.state.time.compacted || options?.stripMedia ? [] : (part.state.attachments ?? [])
 
+            // Shown images stay in the stored part for the UI, but a text-only model
+            // must not receive the pixels or a generic error in their place.
+            const shownToTextOnly =
+              part.state.metadata?.shown === true && model.capabilities.input.image === false
+
             // For providers that don't support media in tool results, extract media files
             // (images, PDFs) to be sent as a separate user message
-            const mediaAttachments = attachments.filter((a) => isMedia(a.mime))
+            const mediaAttachments = shownToTextOnly ? [] : attachments.filter((a) => isMedia(a.mime))
             const extractedMedia = mediaAttachments.filter((a) => !supportsMediaInToolResult(a))
             if (extractedMedia.length > 0) {
               media.push(...extractedMedia)
             }
-            const finalAttachments = attachments.filter((a) => !isMedia(a.mime) || supportsMediaInToolResult(a))
+            const finalAttachments = shownToTextOnly
+              ? attachments.filter((a) => !isMedia(a.mime))
+              : attachments.filter((a) => !isMedia(a.mime) || supportsMediaInToolResult(a))
+            const finalOutputText = shownToTextOnly
+              ? `${outputText}\n\n${SHOWN_IMAGE_TEXT_ONLY_NOTE}`
+              : outputText
 
             const output =
               finalAttachments.length > 0
                 ? {
-                    text: outputText,
+                    text: finalOutputText,
                     attachments: finalAttachments,
                   }
-                : outputText
+                : finalOutputText
 
             assistantMessage.parts.push({
               type: ("tool-" + part.tool) as `tool-${string}`,

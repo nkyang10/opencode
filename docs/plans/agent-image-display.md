@@ -466,3 +466,23 @@ Definition of done for every milestone:
   Known gaps: Electron Save relies on Chromium's default download prompt (confirmed in Electron's DownloadItem
   docs), not an explicit save IPC; v1 layout hides Attach because its composer does not register the handler. No merge,
   deploy or live-host restart performed.
+- M3: `show_image` in the legacy runtime implemented. `packages/core/src/image/dimensions.ts`
+  parses PNG/JPEG/GIF/WebP headers; `tool/show-image.ts` mirrors `read` path resolution, external-directory/read asks,
+  rejects missing files, directories, SVG/BMP/TIFF/HEIC/AVIF and raw files over 20 MB, normalizes via `Image.Service`
+  (falls back to the original only on `ResizerUnavailableError`, fails other normalizer errors explicitly), and returns
+  `{ path, name, mime, width, height, bytes, caption?, resizedFrom?, shown: true, truncated: false }` with a data-URL
+  attachment. Registered beside `read`; `Permission.disabled` maps `show_image` to `read`. `message-v2.ts` drops shown
+  media and appends `SHOWN_IMAGE_TEXT_ONLY_NOTE` only when `model.capabilities.input.image === false`; vision and
+  non-shown behavior is unchanged. The session-ui `shown-image-card` renders only completed `shown` parts with safe
+  inline media (mock screenshot parts without `shown` stay tool media), outside the collapsible/context group, with
+  caption/name, filename/W×H, 360px/240px preview caps, gallery open, actions menu and viewer metadata path/caption;
+  generic `ToolMedia` is suppressed. TUI renders `Image shown: <path> (W×H)` in `theme.text`. Copy path now prefers
+  `navigator.clipboard.writeText` with a textarea/`execCommand` fallback, fixing the empty-clipboard read-back. No new
+  locale keys. Validation: core 5/5; opencode targeted 73/73 (show_image 15/15) + read/image 44/44; session-ui 126/126;
+  TUI 3/3; app typecheck; 23/23 Playwright M1+M2+M3 regressions (v1/v2 tool images, viewer, shown card at 1280/390,
+  actions/clipboard/download/viewer menu, geometry); `test:stability` 42 pass / 2 fails (known `adverse` + flaky
+  `context-first-remove`). `packages/opencode` typecheck still reports only the two pre-existing `httpapi-*` test-layer
+  errors. Production streaming medians of 3 (20 turns/20 deltas, throttle 1, minimal): review closed
+  384.9ms / 4860.2ms / 16.7ms p95; image history 395.7ms / 5080.5ms / 16.7ms p95; no long tasks, no row/markdown
+  replacement, zero 33/50ms gaps. M2 single observations were 392.3 / 4909.1 / 16.8 and 371.2 / 4934.7 / 16.8.
+  Commit: `feat(opencode): add show_image tool for user-visible images`.

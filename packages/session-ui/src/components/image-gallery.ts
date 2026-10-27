@@ -25,9 +25,15 @@ function stringValue(value: unknown): string | undefined {
 
 export function toolImagePath(part: ToolPart): string | undefined {
   if (part.state.status !== "completed" && part.state.status !== "running" && part.state.status !== "pending") return
+  if (part.state.status === "completed") {
+    const metadataPath = stringValue(part.state.metadata?.path)
+    if (metadataPath) return metadataPath
+  }
   const input = part.state.input
   if (!input) return
-  return stringValue(input.filePath) ?? stringValue(input.file_path) ?? stringValue(input.path) ?? stringValue(input.name)
+  return (
+    stringValue(input.filePath) ?? stringValue(input.file_path) ?? stringValue(input.path) ?? stringValue(input.name)
+  )
 }
 
 export function toolImageSource(part: ToolPart, fallback?: string): string {
@@ -37,21 +43,31 @@ export function toolImageSource(part: ToolPart, fallback?: string): string {
   return part.tool
 }
 
+function positiveNumber(value: unknown): number | undefined {
+  if (typeof value !== "number") return
+  if (!Number.isFinite(value)) return
+  if (value <= 0) return
+  return value
+}
+
 export function toolImageViewerItem(
   part: ToolPart,
   media: ToolMediaItem,
   labels: Pick<ImageGalleryLabels, "image">,
 ): ImageViewerItem {
   const metadata = part.state.status === "completed" ? part.state.metadata : undefined
+  const caption = typeof metadata === "object" && metadata ? stringValue(metadata.caption) : undefined
+  const name = typeof metadata === "object" && metadata ? stringValue(metadata.name) : undefined
   const width = typeof metadata === "object" && metadata ? metadata.width : undefined
   const height = typeof metadata === "object" && metadata ? metadata.height : undefined
   return {
     src: media.url,
-    alt: media.filename ?? labels.image,
-    filename: media.filename,
+    alt: caption ?? name ?? media.filename ?? labels.image,
+    caption,
+    filename: media.filename ?? name,
     mime: media.mime,
-    width: typeof width === "number" ? width : undefined,
-    height: typeof height === "number" ? height : undefined,
+    width: positiveNumber(width),
+    height: positiveNumber(height),
     source: toolImageSource(part, media.filename),
     path: absolutePath(toolImagePath(part)),
     messageID: part.messageID,
