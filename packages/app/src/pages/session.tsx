@@ -32,6 +32,7 @@ import { DirectoryDataProvider } from "@/pages/directory-layout"
 import { useServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
+import { createComposerAttachHandler, useImageActions } from "@/context/image-actions"
 import { ModelsProvider } from "@/context/models"
 import { useNotification } from "@/context/notification"
 import { PromptProvider, usePrompt } from "@/context/prompt"
@@ -356,6 +357,7 @@ export default function Page() {
   const comments = useComments()
   const command = useCommand()
   const terminal = useTerminal()
+  const imageActions = useImageActions()
   const [searchParams, setSearchParams] = useSearchParams<{ prompt?: string }>()
   const location = useLocation()
   const navigate = useNavigate()
@@ -2297,6 +2299,10 @@ export default function Page() {
                         if (!id) return
                         setFollowup("paused", id, true)
                       },
+                    })
+                    createEffect(() => {
+                      const unregister = imageActions.registerAttach(createComposerAttachHandler(controller))
+                      onCleanup(unregister)
                     })
                     return <PromptInputV2Composer controller={controller} borderUnderlay />
                   }}

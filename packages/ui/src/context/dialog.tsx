@@ -67,6 +67,12 @@ function init() {
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
+      if (
+        document.querySelector(
+          '[data-component="dropdown-menu-content"][data-expanded], [data-component="context-menu-content"][data-expanded], [role="menu"][data-expanded]',
+        )
+      )
+        return
       close()
       event.preventDefault()
       event.stopPropagation()

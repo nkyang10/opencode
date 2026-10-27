@@ -139,7 +139,7 @@ test("renders v2 current-message tool attachments", async ({ page }) => {
   await expect(part.locator('[data-slot="tool-media-image-content"]')).toHaveAttribute("src", smallPng)
 })
 
-test("opens and closes a tool image preview by mouse and keyboard", async ({ page }) => {
+test("opens and closes a tool image viewer by mouse and keyboard", async ({ page }) => {
   await setupTimeline(page, {
     messages: [
       userMessage(),
@@ -159,22 +159,24 @@ test("opens and closes a tool image preview by mouse and keyboard", async ({ pag
   })
 
   const image = page.getByRole("button", { name: "Open image: preview-shot.png" })
-  const preview = page.locator('[data-component="image-preview"]')
+  const viewer = page.locator('[data-component="image-viewer"]')
   await expect(image).toBeVisible()
 
   await image.click()
-  await expect(preview).toBeVisible()
-  await expect(preview.locator('[data-slot="image-preview-image"]')).toHaveAttribute("alt", "preview-shot.png")
+  await expect(viewer).toBeVisible()
+  await expect(viewer.locator('[data-slot="image-viewer-image"]')).toHaveAttribute("src", smallPng)
   await page.keyboard.press("Escape")
-  await expect(preview).toBeHidden()
-  await expect(preview).toHaveCount(0)
+  await expect(viewer).toBeHidden()
+  await expect(viewer).toHaveCount(0)
+  await expect(image).toBeFocused()
 
   await image.focus()
   await expect(image).toBeFocused()
   await page.keyboard.press("Enter")
-  await expect(preview).toBeVisible()
+  await expect(viewer).toBeVisible()
   await page.keyboard.press("Escape")
-  await expect(preview).toBeHidden()
+  await expect(viewer).toBeHidden()
+  await expect(image).toBeFocused()
 })
 
 test("renders images from compacted completed tool parts", async ({ page }) => {

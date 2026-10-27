@@ -1,15 +1,15 @@
 import { createMemo, For, Show } from "solid-js"
 import type { ToolPart } from "@opencode-ai/sdk/v2"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useI18n } from "@opencode-ai/ui/context/i18n"
 import { FileIcon } from "@opencode-ai/ui/file-icon"
-import { ImagePreview } from "@opencode-ai/ui/image-preview"
+import { ImageActionsContext, ImageActionsDropdown, useImageGallery } from "./image-actions-menu"
+import { toolImageViewerItem } from "./image-gallery"
 import { typeLabel } from "./message-file"
 import { toolMedia } from "./tool-media"
 
 export function ToolMedia(props: { part: ToolPart | undefined; compact?: boolean }) {
-  const dialog = useDialog()
   const i18n = useI18n()
+  const gallery = useImageGallery()
   const items = createMemo(() => toolMedia(props.part))
 
   return (
@@ -18,7 +18,13 @@ export function ToolMedia(props: { part: ToolPart | undefined; compact?: boolean
         <For each={items()}>
           {(item) => {
             const name = item.filename ?? i18n.t(item.kind === "image" ? "ui.toolMedia.image" : "ui.toolMedia.file")
-            const open = () => dialog.show(() => <ImagePreview src={item.url} alt={name} />)
+            const target = () =>
+              toolImageViewerItem(props.part!, item, { image: i18n.t("ui.toolMedia.image") })
+            let imageRef: HTMLButtonElement | undefined
+            const open = (source?: HTMLElement | null) => {
+              if (!props.part) return
+              gallery.open({ sessionID: props.part.sessionID, target: target(), source })
+            }
 
             return (
               <Show
@@ -33,16 +39,32 @@ export function ToolMedia(props: { part: ToolPart | undefined; compact?: boolean
                   </div>
                 }
               >
-                <button
-                  type="button"
-                  data-slot="tool-media-image"
-                  data-mime={item.mime}
-                  aria-label={i18n.t("ui.toolMedia.openImage", { name })}
-                  title={name}
-                  onClick={open}
-                >
-                  <img data-slot="tool-media-image-content" src={item.url} alt={name} loading="lazy" decoding="async" />
-                </button>
+                <div data-slot="tool-media-image-group">
+                  <ImageActionsContext target={target()} onOpen={(source) => open(source)}>
+                    <button
+                      ref={imageRef}
+                      type="button"
+                      data-slot="tool-media-image"
+                      data-mime={item.mime}
+                      aria-label={i18n.t("ui.toolMedia.openImage", { name })}
+                      title={name}
+                      onClick={(event) => open(event.currentTarget)}
+                    >
+                      <img
+                        data-slot="tool-media-image-content"
+                        src={item.url}
+                        alt={name}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </button>
+                  </ImageActionsContext>
+                  <ImageActionsDropdown
+                    target={target()}
+                    onOpen={(source) => open(source)}
+                    source={() => imageRef}
+                  />
+                </div>
               </Show>
             )
           }}

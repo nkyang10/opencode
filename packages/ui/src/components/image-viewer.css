@@ -1,0 +1,213 @@
+[data-component="image-viewer"] {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--background-stronger) 94%, transparent);
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  [data-slot="image-viewer-header"] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex: none;
+    padding: 12px 16px;
+    min-height: 52px;
+    border-bottom: 1px solid var(--border-weak-base);
+
+    [data-slot="image-viewer-heading"] {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 0;
+      flex: 1;
+      overflow: hidden;
+
+      [data-slot="image-viewer-title"] {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--text-strong);
+        font-family: var(--font-family-sans);
+        font-size: var(--font-size-base);
+        font-weight: var(--font-weight-medium);
+        line-height: var(--line-height-large);
+      }
+
+      [data-slot="image-viewer-dimensions"],
+      [data-slot="image-viewer-source"] {
+        flex: none;
+        color: var(--text-weak);
+        font-family: var(--font-family-sans);
+        font-size: var(--font-size-small);
+        line-height: var(--line-height-large);
+        white-space: nowrap;
+      }
+
+      [data-slot="image-viewer-source"] {
+        max-width: 40%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
+    [data-slot="image-viewer-header-actions"] {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: none;
+    }
+  }
+
+  [data-slot="image-viewer-stage"] {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    cursor: default;
+    touch-action: none;
+    user-select: none;
+
+    &[data-dragging="true"] {
+      cursor: grabbing;
+    }
+
+    [data-slot="image-viewer-image"] {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      max-width: none;
+      max-height: none;
+      object-fit: contain;
+      border-radius: var(--radius-sm);
+      transform-origin: center center;
+      transition: transform 140ms ease-out;
+      will-change: transform;
+      pointer-events: none;
+
+      &[data-pixelated="true"] {
+        image-rendering: pixelated;
+      }
+    }
+
+    &[data-dragging="true"] [data-slot="image-viewer-image"] {
+      transition: none;
+    }
+  }
+
+  [data-slot="image-viewer-toolbar"] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex: none;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border-weak-base);
+
+    [data-slot="image-viewer-nav"],
+    [data-slot="image-viewer-zoom-controls"],
+    [data-slot="image-viewer-file-actions"] {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    [data-slot="image-viewer-counter"],
+    [data-slot="image-viewer-zoom"] {
+      color: var(--text-base);
+      font-family: var(--font-family-sans);
+      font-size: var(--font-size-small);
+      font-variant-numeric: tabular-nums;
+      line-height: var(--line-height-large);
+      white-space: nowrap;
+    }
+
+    [data-slot="image-viewer-counter"] {
+      min-width: 56px;
+      text-align: center;
+    }
+
+    [data-slot="image-viewer-zoom"] {
+      min-width: 72px;
+      text-align: center;
+    }
+
+    button[data-action] {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 28px;
+      min-width: 28px;
+      padding: 0 8px;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text-base);
+      font-family: var(--font-family-sans);
+      font-size: var(--font-size-small);
+      font-weight: var(--font-weight-medium);
+      line-height: 1;
+      cursor: pointer;
+
+      &:hover {
+        background: var(--surface-raised-base-hover);
+        color: var(--text-strong);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--border-focus);
+        outline-offset: 1px;
+      }
+    }
+
+    [data-action="image-viewer-zoom-out"],
+    [data-action="image-viewer-zoom-in"] {
+      font-size: var(--font-size-large);
+      font-weight: var(--font-weight-regular);
+    }
+  }
+
+  [data-slot="image-viewer-live"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media (max-width: 640px) {
+    [data-slot="image-viewer-header"] {
+      padding: 8px 12px;
+      min-height: 44px;
+
+      [data-slot="image-viewer-dimensions"],
+      [data-slot="image-viewer-source"] {
+        display: none;
+      }
+    }
+
+    [data-slot="image-viewer-toolbar"] {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-slot="image-viewer-stage"] [data-slot="image-viewer-image"] {
+      transition: none;
+    }
+  }
+}

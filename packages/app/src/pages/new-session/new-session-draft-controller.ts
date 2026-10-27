@@ -1,7 +1,8 @@
 import { useSearchParams } from "@solidjs/router"
-import { createEffect, untrack } from "solid-js"
+import { createEffect, onCleanup, untrack } from "solid-js"
 import { usePromptInputV2Controller } from "@/components/prompt-input-v2"
 import { useComments } from "@/context/comments"
+import { createComposerAttachHandler, useImageActions } from "@/context/image-actions"
 import { useLocal } from "@/context/local"
 import { usePrompt } from "@/context/prompt"
 import { useServerSync } from "@/context/server-sync"
@@ -15,6 +16,7 @@ export function createNewSessionDraftController(workspace: { worktree: () => str
   const serverSync = useServerSync()
   const comments = useComments()
   const local = useLocal()
+  const imageActions = useImageActions()
   const route = useSessionKey()
   const [searchParams, setSearchParams] = useSearchParams<{ draftId?: string; prompt?: string }>()
   const model = createPromptModelSelection({ agent: () => local.agent.current() })
@@ -37,6 +39,11 @@ export function createNewSessionDraftController(workspace: { worktree: () => str
     },
     onNewSessionWorktreeReset: workspace.resetWorktree,
     onSubmit: comments.clear,
+  })
+
+  createEffect(() => {
+    const unregister = imageActions.registerAttach(createComposerAttachHandler(input))
+    onCleanup(unregister)
   })
 
   createEffect(() => {

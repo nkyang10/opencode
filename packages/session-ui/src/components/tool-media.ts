@@ -10,6 +10,10 @@ export type ToolMediaItem = {
 
 const INLINE_IMAGE = /^data:image\/(png|jpeg|gif|webp);base64,/i
 
+export function isInlineImageUrl(url: string) {
+  return INLINE_IMAGE.test(url)
+}
+
 export function toolMedia(part: ToolPart | undefined): ToolMediaItem[] {
   if (!part || part.state.status !== "completed") return []
   const attachments = part.state.attachments

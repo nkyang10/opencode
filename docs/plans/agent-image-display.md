@@ -421,7 +421,7 @@ Definition of done for every milestone:
 
 - M0: plan written (`ef7d980`).
 - M0 refinement: screenshot tool with window capture, storage decision, image viewer and actions, handoff notes.
-- M1: inline tool-result images implemented (uncommitted working tree). `tool-media.ts` selects ordered inline
+- M1: inline tool-result images implemented (`25c352a`). `tool-media.ts` selects ordered inline
   `data:image/(png|jpeg|gif|webp);base64` attachments and downgrades PDF/SVG/remote/unknown attachments to chips;
   `tool-media-view.tsx` renders 96px thumbnails (64px inside an expanded context group) as siblings of the tool
   row, outside the collapsible, with click/Enter/Space opening the existing `ImagePreview`; `message-part.tsx`
@@ -436,4 +436,33 @@ Definition of done for every milestone:
   Single observations, not a performance guarantee. Environment limits observed, not introduced by M1: the
   `adverse` virtualization stability test fails on the pristine branch head too, and the app unit suite has the
   same 10 pre-existing solid-js `use` export failures (800 pass of 810) on the pristine head. Full
-  `test:stability` is 42 pass / 1 pre-existing fail. No commit, merge, deploy or live-host restart performed.
+  `test:stability` is 42 pass / 1 pre-existing fail. Committed as `25c352a`; no merge, deploy or live-host restart performed.
+- M2: image viewer and image actions implemented. `image-viewer.tsx` (+ CSS/story)
+  is a Kobalte dialog gallery over the current session's inline images with fit/10-800% zoom (wheel/trackpad,
+  `+`/`-`, `0`, `1`, double-click), pan/swipe, keyboard navigation, counter, W×H/source header, Save/Copy/⋯/Close
+  toolbar, compact toolbar under 640px, reduced-motion, polite zoom announcements and focus return. `image-gallery.ts`
+  keeps only `data:image/(png|jpeg|gif|webp);base64` items in timeline order and labels user images `You`;
+  unsupported file parts stay as chips/fallback cards and are never loaded. `image-actions-helpers.ts` +
+  `image-actions-menu.tsx` (split rather than the plan's same-basename `.ts`/`.tsx` pair, which the bundler resolves
+  ambiguously) provide one action list by right-click, ⋯, ContextMenu/Shift+F10 and Kobalte long-press. Copy image is
+  gated by MIME and secure context/`ClipboardItem`; Save only appears for inline images; Copy path/Reveal only for
+  absolute host paths; Open in new tab only in the web app (validated blob URL via `<a>`); Attach only when a composer
+  registered; Go to message inside the viewer. The viewer actions menu closes on the first Escape and returns focus to
+  its trigger; the viewer ignores gallery/zoom keys while a menu is open; RTL swaps ArrowLeft/ArrowRight for
+  previous/next and the icons auto-flip. The user-image ⋯ overlays the 58×46 (48×48 v1) thumbnail instead of adding
+  26px. `ui.imageViewer.*` and `ui.imageActions.*` keys (including `source.you` and `attachFailed`) exist in `en.ts`
+  and all 61 non-English locales as English fallbacks; app-side attach/open/reveal callbacks are wired in
+  `directory-layout.tsx` (attach only with the v2 composer, new tab only in web, reveal only desktop+local). The
+  legacy toast region stays mounted beside the v2 region because session-ui toasts use the legacy toaster.
+  Validation: 115 session-ui + 27 ui unit tests, app i18n parity (5/979), all typechecks, 20/20 Playwright M1+M2
+  regressions (v1/v2 viewer, zoom/pan, gallery order, menu by right-click/⋯/Shift+F10, two-stage Escape and menu key
+  isolation, clipboard read-back, download name, attach and focus, 390px, user overlay/`You`, geometry unchanged).
+  Full `test:stability` is 43 pass / 1 pre-existing `adverse` fail; a later repeat also flaked the
+  `context-first-remove` motion check (passed 2/3 isolated repeats). The app unit suite is the same pre-existing
+  800/810 with solid-js `use` errors. Production streaming (v2, review closed, 20 history turns, 20 deltas,
+  throttle 1, minimal probes): baseline 392.3ms / 4909.1ms / 16.8ms p95; image-history 371.2ms / 4934.7ms / 16.8ms
+  p95 (M1: 368.9 / 5095.3 / 16.7 and 366.3 / 4900.8 / 16.7), no long tasks, no row or markdown replacement. The
+  default throttle-30 320-turn/160-delta benchmark also passes with zero geometry drift and zero blank samples.
+  Known gaps: Electron Save relies on Chromium's default download prompt (confirmed in Electron's DownloadItem
+  docs), not an explicit save IPC; v1 layout hides Attach because its composer does not register the handler. No merge,
+  deploy or live-host restart performed.
