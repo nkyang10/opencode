@@ -39,6 +39,8 @@ import { SessionRevert } from "../../src/session/revert"
 import { SessionRunState } from "../../src/session/run-state"
 import { MessageID, PartID, SessionID } from "../../src/session/schema"
 import { SessionStatus } from "../../src/session/status"
+import { Global } from "@opencode-ai/core/global"
+import { ScreenshotStorage } from "@opencode-ai/core/screen-capture/storage"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { SessionExecution } from "@opencode-ai/core/session/execution"
 import { Skill } from "../../src/skill"
@@ -575,6 +577,32 @@ withMcpInstructions.instance(
       const body = JSON.stringify(hits[0]?.body)
       expect(body).toContain('<server name=\\"guide-server\\">')
       expect(body).toContain("Use lookup before mutate.")
+      yield* Fiber.interrupt(fiber)
+    }),
+  15_000,
+)
+
+it.instance(
+  "loop includes the screenshots directory, show_image and capture-screenshot in the model request",
+  () =>
+    Effect.gen(function* () {
+      const { llm } = yield* useServerConfig(providerCfg)
+      const prompt = yield* SessionPrompt.Service
+      const sessions = yield* Session.Service
+      const chat = yield* sessions.create({
+        title: "Pinned",
+        permission: [{ permission: "*", pattern: "*", action: "allow" }],
+      })
+      yield* llm.hang
+      yield* user(chat.id, "hello")
+
+      const fiber = yield* prompt.loop({ sessionID: chat.id }).pipe(Effect.forkChild)
+      yield* awaitWithTimeout(llm.wait(1), "timed out waiting for screenshot request", "10 seconds")
+
+      const body = JSON.stringify((yield* llm.hits)[0]?.body)
+      expect(body).toContain(ScreenshotStorage.directory(Global.make()))
+      expect(body).toContain("show_image")
+      expect(body).toContain("capture-screenshot")
       yield* Fiber.interrupt(fiber)
     }),
   15_000,

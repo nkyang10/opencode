@@ -14,6 +14,7 @@ import { Location } from "@opencode-ai/core/location"
 import { LocationMutation } from "@opencode-ai/core/location-mutation"
 import { PermissionV2 } from "@opencode-ai/core/permission"
 import { AbsolutePath } from "@opencode-ai/core/schema"
+import { ScreenshotStorage } from "@opencode-ai/core/screen-capture/storage"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { ToolRegistry } from "@opencode-ai/core/tool/registry"
 import { ShowImageTool } from "@opencode-ai/core/tool/show-image"
@@ -96,7 +97,7 @@ const suite = (image: Layer.Layer<Image.Service>) =>
     [PermissionV2.node, permission],
     [Image.node, image],
     [Location.node, locationLayer],
-    [Global.node, Global.layerWith({ data: path.join(directory, ".data") })],
+    [Global.node, Global.layerWith({ data: directory })],
     [ToolOutputStore.node, ToolOutputStore.nodeWithoutConfig],
   ])
 
@@ -122,6 +123,20 @@ const put = (file: string, data: string | Uint8Array) =>
 
 const dataBytes = (url: string) =>
   new Uint8Array(Buffer.from(url.slice(url.indexOf(";base64,") + ";base64,".length), "base64"))
+
+describe("ShowImageTool description", () => {
+  it.effect("materializes the screenshots directory into the tool description", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const definitions = yield* toolDefinitions(registry)
+      const description = definitions.find((definition) => definition.name === "show_image")?.description
+      const screenshots = ScreenshotStorage.directory(Global.make({ data: directory }))
+
+      expect(description).toContain(screenshots)
+      expect(description).not.toContain("{{screenshots_dir}}")
+    }),
+  )
+})
 
 describe("ShowImageTool supported formats", () => {
   for (const fixture of fixtures) {

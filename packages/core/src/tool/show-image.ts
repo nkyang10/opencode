@@ -7,10 +7,12 @@ import { pathToFileURL } from "node:url"
 import { makeLocationNode } from "../effect/app-node"
 import { FileSystem } from "../filesystem"
 import { FSUtil } from "../fs-util"
+import { Global } from "../global"
 import { Image } from "../image"
 import { imageDimensions } from "../image/dimensions"
 import { LocationMutation } from "../location-mutation"
 import { PermissionV2 } from "../permission"
+import { ScreenshotStorage } from "../screen-capture/storage"
 import { ToolRegistry } from "./registry"
 import { Tool } from "./tool"
 import { Tools } from "./tools"
@@ -70,6 +72,7 @@ const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     const tools = yield* Tools.Service
     const fs = yield* FSUtil.Service
+    const global = yield* Global.Service
     const mutation = yield* LocationMutation.Service
     const image = yield* Image.Service
     const permission = yield* PermissionV2.Service
@@ -78,7 +81,7 @@ const layer = Layer.effectDiscard(
       .register({
         [name]: Tool.withPermission(
           Tool.make({
-            description: DESCRIPTION,
+            description: DESCRIPTION.replaceAll("{{screenshots_dir}}", ScreenshotStorage.directory(global)),
             input: Input,
             output: Output,
             structured: Metadata,
@@ -234,5 +237,5 @@ function humanSize(bytes: number) {
 export const node = makeLocationNode({
   name: "tool/show-image",
   layer,
-  deps: [ToolRegistry.node, FSUtil.node, LocationMutation.node, Image.node, PermissionV2.node],
+  deps: [ToolRegistry.node, FSUtil.node, Global.node, LocationMutation.node, Image.node, PermissionV2.node],
 })

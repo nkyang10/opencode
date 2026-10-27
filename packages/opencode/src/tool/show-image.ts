@@ -2,6 +2,8 @@ import { Effect, Schema } from "effect"
 import * as path from "path"
 import * as Tool from "./tool"
 import { FSUtil } from "@opencode-ai/core/fs-util"
+import { Global } from "@opencode-ai/core/global"
+import { ScreenshotStorage } from "@opencode-ai/core/screen-capture/storage"
 import { imageDimensions } from "@opencode-ai/core/image/dimensions"
 import { InstanceState } from "@/effect/instance-state"
 import { Image } from "@/image/image"
@@ -47,6 +49,7 @@ export const ShowImageTool = Tool.define<
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
     const image = yield* Image.Service
+    const screenshotsDir = ScreenshotStorage.directory(Global.make())
 
     const unsupported = (bytes: Uint8Array) => {
       if (bytes.length === 0) return
@@ -180,7 +183,7 @@ export const ShowImageTool = Tool.define<
     })
 
     return {
-      description: DESCRIPTION,
+      description: DESCRIPTION.replaceAll("{{screenshots_dir}}", screenshotsDir),
       parameters: Parameters,
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context<Metadata>) =>
         run(params, ctx).pipe(Effect.orDie),

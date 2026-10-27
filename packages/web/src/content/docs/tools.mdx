@@ -117,6 +117,23 @@ This tool reads files and returns their contents. It supports reading specific l
 
 ---
 
+### show_image
+
+Show an image to the user.
+
+```json title="opencode.json" {4}
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "read": "allow"
+  }
+}
+```
+
+This tool displays an image from disk in the conversation so the user can see it. Use it when the user should look at a screenshot, rendered page, chart or generated asset; use `read` when only the agent needs to inspect an image. It supports PNG, JPEG, GIF and WebP images up to 20 MB (raw file size), and larger files must be resized first. Relative paths resolve from the project directory, paths outside the project ask for `external_directory`, and the tool uses the `read` permission. New captures should be saved under the default screenshots directory (`~/.local/share/opencode/screenshots/`), which is allow-listed; load the `capture-screenshot` skill for capture recipes.
+
+---
+
 ### grep
 
 Search file contents using regular expressions.

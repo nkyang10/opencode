@@ -9,6 +9,7 @@ import { Auth } from "../../src/auth"
 import { Config } from "../../src/config/config"
 import { RuntimeFlags } from "../../src/effect/runtime-flags"
 import { Global } from "@opencode-ai/core/global"
+import { ScreenshotStorage } from "@opencode-ai/core/screen-capture/storage"
 import { Permission } from "../../src/permission"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Plugin } from "../../src/plugin"
@@ -147,6 +148,13 @@ it.instance("explore agent asks for external directories and allows whitelisted 
     expect(Permission.evaluate("external_directory", Truncate.GLOB, explore!.permission).action).toBe("allow")
     expect(
       Permission.evaluate("external_directory", path.join(Global.Path.tmp, "agent-work"), explore!.permission).action,
+    ).toBe("allow")
+    expect(
+      Permission.evaluate(
+        "external_directory",
+        path.join(ScreenshotStorage.directory(Global.make()), "shot.png"),
+        explore!.permission,
+      ).action,
     ).toBe("allow")
   }),
 )

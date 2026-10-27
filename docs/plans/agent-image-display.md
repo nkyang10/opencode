@@ -504,3 +504,15 @@ Definition of done for every milestone:
   (15 `cross-spawn` tests need the absent `node` binary, 1 `ProjectCopy` git-worktree force assertion in an untouched
   file). No benchmark or Playwright run: M4 changes no timeline/UI rendering. No merge, deploy or live-host restart
   performed. Commit: `feat(core): add show_image tool and image capability gating`.
+- M5: screenshot storage and the `capture-screenshot` skill implemented. `packages/core/src/screen-capture/storage.ts`
+  writes `<data>/screenshots/YYYYMMDD-HHmmss-<slug>-<4 hex>.png` (0700 directory/0600 files, temporary file plus
+  rename), rejects symlinked directories/files during write and cleanup, and deletes matching files older than 7 days
+  at startup and hourly through `cleanupNode`; the core server and both legacy app layers install cleanup.
+  `<data>/screenshots/*` is allow-listed in the core and legacy agents. `capture-screenshot.md` is registered as a
+  built-in in both runtimes before disk discovery, substitutes `{{screenshots_dir}}`, can be overridden by a same-name
+  disk skill and hidden with a `permission.skill` deny. The `show_image` descriptions use the resolved directory; docs
+  cover `show_image` and built-in skills. Validation: core targeted 34/34 (135 assertions across storage/skill/agent/
+  show-image), core and server typechecks; legacy targeted 138 pass/1 skip (skill/agent/prompt/show-image), legacy skill
+  rerun 20/20; `packages/opencode` typecheck still reports only the two pre-existing `httpapi-*` test-layer errors. No app
+  change, benchmark or Playwright run; manual phone smoke not performed. Commit:
+  `feat: add screenshot storage and capture-screenshot skill`.
