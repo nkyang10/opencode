@@ -111,6 +111,10 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.list.one": "{{count}} list",
   "ui.messagePart.context.list.other": "{{count}} lists",
 
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Loading",
   "ui.list.empty": "No results",
   "ui.list.clearFilter": "Clear filter",

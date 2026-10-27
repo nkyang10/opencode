@@ -102,6 +102,11 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.search.other": "{{count}} kërkime",
   "ui.messagePart.context.list.one": "Lista {{count}}",
   "ui.messagePart.context.list.other": "Listat {{count}}",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Po ngarkohet",
   "ui.list.empty": "Nuk ka rezultate",
   "ui.list.clearFilter": "Pastro filtrin",

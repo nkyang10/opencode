@@ -104,6 +104,11 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.search.other": "{{count}} qidiruvi",
   "ui.messagePart.context.list.one": "{{count}} ro'yxati",
   "ui.messagePart.context.list.other": "{{count}} ro'yxatlari",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Yuklanmoqda",
   "ui.list.empty": "Natija yoʻq",
   "ui.list.clearFilter": "Filtrni tozalash",

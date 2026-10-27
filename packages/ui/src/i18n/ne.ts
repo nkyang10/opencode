@@ -104,6 +104,11 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.search.other": "{{count}} खोजहरू",
   "ui.messagePart.context.list.one": "{{count}} सूची",
   "ui.messagePart.context.list.other": "{{count}} सूचीहरू",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "लोड गर्दै",
   "ui.list.empty": "कुनै परिणाम छैन",
   "ui.list.clearFilter": "फिल्टर खाली गर्नुहोस्",

@@ -113,6 +113,10 @@ export const dict = {
   "ui.messagePart.option.typeOwnAnswer": "Escribe tu propia respuesta",
   "ui.messagePart.review.title": "Revisa tus respuestas",
 
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Cargando",
   "ui.list.empty": "Sin resultados",
   "ui.list.clearFilter": "Borrar filtro",

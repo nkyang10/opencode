@@ -119,6 +119,10 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.list.many": "{{count}} списків",
   "ui.messagePart.context.list.other": "{{count}} списків",
 
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Завантаження",
   "ui.list.empty": "Немає результатів",
   "ui.list.clearFilter": "Очистити фільтр",

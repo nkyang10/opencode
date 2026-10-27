@@ -103,6 +103,11 @@ export const dict = {
   "ui.messagePart.context.search.other": "{{count}} ရှာဖွေမှုများ",
   "ui.messagePart.context.list.one": "{{count}} စာရင်း",
   "ui.messagePart.context.list.other": "{{count}} စာရင်းများ",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "တင်နေသည်။",
   "ui.list.empty": "ရလဒ်မရှိပါ။",
   "ui.list.clearFilter": "စစ်ထုတ်မှုကို ရှင်းလင်းပါ။",

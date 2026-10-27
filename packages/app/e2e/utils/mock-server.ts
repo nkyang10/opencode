@@ -406,7 +406,18 @@ function currentMessage(value: unknown) {
                     status: "completed",
                     input: state.input ?? {},
                     structured: state.metadata ?? {},
-                    content: [{ type: "text", text: state.output ?? "" }],
+                    content: [
+                      { type: "text", text: state.output ?? "" },
+                      ...(Array.isArray(state.attachments)
+                        ? (state.attachments as Array<{ url?: string; mime?: string; filename?: string }>)
+                        : []
+                      ).map((attachment) => ({
+                        type: "file",
+                        uri: attachment.url,
+                        mime: attachment.mime,
+                        name: attachment.filename,
+                      })),
+                    ],
                   }
                 : state.status === "error"
                   ? {

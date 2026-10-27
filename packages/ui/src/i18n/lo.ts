@@ -102,6 +102,11 @@ export const dict = {
   "ui.messagePart.context.search.other": "{{count}} ຄົ້ນຫາ",
   "ui.messagePart.context.list.one": "{{count}} ບັນຊີລາຍຊື່",
   "ui.messagePart.context.list.other": "{{count}} ລາຍການ",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "ກຳລັງໂຫຼດ",
   "ui.list.empty": "ບໍ່ມີຜົນໄດ້ຮັບ",
   "ui.list.clearFilter": "ລ້າງການກັ່ນຕອງ",

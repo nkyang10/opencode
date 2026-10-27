@@ -102,6 +102,11 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.search.other": "{{count}} αναζητήσεις",
   "ui.messagePart.context.list.one": "{{count}} λίστα",
   "ui.messagePart.context.list.other": "{{count}} λίστες",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Φόρτωση",
   "ui.list.empty": "Δεν υπάρχουν αποτελέσματα",
   "ui.list.clearFilter": "Διαγραφή φίλτρου",

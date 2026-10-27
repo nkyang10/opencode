@@ -106,6 +106,11 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.list.one": "{{count}} saraksts",
   "ui.messagePart.context.list.other": "{{count}} saraksti",
   "ui.messagePart.context.list.zero": "{{count}} sarakstu",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Ielādējas",
   "ui.list.empty": "Nav rezultātu",
   "ui.list.clearFilter": "Notīrīt filtru",

@@ -421,3 +421,19 @@ Definition of done for every milestone:
 
 - M0: plan written (`ef7d980`).
 - M0 refinement: screenshot tool with window capture, storage decision, image viewer and actions, handoff notes.
+- M1: inline tool-result images implemented (uncommitted working tree). `tool-media.ts` selects ordered inline
+  `data:image/(png|jpeg|gif|webp);base64` attachments and downgrades PDF/SVG/remote/unknown attachments to chips;
+  `tool-media-view.tsx` renders 96px thumbnails (64px inside an expanded context group) as siblings of the tool
+  row, outside the collapsible, with click/Enter/Space opening the existing `ImagePreview`; `message-part.tsx`
+  wires both `ToolPartDisplay` and `ContextToolGroup`. New keys `ui.toolMedia.openImage|image|file` exist in
+  `en.ts` and all 61 non-English locales as explicit English source-copy fallbacks. Validation: 7 `tool-media`
+  unit tests and 90 session-ui tests pass; session-ui, ui, app and app/e2e typechecks pass; app i18n parity
+  passes (5 tests / 979 assertions); 9 new production-browser regressions pass (v1/v2 MCP + `read` images,
+  preview mouse/keyboard, compacted parts, PDF/SVG/remote chips, 1280/390 no-overflow, row-height stability,
+  answer/error typography). Production streaming (v2, review closed, 20 history turns, 20 deltas, throttle 1,
+  minimal probes): initial content 368.9ms, completion 5095.3ms, progress frame-gap p95 16.7ms, no long tasks,
+  row or markdown replacement. Image-history variant (one PNG per history turn): 366.3ms / 4900.8ms / 16.7ms.
+  Single observations, not a performance guarantee. Environment limits observed, not introduced by M1: the
+  `adverse` virtualization stability test fails on the pristine branch head too, and the app unit suite has the
+  same 10 pre-existing solid-js `use` export failures (800 pass of 810) on the pristine head. Full
+  `test:stability` is 42 pass / 1 pre-existing fail. No commit, merge, deploy or live-host restart performed.

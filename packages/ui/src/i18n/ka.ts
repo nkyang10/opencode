@@ -102,6 +102,11 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.search.other": "{{count}} ძიება",
   "ui.messagePart.context.list.one": "{{count}} სია",
   "ui.messagePart.context.list.other": "{{count}} სიები",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "იტვირთება",
   "ui.list.empty": "შედეგები არ არის",
   "ui.list.clearFilter": "ფილტრის გასუფთავება",

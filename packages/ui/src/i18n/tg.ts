@@ -102,6 +102,11 @@ export const dict = {
   "ui.messagePart.context.search.other": "{{count}} ҷустуҷӯ",
   "ui.messagePart.context.list.one": "{{count}} рӯйхат",
   "ui.messagePart.context.list.other": "{{count}} рӯйхатҳо",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Бор карда мешавад",
   "ui.list.empty": "Ҳеҷ натиҷае нест",
   "ui.list.clearFilter": "Филтрро тоза кунед",

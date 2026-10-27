@@ -102,6 +102,11 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.search.other": "{{count}} tìm kiếm",
   "ui.messagePart.context.list.one": "{{count}} danh sách",
   "ui.messagePart.context.list.other": "{{count}} danh sách",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Đang tải",
   "ui.list.empty": "Không có kết quả",
   "ui.list.clearFilter": "Xóa bộ lọc",

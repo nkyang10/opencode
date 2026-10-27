@@ -109,6 +109,10 @@ export const dict = {
   "ui.messagePart.option.typeOwnAnswer": "พิมพ์คำตอบของคุณเอง",
   "ui.messagePart.review.title": "ตรวจสอบคำตอบของคุณ",
 
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "กำลังโหลด",
   "ui.list.empty": "ไม่มีผลลัพธ์",
   "ui.list.clearFilter": "ล้างตัวกรอง",

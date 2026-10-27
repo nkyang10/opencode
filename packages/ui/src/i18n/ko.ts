@@ -85,6 +85,10 @@ export const dict = {
   "ui.messagePart.option.typeOwnAnswer": "직접 답변 입력",
   "ui.messagePart.review.title": "답변 검토",
 
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "로딩 중",
   "ui.list.empty": "결과 없음",
   "ui.list.clearFilter": "필터 지우기",

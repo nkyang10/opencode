@@ -103,6 +103,11 @@ export const dict = {
   "ui.messagePart.context.search.other": "{{count}} ស្វែងរក",
   "ui.messagePart.context.list.one": "បញ្ជី {{count}}",
   "ui.messagePart.context.list.other": "បញ្ជី {{count}}",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "កំពុងផ្ទុក",
   "ui.list.empty": "គ្មានលទ្ធផល",
   "ui.list.clearFilter": "ជម្រះតម្រង",

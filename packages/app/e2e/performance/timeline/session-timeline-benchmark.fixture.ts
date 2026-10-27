@@ -1,5 +1,6 @@
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import type { Page } from "@playwright/test"
+import { smallPng } from "../timeline-stability/fixture"
 import { mockOpenCodeServer } from "../../utils/mock-server"
 import { expectAppVisible, expectSessionTitle } from "../../utils/waits"
 import { expect } from "../benchmark"
@@ -99,6 +100,7 @@ export async function setupTimelineBenchmark(
     historyTurns: number
     eventBatch: number
     newLayoutDesigns?: boolean
+    withImages?: boolean
     vcsDiff?: unknown[]
     turnDiffs?: unknown[]
   },
@@ -116,7 +118,9 @@ export async function setupTimelineBenchmark(
     vcsDiff: options.vcsDiff,
     pageMessages: () => ({
       items: [
-        ...Array.from({ length: options.historyTurns }, (_, index) => performanceTurn(index)).flat(),
+        ...Array.from({ length: options.historyTurns }, (_, index) =>
+          performanceTurn(index, options.withImages ?? false),
+        ).flat(),
         currentUserMessage,
         assistantMessage,
       ],
@@ -217,7 +221,7 @@ export function buildStreamDeltaEvents(deltaCount: number): EventPayload[] {
   }))
 }
 
-function performanceTurn(index: number) {
+function performanceTurn(index: number, withImages: boolean) {
   const suffix = String(index).padStart(4, "0")
   const userID = `msg_0000_${suffix}_a_user`
   const assistantID = `msg_0000_${suffix}_b_assistant`
@@ -316,6 +320,37 @@ function performanceTurn(index: number) {
                 ],
               },
               time: { start: 1690000001500 + index * 2_000, end: 1690000001700 + index * 2_000 },
+            },
+          },
+        ]
+      : []),
+    ...(withImages
+      ? [
+          {
+            id: `prt_0000_${suffix}_image`,
+            sessionID,
+            messageID: assistantID,
+            type: "tool",
+            callID: `call_0000_${suffix}_image`,
+            tool: "read",
+            state: {
+              status: "completed",
+              input: { filePath: `assets/history-${index}.png` },
+              output: `Read assets/history-${index}.png`,
+              title: `assets/history-${index}.png`,
+              metadata: {},
+              time: { start: 1690000001200 + index * 2_000, end: 1690000001300 + index * 2_000 },
+              attachments: [
+                {
+                  id: `prt_0000_${suffix}_image_file`,
+                  sessionID,
+                  messageID: assistantID,
+                  type: "file",
+                  mime: "image/png",
+                  filename: `history-${index}.png`,
+                  url: smallPng,
+                },
+              ],
             },
           },
         ]

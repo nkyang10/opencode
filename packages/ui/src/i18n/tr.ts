@@ -115,6 +115,10 @@ export const dict = {
   "ui.messagePart.option.typeOwnAnswer": "Kendi yanıtınızı yazın",
   "ui.messagePart.review.title": "Yanıtlarınızı gözden geçirin",
 
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Yükleniyor",
   "ui.list.empty": "Sonuç bulunamadı",
   "ui.list.clearFilter": "Filtreyi temizle",

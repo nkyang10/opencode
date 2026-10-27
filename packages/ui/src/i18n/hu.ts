@@ -104,6 +104,11 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.search.other": "{{count}} keresések",
   "ui.messagePart.context.list.one": "{{count}} lista",
   "ui.messagePart.context.list.other": "{{count}} listák",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Betöltés",
   "ui.list.empty": "Nincs eredmény",
   "ui.list.clearFilter": "Szűrő törlése",

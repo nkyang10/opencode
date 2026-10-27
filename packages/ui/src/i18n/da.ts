@@ -107,6 +107,10 @@ export const dict = {
   "ui.messagePart.option.typeOwnAnswer": "Skriv dit eget svar",
   "ui.messagePart.review.title": "Gennemgå dine svar",
 
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Indlæser",
   "ui.list.empty": "Ingen resultater",
   "ui.list.clearFilter": "Ryd filter",

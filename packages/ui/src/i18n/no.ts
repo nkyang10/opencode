@@ -88,6 +88,10 @@ export const dict: Record<Keys, string> = {
   "ui.messagePart.option.typeOwnAnswer": "Skriv ditt eget svar",
   "ui.messagePart.review.title": "Gjennomgå svarene dine",
 
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Laster",
   "ui.list.empty": "Ingen resultater",
   "ui.list.clearFilter": "Tøm filter",

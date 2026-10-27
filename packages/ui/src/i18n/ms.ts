@@ -102,6 +102,11 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.search.other": "{{count}} carian",
   "ui.messagePart.context.list.one": "{{count}} senarai",
   "ui.messagePart.context.list.other": "{{count}} senarai",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Memuatkan",
   "ui.list.empty": "Tiada hasil",
   "ui.list.clearFilter": "Kosongkan penapis",

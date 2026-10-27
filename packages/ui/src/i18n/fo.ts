@@ -102,6 +102,11 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.search.other": "{{count}} leitingar",
   "ui.messagePart.context.list.one": "{{count}} listi",
   "ui.messagePart.context.list.other": "{{count}} listar",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Innlesing",
   "ui.list.empty": "Einki úrslit",
   "ui.list.clearFilter": "Rudda filtur",

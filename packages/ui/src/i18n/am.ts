@@ -101,6 +101,11 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.search.other": "{{count}} ፍለጋዎች",
   "ui.messagePart.context.list.one": "{{count}}ዝርዝር",
   "ui.messagePart.context.list.other": "{{count}}ዝርዝሮች",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "በመጫን ላይ",
   "ui.list.empty": "ምንም ውጤቶች",
   "ui.list.clearFilter": "ማጣሪያን አጽዳ",

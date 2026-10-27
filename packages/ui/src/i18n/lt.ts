@@ -110,6 +110,11 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.list.other": "{{count}} sąrašai",
   "ui.messagePart.context.list.few": "{{count}} sąrašai",
   "ui.messagePart.context.list.many": "{{count}} sąrašo",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Įkeliama",
   "ui.list.empty": "Jokių rezultatų",
   "ui.list.clearFilter": "Išvalyti filtrą",

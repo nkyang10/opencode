@@ -125,6 +125,10 @@ export const dict = {
   "ui.messagePart.option.typeOwnAnswer": "اكتب إجابتك الخاصة",
   "ui.messagePart.review.title": "مراجعة إجاباتك",
 
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "جارٍ التحميل",
   "ui.list.empty": "لا توجد نتائج",
   "ui.list.clearFilter": "مسح عامل التصفية",

@@ -117,6 +117,10 @@ export const dict = {
   "ui.messagePart.option.typeOwnAnswer": "Unesi svoj odgovor",
   "ui.messagePart.review.title": "Pregledaj svoje odgovore",
 
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Učitavanje",
   "ui.list.empty": "Nema rezultata",
   "ui.list.clearFilter": "Očisti filter",

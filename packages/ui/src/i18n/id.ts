@@ -110,6 +110,10 @@ export const dict: Record<string, string> = {
   "ui.messagePart.context.list.one": "{{count}} daftar",
   "ui.messagePart.context.list.other": "{{count}} daftar",
 
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Memuat",
   "ui.list.empty": "Tidak ada hasil",
   "ui.list.clearFilter": "Hapus filter",

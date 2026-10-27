@@ -108,6 +108,10 @@ export const dict = {
   "ui.messagePart.option.typeOwnAnswer": "自分の回答を入力",
   "ui.messagePart.review.title": "回答を確認",
 
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "読み込み中",
   "ui.list.empty": "結果なし",
   "ui.list.clearFilter": "フィルターをクリア",

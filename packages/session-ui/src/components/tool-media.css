@@ -1,0 +1,67 @@
+[data-component="tool-media"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  max-width: 100%;
+  min-width: 0;
+
+  &[data-compact="true"] {
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  [data-slot="tool-media-image"] {
+    height: 96px;
+    width: auto;
+    max-width: 100%;
+    padding: 0;
+    border: 1px solid var(--border-weak-base);
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--surface-weak);
+
+    &:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+    }
+  }
+
+  &[data-compact="true"] [data-slot="tool-media-image"] {
+    height: 64px;
+  }
+
+  [data-slot="tool-media-image-content"] {
+    display: block;
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+  }
+
+  [data-slot="tool-media-chip"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    min-width: 0;
+    padding: 4px 8px;
+    border: 1px solid var(--border-weak-base);
+    border-radius: 6px;
+    background: var(--surface-weak);
+    font-size: 12px;
+    color: var(--text-weak);
+  }
+
+  [data-slot="tool-media-chip-name"] {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  [data-slot="tool-media-chip-type"] {
+    flex: none;
+  }
+}

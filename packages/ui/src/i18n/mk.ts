@@ -102,6 +102,11 @@ export const dict = {
   "ui.messagePart.context.search.other": "{{count}} пребарувања",
   "ui.messagePart.context.list.one": "{{count}} листа",
   "ui.messagePart.context.list.other": "{{count}} списоци",
+
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "Се вчитува",
   "ui.list.empty": "Нема резултати",
   "ui.list.clearFilter": "Исчистете го филтерот",

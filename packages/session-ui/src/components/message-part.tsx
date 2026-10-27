@@ -42,6 +42,7 @@ import { Collapsible } from "@opencode-ai/ui/collapsible"
 import { FileIcon } from "@opencode-ai/ui/file-icon"
 import { Icon } from "@opencode-ai/ui/icon"
 import { ToolErrorCard } from "./tool-error-card"
+import { ToolMedia } from "./tool-media-view"
 import { Checkbox } from "@opencode-ai/ui/checkbox"
 import { DiffChanges } from "@opencode-ai/ui/diff-changes"
 import { Markdown } from "./markdown"
@@ -1141,6 +1142,9 @@ export function ContextToolGroup(props: {
                       </div>
                     </div>
                   </div>
+                  <Show when={partAccessor().state.status === "completed"}>
+                    <ToolMedia part={partAccessor()} compact />
+                  </Show>
                 </div>
               )
             }}
@@ -1626,6 +1630,9 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
               virtualizeDiff={props.virtualizeDiff}
               onContentRendered={props.onContentRendered}
             />
+            <Show when={part().state.status === "completed"}>
+              <ToolMedia part={part()} />
+            </Show>
           </Match>
         </Switch>
       </div>

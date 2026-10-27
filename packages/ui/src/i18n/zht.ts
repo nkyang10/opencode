@@ -113,6 +113,10 @@ export const dict = {
   "ui.messagePart.option.typeOwnAnswer": "輸入自己的答案",
   "ui.messagePart.review.title": "檢閱你的答案",
 
+  "ui.toolMedia.openImage": "Open image: {{name}}",
+  "ui.toolMedia.image": "Image",
+  "ui.toolMedia.file": "File",
+
   "ui.list.loading": "載入中",
   "ui.list.empty": "無結果",
   "ui.list.clearFilter": "清除篩選",
