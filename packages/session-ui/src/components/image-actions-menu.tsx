@@ -121,7 +121,7 @@ function saveImage(item: ImageViewerItem) {
   link.href = item.src
   link.download = imageFileName(item)
   link.rel = "noopener"
-  document.body.append(link)
+  document.body.appendChild(link)
   link.click()
   link.remove()
 }
