@@ -140,6 +140,60 @@ describe("v2 session reducer", () => {
     })
   })
 
+  test("maps structured tool success metadata", () => {
+    const reducer = createV2SessionReducer()
+    let messages: SessionMessageInfo[] = []
+    const apply = (input: object) => {
+      const result = reducer.reduce(messages, event(input))
+      if (result) messages = result.messages
+    }
+
+    apply({
+      ...base,
+      id: "evt_step",
+      type: "session.step.started",
+      data: {
+        sessionID: "ses_1",
+        assistantMessageID: "msg_assistant",
+        agent: "build",
+        model: { id: "model", providerID: "provider" },
+      },
+    })
+    apply({
+      ...base,
+      id: "evt_tool_start",
+      type: "session.tool.input.started",
+      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", callID: "call_1", name: "show_image" },
+    })
+    apply({
+      ...base,
+      id: "evt_tool_called",
+      type: "session.tool.called",
+      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", callID: "call_1", input: {}, executed: false },
+    })
+    apply({
+      ...base,
+      id: "evt_tool_success",
+      type: "session.tool.success",
+      data: {
+        sessionID: "ses_1",
+        assistantMessageID: "msg_assistant",
+        callID: "call_1",
+        structured: { shown: true },
+        content: [
+          { type: "text", text: "Shown to the user: shot.png" },
+          { type: "file", uri: "data:image/png;base64,Zm9v", mime: "image/png", name: "shot.png" },
+        ],
+        executed: false,
+      },
+    })
+
+    expect(messages[0]).toMatchObject({
+      type: "assistant",
+      content: [{ type: "tool", id: "call_1", state: { status: "completed", metadata: { shown: true } } }],
+    })
+  })
+
   test("requests hydration when promotion admission was missed", () => {
     const result = createV2SessionReducer().reduce(
       [],

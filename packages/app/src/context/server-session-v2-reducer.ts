@@ -1,4 +1,4 @@
-import type { OpenCodeEvent, SessionMessageInfo, SessionPendingMessage } from "@opencode-ai/client/promise"
+import type { JsonValue, OpenCodeEvent, SessionMessageInfo, SessionPendingMessage } from "@opencode-ai/client/promise"
 
 type Assistant = Extract<SessionMessageInfo, { type: "assistant" }>
 type Compaction = Extract<SessionMessageInfo, { type: "compaction" }>
@@ -278,8 +278,7 @@ export function createV2SessionReducer() {
           tool.state.status === "running"
             ? {
                 ...tool,
-                // state: { ...tool.state, structured: event.data.structured, content: event.data.content },
-                state: { ...tool.state, metadata: event.data.metadata },
+                state: { ...tool.state, metadata: toolMetadata(event.data) },
               }
             : tool,
         )
@@ -293,10 +292,8 @@ export function createV2SessionReducer() {
             state: {
               status: "completed",
               input: tool.state.input,
-              // structured: event.data.structured,
-              metadata: event.data.metadata,
+              metadata: toolMetadata(event.data),
               content: event.data.content,
-              // result: event.data.result,
             },
             time: { ...tool.time, completed: event.created },
           }
@@ -311,11 +308,9 @@ export function createV2SessionReducer() {
             state: {
               status: "error",
               input: typeof tool.state.input === "string" ? {} : tool.state.input,
-              // structured: tool.state.status === "running" ? tool.state.structured : {},
-              metadata: event.data.metadata ?? (tool.state.status === "running" ? tool.state.metadata : {}),
+              metadata: toolMetadata(event.data, tool.state.status === "running" ? tool.state.metadata : {}),
               content: event.data.content,
               error: event.data.error,
-              // result: event.data.result,
             },
             time: { ...tool.time, completed: event.created },
           }
@@ -418,6 +413,19 @@ export function createV2SessionReducer() {
 
 function key(sessionID: string, inputID: string) {
   return `${sessionID}:${inputID}`
+}
+
+function record(value: unknown): value is Record<string, JsonValue> {
+  return !!value && typeof value === "object" && !Array.isArray(value)
+}
+
+function toolMetadata(
+  value: { metadata?: unknown },
+  fallback: Record<string, JsonValue> = {},
+): Record<string, JsonValue> {
+  const structured = (value as { structured?: unknown }).structured
+  const metadata = value.metadata ?? structured
+  return record(metadata) ? metadata : fallback
 }
 
 function messageID(eventID: string) {

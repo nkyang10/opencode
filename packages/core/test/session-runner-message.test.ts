@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import { Message, Model } from "@opencode-ai/llm"
 import * as OpenAIChat from "@opencode-ai/llm/protocols/openai-chat"
+import * as OpenAICompatibleChat from "@opencode-ai/llm/protocols/openai-compatible-chat"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { SessionMessage } from "@opencode-ai/core/session/message"
 import { AgentAttachment, FileAttachment } from "@opencode-ai/core/session/prompt"
-import { toLLMMessages } from "@opencode-ai/core/session/runner/to-llm-message"
+import { SHOWN_IMAGE_TEXT_ONLY_NOTE, toLLMMessages } from "@opencode-ai/core/session/runner/to-llm-message"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { DateTime } from "effect"
 
@@ -14,6 +15,40 @@ const id = (value: string) => SessionMessage.ID.make(`msg_${value}`)
 const model = Model.make({ id: "model", provider: "provider", route: OpenAIChat.route })
 
 describe("toLLMMessages", () => {
+  const showImage = (shown: boolean) =>
+    SessionMessage.Assistant.make({
+      id: id("show-image"),
+      type: "assistant",
+      agent: "build",
+      model: { id: ModelV2.ID.make("model"), providerID: ProviderV2.ID.make("provider") },
+      content: [
+        SessionMessage.AssistantTool.make({
+          type: "tool",
+          id: "show-image",
+          name: "show_image",
+          state: SessionMessage.ToolStateCompleted.make({
+            status: "completed",
+            input: { path: "/tmp/shot.png" },
+            content: [
+              { type: "text", text: "Shown to the user: shot.png" },
+              {
+                type: "file",
+                uri: "data:image/png;base64,Zm9v",
+                mime: "image/png",
+                name: "shot.png",
+              },
+            ],
+            structured: shown ? { shown: true } : {},
+          }),
+          time: { created, completed: created },
+        }),
+      ],
+      time: { created, completed: created },
+    })
+
+  const showImageMessages = (shown: boolean, capabilities?: ModelV2.Capabilities, route = OpenAIChat.route) =>
+    toLLMMessages([showImage(shown)], Model.make({ id: "model", provider: "provider", route }), capabilities)
+
   test("omits empty assistant turns", () => {
     const assistant = (value: string, content: SessionMessage.Assistant["content"]) =>
       SessionMessage.Assistant.make({
@@ -497,5 +532,97 @@ Recent work
         providerMetadata: undefined,
       },
     ])
+  })
+
+  test("keeps shown image media for vision capabilities", () => {
+    const messages = showImageMessages(true, { tools: true, input: ["text", "image"], output: ["text"] })
+
+    expect(messages[1]?.content).toEqual([
+      {
+        type: "tool-result",
+        id: "show-image",
+        name: "show_image",
+        result: {
+          type: "content",
+          value: [
+            { type: "text", text: "Shown to the user: shot.png" },
+            { type: "file", uri: "data:image/png;base64,Zm9v", mime: "image/png", name: "shot.png" },
+          ],
+        },
+      },
+    ])
+    expect(JSON.stringify(messages[1])).not.toContain(SHOWN_IMAGE_TEXT_ONLY_NOTE)
+  })
+
+  test("drops shown image media and notes text-only capabilities", () => {
+    const messages = showImageMessages(true, { tools: true, input: ["text"], output: ["text"] })
+
+    expect(messages[1]?.content).toEqual([
+      {
+        type: "tool-result",
+        id: "show-image",
+        name: "show_image",
+        result: { type: "text", value: `Shown to the user: shot.png\n\n${SHOWN_IMAGE_TEXT_ONLY_NOTE}` },
+      },
+    ])
+    expect(JSON.stringify(messages[1])).not.toContain('"file"')
+  })
+
+  test("keeps non-shown image media for text-only capabilities", () => {
+    const messages = showImageMessages(false, { tools: true, input: ["text"], output: ["text"] })
+
+    expect(messages[1]?.content).toEqual([
+      {
+        type: "tool-result",
+        id: "show-image",
+        name: "show_image",
+        result: {
+          type: "content",
+          value: [
+            { type: "text", text: "Shown to the user: shot.png" },
+            { type: "file", uri: "data:image/png;base64,Zm9v", mime: "image/png", name: "shot.png" },
+          ],
+        },
+      },
+    ])
+    expect(JSON.stringify(messages[1])).not.toContain(SHOWN_IMAGE_TEXT_ONLY_NOTE)
+  })
+
+  test("keeps shown image media when capabilities are unknown", () => {
+    const messages = showImageMessages(true)
+
+    expect(messages[1]?.content).toEqual([
+      {
+        type: "tool-result",
+        id: "show-image",
+        name: "show_image",
+        result: {
+          type: "content",
+          value: [
+            { type: "text", text: "Shown to the user: shot.png" },
+            { type: "file", uri: "data:image/png;base64,Zm9v", mime: "image/png", name: "shot.png" },
+          ],
+        },
+      },
+    ])
+    expect(JSON.stringify(messages[1])).not.toContain(SHOWN_IMAGE_TEXT_ONLY_NOTE)
+  })
+
+  test("gates shown image media for OpenAI-compatible text-only capabilities", () => {
+    const messages = showImageMessages(
+      true,
+      { tools: true, input: ["text"], output: ["text"] },
+      OpenAICompatibleChat.route,
+    )
+
+    expect(messages[1]?.content).toEqual([
+      {
+        type: "tool-result",
+        id: "show-image",
+        name: "show_image",
+        result: { type: "text", value: `Shown to the user: shot.png\n\n${SHOWN_IMAGE_TEXT_ONLY_NOTE}` },
+      },
+    ])
+    expect(JSON.stringify(messages[1])).not.toContain('"file"')
   })
 })

@@ -153,6 +153,47 @@ describe("normalizeSessionMessages", () => {
     ])
   })
 
+  test("maps v2 structured tool metadata into the legacy state", () => {
+    const source = [
+      { id: "msg_user", type: "user", text: "show the image", time: { created: 1 } },
+      {
+        id: "msg_assistant",
+        type: "assistant",
+        agent: "build",
+        model: { id: "model", providerID: "provider" },
+        content: [
+          {
+            type: "tool",
+            id: "call_show",
+            name: "show_image",
+            state: {
+              status: "completed",
+              input: { path: "/tmp/shot.png" },
+              structured: { shown: true, path: "/tmp/shot.png" },
+              content: [
+                { type: "text", text: "Shown to the user: shot.png" },
+                { type: "file", uri: "data:image/png;base64,Zm9v", mime: "image/png", name: "shot.png" },
+              ],
+            },
+            time: { created: 2, ran: 3, completed: 4 },
+          },
+        ],
+        time: { created: 2, completed: 4 },
+      },
+    ] as SessionMessageInfo[]
+
+    const result = normalizeSessionMessages("ses_1", source)
+
+    expect(result.parts.get("msg_assistant")?.[0]).toMatchObject({
+      type: "tool",
+      tool: "show_image",
+      state: {
+        status: "completed",
+        metadata: { shown: true, path: "/tmp/shot.png" },
+      },
+    })
+  })
+
   test("adapts current edit fields for the legacy edit renderer", () => {
     const source = [
       { id: "msg_user", type: "user", text: "edit it", time: { created: 1 } },

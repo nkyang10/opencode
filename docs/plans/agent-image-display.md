@@ -486,3 +486,21 @@ Definition of done for every milestone:
   384.9ms / 4860.2ms / 16.7ms p95; image history 395.7ms / 5080.5ms / 16.7ms p95; no long tasks, no row/markdown
   replacement, zero 33/50ms gaps. M2 single observations were 392.3 / 4909.1 / 16.8 and 371.2 / 4934.7 / 16.8.
   Commit: `feat(opencode): add show_image tool for user-visible images`.
+- M4: `show_image` in the core runtime and image capability gating implemented. `packages/core/src/tool/show-image.ts`
+  and `show-image.txt` mirror the legacy contract with `LocationMutation`/`FSUtil` path resolution, external-directory
+  then `read` asks, missing/directory/format/20 MB rejection hints, `Image.Service` normalization with explicit
+  decode/size failures and `ResizerUnavailableError` fallback, final `{ path, name, mime, width, height, bytes,
+  caption?, resizedFrom?, shown: true, truncated: false }`, and a text + image `file` content result. It is registered
+  in `builtins.ts` through `Tool.withPermission(..., "read")`, so a wholly denied `read` hides it. The tool uses
+  `LocationMutation` and `FSUtil` directly rather than `ReadToolFileSystem` because the reader maps unsupported formats
+  to `BinaryFileError` instead of the requested conversion hints. `SessionRunnerModel` gained an optional
+  `capabilities` method (with a shared catalog selection helper and optional `layerWith` seam); the runner resolves it
+  beside the model, and `toLLMMessages(messages, model, capabilities)` drops shown `file` content and appends
+  `SHOWN_IMAGE_TEXT_ONLY_NOTE` only when capabilities are known and `input` lacks `"image"`. Unknown capabilities,
+  vision models and non-shown images keep media. The app now reads `metadata ?? structured ?? {}` in
+  `session-message.ts` and the v2 reducer, bridging core `structured` metadata into the existing `ToolPart.state.metadata`
+  used by the shown-image card. Validation: core targeted 129/129 (show_image 15, runner conversion/model 114), core
+  typecheck; app targeted 9/9, app typecheck; full core suite 1159 pass / 16 fail, all unrelated environment checks
+  (15 `cross-spawn` tests need the absent `node` binary, 1 `ProjectCopy` git-worktree force assertion in an untouched
+  file). No benchmark or Playwright run: M4 changes no timeline/UI rendering. No merge, deploy or live-host restart
+  performed. Commit: `feat(core): add show_image tool and image capability gating`.

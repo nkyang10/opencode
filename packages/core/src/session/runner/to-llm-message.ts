@@ -7,8 +7,12 @@ import {
   type Model,
   type ProviderMetadata,
 } from "@opencode-ai/llm"
+import { ModelV2 } from "../../model"
 import { SessionMessage } from "../message"
 import type { FileAttachment } from "../prompt"
+
+export const SHOWN_IMAGE_TEXT_ONLY_NOTE =
+  "The image was shown to the user; the current model cannot view images, so do not describe it."
 
 const media = (file: FileAttachment): ContentPart => ({
   type: "media",
@@ -36,14 +40,40 @@ const toolCall = (tool: SessionMessage.AssistantTool, providerMetadata: Provider
     providerMetadata,
   })
 
-const toolResult = (tool: SessionMessage.AssistantTool, providerMetadata: ProviderMetadata | undefined) => {
+const textOnly = (capabilities: ModelV2.Capabilities | undefined) =>
+  capabilities !== undefined && !capabilities.input.includes("image")
+
+const shownToolContent = (
+  content: SessionMessage.ToolStateCompleted["content"],
+  capabilities: ModelV2.Capabilities | undefined,
+) => {
+  if (!textOnly(capabilities)) return content
+  const kept = content.filter((item) => item.type !== "file")
+  const text = kept.findLastIndex((item) => item.type === "text")
+  if (text === -1) return [...kept, { type: "text" as const, text: SHOWN_IMAGE_TEXT_ONLY_NOTE }]
+  return kept.map((item, index) =>
+    index === text && item.type === "text" ? { ...item, text: `${item.text}\n\n${SHOWN_IMAGE_TEXT_ONLY_NOTE}` } : item,
+  )
+}
+
+const toolResult = (
+  tool: SessionMessage.AssistantTool,
+  providerMetadata: ProviderMetadata | undefined,
+  capabilities: ModelV2.Capabilities | undefined,
+) => {
   if (tool.state.status === "completed") {
     // TODO: Materialize remote and managed URIs before provider-history lowering.
     // ToolOutput.toResultValue rejects unresolved URIs rather than treating them as media bytes.
     const result =
       tool.provider?.executed === true && tool.state.result !== undefined
         ? tool.state.result
-        : ToolOutput.toResultValue({ structured: tool.state.structured, content: tool.state.content })
+        : ToolOutput.toResultValue({
+            structured: tool.state.structured,
+            content:
+              tool.state.structured.shown === true
+                ? shownToolContent(tool.state.content, capabilities)
+                : tool.state.content,
+          })
     return ToolResultPart.make({
       id: tool.id,
       name: tool.name,
@@ -67,7 +97,7 @@ const toolResult = (tool: SessionMessage.AssistantTool, providerMetadata: Provid
   }
 }
 
-const assistant = (message: SessionMessage.Assistant, model: Model) => {
+const assistant = (message: SessionMessage.Assistant, model: Model, capabilities: ModelV2.Capabilities | undefined) => {
   const sameModel =
     String(message.model.providerID) === String(model.provider) && String(message.model.id) === String(model.id)
   const reuseProviderMetadata = sameModel && message.error === undefined
@@ -90,6 +120,7 @@ const assistant = (message: SessionMessage.Assistant, model: Model) => {
     const result = toolResult(
       item,
       reuseProviderMetadata ? (item.provider.resultMetadata ?? item.provider.metadata) : undefined,
+      capabilities,
     )
     return result ? [call, result] : [call]
   })
@@ -101,7 +132,11 @@ const assistant = (message: SessionMessage.Assistant, model: Model) => {
   const results = message.content
     .filter((item): item is SessionMessage.AssistantTool => item.type === "tool" && item.provider?.executed !== true)
     .map((item) =>
-      toolResult(item, reuseProviderMetadata ? (item.provider?.resultMetadata ?? item.provider?.metadata) : undefined),
+      toolResult(
+        item,
+        reuseProviderMetadata ? (item.provider?.resultMetadata ?? item.provider?.metadata) : undefined,
+        capabilities,
+      ),
     )
     .filter((message) => message !== undefined)
     .map(Message.tool)
@@ -112,7 +147,11 @@ const assistant = (message: SessionMessage.Assistant, model: Model) => {
   ]
 }
 
-function toLLMMessage(message: SessionMessage.Message, model: Model): Message[] {
+function toLLMMessage(
+  message: SessionMessage.Message,
+  model: Model,
+  capabilities: ModelV2.Capabilities | undefined,
+): Message[] {
   switch (message.type) {
     case "agent-switched":
     case "model-switched":
@@ -143,7 +182,7 @@ function toLLMMessage(message: SessionMessage.Message, model: Model): Message[] 
         }),
       ]
     case "assistant":
-      return assistant(message, model)
+      return assistant(message, model, capabilities)
     case "compaction":
       return [
         Message.make({
@@ -167,5 +206,8 @@ ${message.recent}
 }
 
 /** Translate projected V2 Session history into canonical @opencode-ai/llm context. */
-export const toLLMMessages = (messages: readonly SessionMessage.Message[], model: Model) =>
-  messages.flatMap((message) => toLLMMessage(message, model))
+export const toLLMMessages = (
+  messages: readonly SessionMessage.Message[],
+  model: Model,
+  capabilities?: ModelV2.Capabilities,
+) => messages.flatMap((message) => toLLMMessage(message, model, capabilities))
