@@ -292,6 +292,15 @@ function readCompactionPart(sessionID: SessionID) {
     )
 }
 
+function pngDataUrl(width: number, height: number) {
+  const bytes = Buffer.alloc(24)
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0)
+  bytes.write("IHDR", 12)
+  bytes.writeUInt32BE(width, 16)
+  bytes.writeUInt32BE(height, 20)
+  return `data:image/png;base64,${bytes.toString("base64")}`
+}
+
 function llm() {
   const queue: Array<
     Stream.Stream<LLMEvent, unknown> | ((input: LLM.StreamInput) => Stream.Stream<LLMEvent, unknown>)
@@ -807,6 +816,64 @@ describe("session.compaction.prune", () => {
           expect(part.state.time.compacted).toBeUndefined()
         }
       }),
+    ),
+  )
+
+  it.live(
+    "compacts old completed tool output when image attachments dominate the estimate",
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          const compact = yield* SessionCompaction.Service
+          const ssn = yield* SessionNs.Service
+          const info = yield* ssn.create({})
+          const a = yield* createUserMessage(info.id, "first")
+          const b = yield* createAssistantMessage(info.id, a.id, dir)
+          yield* ssn.updatePart({
+            id: PartID.ascending(),
+            messageID: b.id,
+            sessionID: info.id,
+            type: "tool",
+            callID: crypto.randomUUID(),
+            tool: "bash",
+            state: {
+              status: "completed",
+              input: {},
+              output: "short",
+              title: "done",
+              metadata: {},
+              time: { start: Date.now(), end: Date.now() },
+              attachments: [
+                {
+                  id: PartID.ascending(),
+                  messageID: b.id,
+                  sessionID: info.id,
+                  type: "file",
+                  mime: "image/png",
+                  filename: "shot.png",
+                  url: pngDataUrl(10_000, 10_000),
+                },
+              ],
+            },
+          })
+          yield* createUserMessage(info.id, "second")
+          yield* createUserMessage(info.id, "third")
+
+          yield* compact.prune({ sessionID: info.id })
+
+          const msgs = yield* ssn.messages({ sessionID: info.id })
+          const part = msgs.flatMap((msg) => msg.parts).find((part) => part.type === "tool")
+          expect(part?.type).toBe("tool")
+          expect(part?.state.status).toBe("completed")
+          if (part?.type === "tool" && part.state.status === "completed") {
+            expect(part.state.time.compacted).toBeNumber()
+          }
+        }),
+      {
+        config: {
+          compaction: { prune: true },
+        },
+      },
     ),
   )
 })
@@ -1675,6 +1742,14 @@ describe("util.token.estimate", () => {
 
   test("returns 0 for empty string", () => {
     expect(Token.estimate("")).toBe(0)
+  })
+
+  test("estimates image tokens from pixel dimensions", () => {
+    expect(Token.estimateImage({ width: 1500, height: 1000 })).toBe(2000)
+  })
+
+  test("uses one image token as the minimum", () => {
+    expect(Token.estimateImage({ width: 1, height: 1 })).toBe(1)
   })
 })
 

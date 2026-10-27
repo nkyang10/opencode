@@ -570,3 +570,11 @@ Definition of done for every milestone:
   the unchanged environment baseline (15 cross-spawn tests plus one worktree assertion require the absent `node` binary).
   The real GNOME, KDE Plasma, Sway, and Hyprland matrices were not performed because this Linux host has no Wayland
   compositor, `grim`, `swaymsg`, or `hyprctl`. Commit: `feat: add Wayland screenshot backends`.
+- M10 item 1: prune estimates include images. `Token.estimateImage` estimates image attachments as
+  `ceil(width * height / 750)` with a one-token floor, and `SessionCompaction.prune` now estimates completed tool
+  attachments from PNG/JPEG/GIF/WebP dimensions in the leading bytes of base64 `data:` URLs. If dimensions cannot be
+  parsed, the attachment URL is estimated by length instead so image data is not counted as zero. SVG attachments remain
+  excluded from image-token estimation. The ambient `*.jxa` declaration is referenced from `macos.ts` so
+  `packages/opencode` typechecks include it when it resolves the core source. Validation: opencode targeted
+  58 pass / 1 skip in `test/session/compaction.test.ts` and core targeted 71/71 across screenshot/detect/tool/agent
+  location tests; core and opencode typechecks pass. Commit: `fix: include image tokens in prune estimates`.

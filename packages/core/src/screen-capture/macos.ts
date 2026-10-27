@@ -1,3 +1,5 @@
+/// <reference path="../script.d.ts" />
+
 export * as ScreenCaptureMacos from "./macos"
 
 import { readFile, stat, unlink } from "node:fs/promises"

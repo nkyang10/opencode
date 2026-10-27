@@ -6,6 +6,7 @@ import { SessionID, MessageID, PartID } from "./schema"
 import { Provider } from "@/provider/provider"
 import { MessageV2 } from "./message-v2"
 import { Token } from "@/util/token"
+import { imageDimensions } from "@opencode-ai/core/image/dimensions"
 import { SessionProcessor } from "./processor"
 import { Agent } from "@/agent/agent"
 import { Plugin } from "@/plugin"
@@ -50,6 +51,33 @@ type CompletedCompaction = {
 
 const truncate = (value: string) =>
   value.length <= TOOL_OUTPUT_MAX_CHARS ? value : `${value.slice(0, TOOL_OUTPUT_MAX_CHARS)}\n[truncated]`
+
+const IMAGE_SCAN_CHARS = 64 * 1024
+const IMAGE_BASE64_MARKER = ";base64,"
+
+function prunePartEstimate(part: SessionV1.ToolPart) {
+  if (part.state.status !== "completed") return 0
+  return (
+    Token.estimate(part.state.output) +
+    (part.state.attachments ?? []).reduce((total, attachment) => total + attachmentEstimate(attachment), 0)
+  )
+}
+
+function attachmentEstimate(attachment: SessionV1.FilePart) {
+  if (!attachment.mime.startsWith("image/") || attachment.mime === "image/svg+xml") return 0
+  const dimensions = dimensionsFromDataUrl(attachment.url)
+  return dimensions ? Token.estimateImage(dimensions) : Token.estimate(attachment.url)
+}
+
+function dimensionsFromDataUrl(url: string) {
+  if (!url.startsWith("data:")) return undefined
+  const marker = url.indexOf(IMAGE_BASE64_MARKER)
+  if (marker < 0) return undefined
+  const offset = marker + IMAGE_BASE64_MARKER.length
+  const body = url.slice(offset, Math.min(offset + IMAGE_SCAN_CHARS, url.length))
+  const bytes = Buffer.from(body.slice(0, body.length - (body.length % 4)), "base64")
+  return imageDimensions(new Uint8Array(bytes))
+}
 
 const serialize = (message: SessionV1.WithParts) => {
   if (message.info.role === "user") {
@@ -296,7 +324,7 @@ const layer = Layer.effect(
           if (part.state.status !== "completed") continue
           if (PRUNE_PROTECTED_TOOLS.includes(part.tool)) continue
           if (part.state.time.compacted) break loop
-          const estimate = Token.estimate(part.state.output)
+          const estimate = prunePartEstimate(part)
           total += estimate
           if (total <= PRUNE_PROTECT) continue
           pruned += estimate
