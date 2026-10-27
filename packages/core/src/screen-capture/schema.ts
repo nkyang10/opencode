@@ -178,7 +178,7 @@ export const CaptureResult = Schema.Struct({
   window: Schema.optional(CaptureWindow),
   restored: Schema.Boolean,
   focusChanged: Schema.Boolean,
-  backend: Schema.Literals(["x11", "windows", "wsl"]),
+  backend: Schema.Literals(["x11", "windows", "wsl", "macos"]),
   platform: Schema.Literals(["linux", "darwin", "win32", "unknown"]),
   others: Schema.optional(Schema.Array(Schema.String)),
 })
@@ -203,5 +203,12 @@ export const WindowsBackend = Schema.Struct({
 })
 export type WindowsBackend = typeof WindowsBackend.Type
 
-export const Backend = Schema.Union([X11Backend, WindowsBackend])
+export const MacOSBackend = Schema.Struct({
+  kind: Schema.Literal("macos"),
+  osascript: Schema.String,
+  screencapture: Schema.String,
+})
+export type MacOSBackend = typeof MacOSBackend.Type
+
+export const Backend = Schema.Union([X11Backend, WindowsBackend, MacOSBackend])
 export type Backend = typeof Backend.Type

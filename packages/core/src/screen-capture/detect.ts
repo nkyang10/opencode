@@ -1,7 +1,7 @@
 export * as ScreenCaptureDetect from "./detect"
 
 import { Option } from "effect"
-import type { Backend, WindowsBackend, X11Backend } from "./schema"
+import type { Backend, MacOSBackend, WindowsBackend, X11Backend } from "./schema"
 import { which } from "../util/which"
 
 export function detectX11(env: NodeJS.ProcessEnv = process.env, lookup: typeof which = which): Option.Option<X11Backend> {
@@ -55,11 +55,22 @@ export function detectWsl(
   return Option.some({ kind: "windows", transport: "wsl", program, wslpath })
 }
 
+export function detectMacOS(
+  _env: NodeJS.ProcessEnv = process.env,
+  lookup: typeof which = which,
+): Option.Option<MacOSBackend> {
+  const osascript = lookup("osascript", _env)
+  const screencapture = lookup("screencapture", _env)
+  if (!osascript || !screencapture) return Option.none()
+  return Option.some({ kind: "macos", osascript, screencapture })
+}
+
 export function detect(
   input: { x_display?: string; platform?: NodeJS.Platform; env?: NodeJS.ProcessEnv } = {},
   lookup: typeof which = which,
 ): Option.Option<Backend> {
   const platform = input.platform ?? process.platform
+  if (platform === "darwin") return detectMacOS(input.env, lookup)
   if (platform !== "linux" && platform !== "win32") return Option.none()
   const env = { ...(input.env ?? process.env), ...(input.x_display ? { DISPLAY: input.x_display } : {}) }
   const x11 = detectX11(env, lookup)

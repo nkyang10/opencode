@@ -21,6 +21,35 @@ describe("ScreenCaptureDetect", () => {
     })
   })
 
+  test("detects macOS through osascript and screencapture", () => {
+    expect(
+      Option.getOrNull(
+        ScreenCaptureDetect.detect(
+          { platform: "darwin", env: {} },
+          lookup({
+            osascript: "/usr/bin/osascript",
+            screencapture: "/usr/sbin/screencapture",
+          }),
+        ),
+      ),
+    ).toEqual({
+      kind: "macos",
+      osascript: "/usr/bin/osascript",
+      screencapture: "/usr/sbin/screencapture",
+    })
+  })
+
+  test("does not detect macOS without screencapture", () => {
+    expect(
+      Option.isNone(
+        ScreenCaptureDetect.detect(
+          { platform: "darwin", env: {} },
+          lookup({ osascript: "/usr/bin/osascript" }),
+        ),
+      ),
+    ).toBe(true)
+  })
+
   test("prefers WSL PowerShell over an available X11 display", () => {
     expect(
       Option.getOrNull(

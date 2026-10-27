@@ -4,6 +4,7 @@ import { Context, Duration, Effect, Layer, Option, Semaphore } from "effect"
 import { makeGlobalNode } from "../effect/app-node"
 import { AppProcess } from "../process"
 import { ScreenCaptureDetect } from "./detect"
+import { ScreenCaptureMacos } from "./macos"
 import { CaptureError, type CaptureResult, type Input, type ListResult } from "./schema"
 import { ScreenCaptureWindows } from "./windows"
 import { ScreenCaptureWsl } from "./wsl"
@@ -24,7 +25,7 @@ const layer = Layer.effect(
     const mutex = Semaphore.makeUnsafe(1)
 
     const backend = Effect.fn("ScreenCapture.backend")(function* (input: Pick<Input, "x_display">) {
-      if (process.platform !== "linux" && process.platform !== "win32")
+      if (process.platform !== "linux" && process.platform !== "win32" && process.platform !== "darwin")
         return yield* new CaptureError({
           code: "unsupported",
           reason: `screenshot capture is not implemented on ${process.platform} yet`,
@@ -45,7 +46,9 @@ const layer = Layer.effect(
           ? ScreenCaptureWsl.list(app, selected)
           : selected.kind === "windows"
             ? ScreenCaptureWindows.list(app, selected)
-            : ScreenCaptureX11.list(app, selected, selected.display),
+            : selected.kind === "macos"
+              ? ScreenCaptureMacos.list(app, selected)
+              : ScreenCaptureX11.list(app, selected, selected.display),
       )
     })
 
@@ -57,7 +60,9 @@ const layer = Layer.effect(
           ? ScreenCaptureWsl.capture(app, selected, input)
           : selected.kind === "windows"
             ? ScreenCaptureWindows.capture(app, selected, input)
-            : ScreenCaptureX11.capture(app, selected, selected.display, input),
+            : selected.kind === "macos"
+              ? ScreenCaptureMacos.capture(app, selected, input)
+              : ScreenCaptureX11.capture(app, selected, selected.display, input),
       )
     })
 
@@ -66,6 +71,11 @@ const layer = Layer.effect(
 )
 
 function noBackend(input: Pick<Input, "x_display">): CaptureError {
+  if (process.platform === "darwin")
+    return new CaptureError({
+      code: "missing_dependency",
+      reason: "macOS screenshot capture requires osascript and screencapture.",
+    })
   if (process.platform === "win32")
     return new CaptureError({
       code: "missing_dependency",

@@ -304,8 +304,8 @@ Body:
 
 ### M8: macOS backend
 
-- Files: `packages/core/src/screen-capture/macos.ts` and `macos.js`.
-- Tests: unit tests for parsing and error mapping; the manual matrix with Screen Recording and Accessibility on and off.
+- Files: `packages/core/src/screen-capture/macos.ts` and `macos.jxa`; `packages/core/src/script.d.ts` declares the JXA helper as a text module.
+- Tests: unit tests for command assembly, JXA payload construction, list parsing, window selection, minimized restore and re-minimize cleanup, and error mapping; the manual matrix with Screen Recording and Accessibility on and off.
 - Commit: `feat: add macOS screenshot backend`.
 
 ### M9: Wayland backends
@@ -542,3 +542,16 @@ Definition of done for every milestone:
   15 cross-spawn tests plus one worktree assertion require the absent `node` binary. The manual Windows 10/11 and WSL 2
   matrices, and therefore PowerShell 5.1 runtime behavior, were not performed because this Linux host has no
   `powershell.exe`. Commit: `feat: add Windows screenshot backend`.
+- M8: macOS screenshot backend implemented. `Backend` is now the `X11Backend | WindowsBackend | MacOSBackend` union, and
+  `darwin` detection requires both `osascript` and `screencapture`. The backend runs JXA through
+  `osascript -l JavaScript -e <loader>` with a JSON stdin payload containing the base64-encoded `macos.jxa` source, and
+  uses `NSScreen`, `CGWindowListCopyWindowInfo`, and `screencapture` for list, screen, and window capture. Screens use
+  `-D` for numbered displays and `-R` for the union bounds of all displays; windows use `-x -o -l <decimal window id>`
+  and write PNGs through a temporary file that is removed in the finalizer. Offscreen/minimized windows are captured
+  through the window server when possible, restored through Accessibility JXA only when the first PNG is blank, and
+  re-minimized in a finalizer even if the second capture fails. The JXA helper is stored as `macos.jxa` (not `macos.js`)
+  so TypeScript imports it as a text module without colliding with `macos.ts`. Validation: core targeted 58/58 (216
+  assertions across macOS, detection, Windows, X11, screenshot tool, agent, and location tools), core typecheck, and full
+  core 1216 pass / 16 fail matching the unchanged environment baseline (15 cross-spawn tests plus one worktree assertion
+  require the absent `node` binary). The real macOS Screen Recording and Accessibility matrices were not performed because
+  this Linux host has no `osascript` or `screencapture`. Commit: `feat: add macOS screenshot backend`.
