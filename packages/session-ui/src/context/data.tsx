@@ -1,6 +1,7 @@
 import type { Message, Session, Part, SnapshotFileDiff, SessionStatus, Provider } from "@opencode-ai/sdk/v2"
 import type { FileDiffInfo } from "@opencode-ai/client/promise"
 import { createSimpleContext } from "@opencode-ai/ui/context"
+import type { ShownImageAddress } from "@opencode-ai/ui/image-viewer"
 import { PreloadMultiFileDiffResult } from "@pierre/diffs/ssr"
 
 export type NormalizedProviderListResponse = {
@@ -64,6 +65,7 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
     onAttachImage?: (image: ImageSource) => void | Promise<void>
     onOpenImageInNewTab?: (image: ImageSource) => void
     onRevealPath?: (path: string) => boolean | Promise<boolean>
+    onLoadFullImage?: (address: ShownImageAddress, options?: { signal?: AbortSignal }) => Promise<ImageSource>
   }) => {
     return {
       get store() {
@@ -80,6 +82,7 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
       attachImage: props.onAttachImage,
       openImageInNewTab: props.onOpenImageInNewTab,
       revealPath: props.onRevealPath,
+      loadFullImage: props.onLoadFullImage,
     }
   },
 })

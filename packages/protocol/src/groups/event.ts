@@ -26,6 +26,13 @@ const schema = <const Definitions extends ReadonlyArray<Definition>>(definitions
         ]),
   ]).annotate({ identifier: "V2Event" })
 
+const EventSubscribeQuery = Schema.Struct({
+  imagePreviews: Schema.optional(Schema.Literal("thumbnail")).annotate({
+    description:
+      "Apply the message list thumbnail rule to streamed tool events. Omitted, events carry the full inline images.",
+  }),
+}).annotate({ identifier: "EventSubscribeQuery" })
+
 const make = <const Definitions extends ReadonlyArray<Definition>>(definitions: Definitions) => {
   const EventSchema = schema(definitions)
   return {
@@ -33,6 +40,7 @@ const make = <const Definitions extends ReadonlyArray<Definition>>(definitions: 
     group: HttpApiGroup.make("server.event")
       .add(
         HttpApiEndpoint.get("event.subscribe", "/api/event", {
+          query: EventSubscribeQuery,
           success: HttpApiSchema.StreamSse({ data: EventSchema }),
         }).annotateMerge(
           OpenApi.annotations({

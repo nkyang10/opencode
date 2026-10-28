@@ -96,6 +96,69 @@ describe("Image", () => {
     }),
   )
 
+  it.effect("attaches a bounded jpeg preview while keeping the full image", () =>
+    Effect.gen(function* () {
+      const photon = yield* Effect.promise(() => import("@silvia-odwyer/photon-node"))
+      const data = Buffer.from(
+        yield* Effect.promise(() =>
+          Bun.file(path.join(import.meta.dir, "fixtures", "picture-5mb-base64.png")).arrayBuffer(),
+        ),
+      )
+      const image = yield* Image.Service
+      const result = yield* image.normalize(part("image/png", data.toString("base64")), { preview: true })
+      const full = result.url.slice(result.url.indexOf(";base64,") + ";base64,".length)
+      const preview = result.preview
+      if (preview === undefined) throw new Error("expected a preview")
+
+      expect(preview.mime).toBe("image/jpeg")
+      expect(preview.uri.startsWith("data:image/jpeg;base64,")).toBe(true)
+      expect(preview.uri).not.toBe(result.url)
+      expect(full.length).toBeGreaterThan(96 * 1024)
+      expect(preview.bytes).toBeLessThanOrEqual(96 * 1024)
+      expect(preview.bytes).toBeLessThan(full.length)
+
+      const decoded = photon.PhotonImage.new_from_byteslice(
+        Buffer.from(preview.uri.slice(preview.uri.indexOf(";base64,") + ";base64,".length), "base64"),
+      )
+      expect(decoded.get_width()).toBe(preview.width)
+      expect(decoded.get_height()).toBe(preview.height)
+      expect(decoded.get_width()).toBeLessThanOrEqual(640)
+      expect(decoded.get_height()).toBeLessThanOrEqual(640)
+      decoded.free()
+    }),
+  )
+
+  it.effect("omits the preview unless it is requested", () =>
+    Effect.gen(function* () {
+      const data = Buffer.from(
+        yield* Effect.promise(() =>
+          Bun.file(path.join(import.meta.dir, "fixtures", "picture-5mb-base64.png")).arrayBuffer(),
+        ),
+      )
+      const image = yield* Image.Service
+
+      expect("preview" in (yield* image.normalize(part("image/png", data.toString("base64"))))).toBe(false)
+    }),
+  )
+
+  it.effect("skips the preview for images smaller than a preview would be", () =>
+    Effect.gen(function* () {
+      const photon = yield* Effect.promise(() => import("@silvia-odwyer/photon-node"))
+      const source = new photon.PhotonImage(
+        new Uint8Array(Array.from({ length: 64 * 64 * 4 }, (_, index) => (index % 4 === 3 ? 255 : index % 251))),
+        64,
+        64,
+      )
+      const image = yield* Image.Service
+      const result = yield* image.normalize(part("image/png", Buffer.from(source.get_bytes()).toString("base64")), {
+        preview: true,
+      })
+
+      source.free()
+      expect(result.preview).toBeUndefined()
+    }),
+  )
+
   tiny.effect("fails with a typed size error when no resized candidate fits", () =>
     Effect.gen(function* () {
       const photon = yield* Effect.promise(() => import("@silvia-odwyer/photon-node"))

@@ -1,5 +1,6 @@
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { InstanceState } from "@/effect/instance-state"
+import { BrowserImagePreview } from "@/server/browser-image-preview"
 import { GlobalBus } from "@/bus/global"
 import { EventV2 } from "@opencode-ai/core/event"
 import { Effect, Queue } from "effect"
@@ -7,14 +8,14 @@ import * as Stream from "effect/Stream"
 import { HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import * as Sse from "effect/unstable/encoding/Sse"
-import { EventApi } from "../groups/event"
+import { EventApi, SubscribeQuery } from "../groups/event"
 
-function eventData(data: unknown): Sse.Event {
+function eventData(data: { type: string; properties: unknown }, imagePreviews: boolean): Sse.Event {
   return {
     _tag: "Event",
     event: "message",
     id: undefined,
-    data: JSON.stringify(data),
+    data: JSON.stringify(imagePreviews ? BrowserImagePreview.previewEvent(data) : data),
   }
 }
 
@@ -22,7 +23,7 @@ function eventID() {
   return EventV2.ID.create()
 }
 
-function eventResponse(events: EventV2.Interface) {
+function eventResponse(events: EventV2.Interface, imagePreviews: boolean) {
   return Effect.gen(function* () {
     const instance = yield* InstanceState.context
     const workspaceID = yield* InstanceState.workspaceID
@@ -69,7 +70,7 @@ function eventResponse(events: EventV2.Interface) {
     return HttpServerResponse.stream(
       Stream.make({ id: eventID(), type: "server.connected", properties: {} }).pipe(
         Stream.concat(output.pipe(Stream.merge(heartbeat, { haltStrategy: "left" }))),
-        Stream.map(eventData),
+        Stream.map((event) => eventData(event, imagePreviews)),
         Stream.pipeThroughChannel(Sse.encode()),
         Stream.encodeText,
         Stream.ensuring(Effect.logInfo("event disconnected")),
@@ -91,8 +92,8 @@ export const eventHandlers = HttpApiBuilder.group(EventApi, "event", (handlers) 
     const events = yield* EventV2Bridge.Service
     return handlers.handleRaw(
       "subscribe",
-      Effect.fn("EventHttpApi.subscribe")(function* () {
-        return yield* eventResponse(events)
+      Effect.fn("EventHttpApi.subscribe")(function* (ctx: { query: typeof SubscribeQuery.Type }) {
+        return yield* eventResponse(events, ctx.query.imagePreviews === "thumbnail")
       }),
     )
   }),

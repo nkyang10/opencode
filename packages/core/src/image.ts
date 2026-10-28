@@ -32,12 +32,25 @@ export class SizeError extends Schema.TaggedErrorClass<SizeError>()("Image.SizeE
   }
 }
 
+/**
+ * A small JPEG of the same image, generated while it is already decoded. Only the browser copy uses it: the stored
+ * attachment and the model request keep the full image.
+ */
+export interface Preview {
+  readonly uri: string
+  readonly mime: string
+  readonly width: number
+  readonly height: number
+  readonly bytes: number
+}
+
 export interface Interface {
   readonly normalize: (
     resource: string,
     content: FileSystem.Content & { readonly encoding: "base64" },
+    options?: { readonly preview?: boolean },
   ) => Effect.Effect<
-    FileSystem.Content & { readonly encoding: "base64" },
+    FileSystem.Content & { readonly encoding: "base64"; readonly preview?: Preview },
     ResizerUnavailableError | DecodeError | SizeError
   >
 }
@@ -57,6 +70,7 @@ const layer = Layer.effect(
     const normalize = Effect.fn("Image.normalize")(function* (
       resource: string,
       content: FileSystem.Content & { readonly encoding: "base64" },
+      options?: { readonly preview?: boolean },
     ) {
       const image = Object.assign(
         {},
@@ -70,6 +84,7 @@ const layer = Layer.effect(
         maxWidth: image.max_width ?? 2_000,
         maxHeight: image.max_height ?? 2_000,
         maxBase64Bytes: image.max_base64_bytes ?? 5 * 1024 * 1024,
+        preview: options?.preview ?? false,
       })
     })
     return Service.of({ normalize })

@@ -4,7 +4,14 @@ import { createSimpleContext } from "@opencode-ai/ui/context"
 import { createGlobalEmitter } from "@solid-primitives/event-bus"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { type Accessor, batch, createMemo, createResource, onCleanup, onMount } from "solid-js"
-import { createApiForServer, createSdkForServer, type ServerApi } from "@/utils/server"
+import {
+  authTokenFromCredentials,
+  createApiForServer,
+  createSdkForServer,
+  fetchWithImagePreviews,
+  type ServerApi,
+} from "@/utils/server"
+import type { ShownImageAddress } from "@opencode-ai/ui/image-viewer"
 import { useLanguage } from "./language"
 import { usePlatform } from "./platform"
 import { ServerConnection, useServer } from "./server"
@@ -185,6 +192,11 @@ type ServerSDKBase = {
   createClient: (
     opts: Omit<Parameters<typeof createSdkForServer>[0], "server" | "fetch">,
   ) => ReturnType<typeof createSdkForServer>
+  loadFullImage: (
+    address: ShownImageAddress,
+    directory: string,
+    options?: { signal?: AbortSignal },
+  ) => Promise<{ src: string; mime: string }>
 }
 
 function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerScope): ServerSDKBase {
@@ -202,7 +214,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     }
   })()
 
-  const eventApi = createApiForServer({ server: server.http, fetch: eventFetch })
+  const eventApi = createApiForServer({ server: server.http, fetch: fetchWithImagePreviews(eventFetch) })
   const eventSdk = createSdkForServer({
     signal: abort.signal,
     fetch: eventFetch,
@@ -277,9 +289,12 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
         abort.signal.addEventListener("abort", onAbort)
         try {
           const kind = await protocol
+          // Both streams are asked for the small JPEG the tool attached beside a shown image; this reader can re-fetch the
+          // full frame when it opens one. The v2 client is pinned to a version whose typed input predates the query, so
+          // its request is tagged in `fetchWithImagePreviews` instead.
           const events =
             kind === "v1"
-              ? (await eventSdk.global.event({ signal: attempt.signal })).stream
+              ? (await eventSdk.global.event({ imagePreviews: "thumbnail" }, { signal: attempt.signal })).stream
               : eventApi.event.subscribe({ signal: attempt.signal })
           let yielded = Date.now()
           for await (const event of events) {
@@ -359,7 +374,10 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     fetch: platform.fetch,
     throwOnError: true,
   })
-  const currentApi: ServerApi = createApiForServer({ server: server.http, fetch: platform.fetch })
+  const currentApi: ServerApi = createApiForServer({
+    server: server.http,
+    fetch: fetchWithImagePreviews(platform.fetch),
+  })
   const legacy = (directory?: string) =>
     createSdkForServer({
       server: server.http,
@@ -389,6 +407,39 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
         fetch: platform.fetch,
         ...opts,
       })
+    },
+    /**
+     * Full frame behind a shown image the server served as a preview.
+     *
+     * The route is instance-scoped, so the caller says which directory it is reading in, and the protocol decides which
+     * server field holds the image: v2 tool results keep file items in `content`, v1 in `attachments`.
+     */
+    async loadFullImage(
+      address: ShownImageAddress,
+      directory: string,
+      options?: { signal?: AbortSignal },
+    ): Promise<{ src: string; mime: string }> {
+      const kind = await protocol
+      const ids = `session/${encodeURIComponent(address.sessionID)}/message/${encodeURIComponent(address.messageID)}/tool/${encodeURIComponent(address.callID)}/image`
+      const path = `${kind === "v1" ? "" : "/api"}/${ids}?index=${address.index}`
+      const response = await (platform.fetch ?? globalThis.fetch)(`${server.http.url}${path}`, {
+        signal: options?.signal,
+        headers: {
+          "x-opencode-directory": directory,
+          ...(server.http.password
+            ? {
+                Authorization: `Basic ${authTokenFromCredentials({
+                  username: server.http.username,
+                  password: server.http.password,
+                })}`,
+              }
+            : {}),
+        },
+      })
+      if (!response.ok) throw new Error(`Could not load the full image (HTTP ${response.status})`)
+      const body: { uri?: unknown; mime?: unknown } = await response.json()
+      if (typeof body.uri !== "string" || typeof body.mime !== "string") throw new Error("Malformed image response")
+      return { src: body.uri, mime: body.mime }
     },
   }
 }
@@ -458,6 +509,8 @@ function createDirSdkContext(directory: string, serverSDK: ServerSDKBase) {
     get url() {
       return serverSDK.url
     },
+    loadFullImage: (address: ShownImageAddress, options?: { signal?: AbortSignal }) =>
+      serverSDK.loadFullImage(address, directory, options),
     createClient(opts: Parameters<typeof serverSDK.createClient>[0]) {
       return serverSDK.createClient(opts)
     },

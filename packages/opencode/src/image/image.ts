@@ -12,6 +12,24 @@ const MAX_WIDTH = 2000
 const MAX_HEIGHT = 2000
 const AUTO_RESIZE = true
 const JPEG_QUALITIES = [80, 85, 70, 55, 40]
+const PREVIEW_MAX_EDGE = 640
+const PREVIEW_TARGET_BASE64_BYTES = 96 * 1024
+// Below this the full image is already cheaper than a preview would be.
+const PREVIEW_MIN_BASE64_BYTES = 32 * 1024
+// A resize of something this large is not the "already in memory, one small resize" the preview is budgeted for.
+const PREVIEW_MAX_SOURCE_EDGE = 8192
+
+/**
+ * A small JPEG of the same image, generated while it is already decoded. Only the browser copy uses it: the stored
+ * attachment and the model request keep the full image.
+ */
+export interface Preview {
+  readonly uri: string
+  readonly mime: string
+  readonly width: number
+  readonly height: number
+  readonly bytes: number
+}
 export class ResizerUnavailableError extends Schema.TaggedErrorClass<ResizerUnavailableError>()(
   "ImageResizerUnavailableError",
   {},
@@ -51,7 +69,10 @@ export class SizeError extends Schema.TaggedErrorClass<SizeError>()("ImageSizeEr
 export type Error = ResizerUnavailableError | InvalidDataUrlError | DecodeError | SizeError
 
 export interface Interface {
-  readonly normalize: (input: SessionV1.FilePart) => Effect.Effect<SessionV1.FilePart, Error>
+  readonly normalize: (
+    input: SessionV1.FilePart,
+    options?: { readonly preview?: boolean },
+  ) => Effect.Effect<SessionV1.FilePart & { readonly preview?: Preview }, Error>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Image") {}
@@ -72,7 +93,10 @@ const layer = Layer.effect(
       ),
     )
 
-    const normalize = Effect.fn("Image.normalize")(function* (input: SessionV1.FilePart) {
+    const normalize = Effect.fn("Image.normalize")(function* (
+      input: SessionV1.FilePart,
+      options?: { readonly preview?: boolean },
+    ) {
       const image = (yield* config.get()).attachment?.image
       const info = {
         autoResize: image?.auto_resize ?? AUTO_RESIZE,
@@ -96,8 +120,14 @@ const layer = Layer.effect(
       try {
         const originalWidth = decoded.get_width()
         const originalHeight = decoded.get_height()
+        const preview = options?.preview
+          ? yield* Effect.try({
+              try: () => buildPreview(photon, decoded, originalWidth, originalHeight, bytes),
+              catch: () => undefined,
+            }).pipe(Effect.orElseSucceed(() => undefined))
+          : undefined
         if (originalWidth <= info.maxWidth && originalHeight <= info.maxHeight && bytes <= info.maxBase64Bytes)
-          return input
+          return preview ? { ...input, preview } : input
         if (!info.autoResize)
           return yield* new SizeError({
             bytes,
@@ -146,6 +176,7 @@ const layer = Layer.effect(
               ...input,
               mime: candidate.mime,
               url: `data:${candidate.mime};base64,${candidate.data}`,
+              ...(preview ? { preview } : {}),
             }
           }
         }
@@ -166,6 +197,50 @@ const layer = Layer.effect(
     return Service.of({ normalize })
   }),
 )
+
+type Photon = Awaited<typeof import("@silvia-odwyer/photon-node")>
+type PhotonImage = ReturnType<Photon["PhotonImage"]["new_from_byteslice"]>
+
+/**
+ * One small JPEG from an image that is already decoded, so the browser does not have to carry the full frame. Returns
+ * `undefined` when a preview is not worth its cost; a preview is never worth failing a tool result over, so callers
+ * treat a throw the same way.
+ */
+function buildPreview(
+  photon: Photon,
+  decoded: PhotonImage,
+  width: number,
+  height: number,
+  base64Bytes: number,
+): Preview | undefined {
+  if (base64Bytes < PREVIEW_MIN_BASE64_BYTES) return undefined
+  if (Math.max(width, height) > PREVIEW_MAX_SOURCE_EDGE) return undefined
+  const scale = Math.min(1, PREVIEW_MAX_EDGE / Math.max(width, height))
+  const size = {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  }
+  const resized = photon.resize(decoded, size.width, size.height, photon.SamplingFilter.Lanczos3)
+  try {
+    let smallest: Preview | undefined
+    for (const quality of JPEG_QUALITIES) {
+      const data = Buffer.from(resized.get_bytes_jpeg(quality)).toString("base64")
+      const candidate: Preview = {
+        uri: `data:image/jpeg;base64,${data}`,
+        mime: "image/jpeg",
+        width: size.width,
+        height: size.height,
+        bytes: Buffer.byteLength(data, "utf-8"),
+      }
+      if (candidate.bytes <= PREVIEW_TARGET_BASE64_BYTES) return candidate
+      smallest = candidate
+    }
+    // Even the lowest quality is over budget, and the smallest frame still beats sending the full image.
+    return smallest
+  } finally {
+    resized.free()
+  }
+}
 
 export const node = LayerNode.make({ service: Service, layer: layer, deps: [Config.node] })
 

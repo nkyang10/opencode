@@ -52,6 +52,16 @@ export const Metadata = Schema.Struct({
       bytes: Schema.Number,
     }),
   ),
+  /** A small JPEG of the shown image. Only the browser copy uses it; the stored attachment keeps the full frame. */
+  preview: Schema.optional(
+    Schema.Struct({
+      uri: Schema.String,
+      mime: Schema.String,
+      width: Schema.Number,
+      height: Schema.Number,
+      bytes: Schema.Number,
+    }),
+  ),
   shown: Schema.Literal(true),
   truncated: Schema.Literal(false),
 })
@@ -158,8 +168,10 @@ const layer = Layer.effectDiscard(
                   encoding: "base64",
                   mime: original.mime,
                 }
-                const normalized = yield* image.normalize(target.resource, content).pipe(
-                  Effect.catchTag("Image.ResizerUnavailableError", () => Effect.succeed(content)),
+                const normalized = yield* image.normalize(target.resource, content, { preview: true }).pipe(
+                  Effect.catchTag("Image.ResizerUnavailableError", () =>
+                    Effect.succeed({ ...content, preview: undefined }),
+                  ),
                   Effect.mapError(
                     (error) => new ToolFailure({ message: `Could not normalize image ${name}: ${error.message}` }),
                   ),
@@ -192,6 +204,7 @@ const layer = Layer.effectDiscard(
                     ...(resized
                       ? { resizedFrom: { width: original.width, height: original.height, bytes: bytes.length } }
                       : {}),
+                    ...(normalized.preview === undefined ? {} : { preview: normalized.preview }),
                     shown: true as const,
                     truncated: false as const,
                   },

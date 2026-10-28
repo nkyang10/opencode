@@ -14,23 +14,24 @@ Images travel as typed tool-result parts, never as base64 text, Markdown image l
 
 ## Decisions
 
-| Topic | Decision |
-| --- | --- |
-| Display | `show_image(path, caption?)` tool in both runtimes. Image results of every tool also render in the chat |
-| Capture | Built-in `screenshot` tool: `list` displays and windows; capture the primary, one or all displays, or one window by id or app/title. Covered windows are captured without focus changes; minimized windows are restored without activation, captured and minimized again |
-| Guidance | Built-in `capture-screenshot` skill: target choice, web-page recipes, headless hosts, privacy. It routes to `screenshot` and `show_image` |
-| Storage | `<data>/screenshots/` (default `~/.local/share/opencode/screenshots/`), outside the project, 7-day retention. The chat keeps its own normalized copy. Project copies only on explicit request |
-| Transport | `data:` URLs in tool attachments (existing convention); no new HTTP route |
-| Model context | Shown images go to vision models; text-only models get a neutral note instead of the generic error |
-| Permissions | `show_image` follows `read` and `external_directory`. `screenshot` has its own permission, default `ask`, patterns `screen`, `window:<app>` and `list` |
-| Chat UI | Inline images for all tools. Click opens an image viewer (zoom, pan, gallery). Right-click, the ⋯ button or a long press opens image actions: Open, Open in new tab, Copy image, Save image, Copy path, Reveal in file manager, Attach to message, Go to message |
-| Out of scope | Plugin tool attachments (upstream #21383), server media store, video recording, region picking, annotation |
+| Topic           | Decision                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Display         | `show_image(path, caption?)` tool in both runtimes. Image results of every tool also render in the chat                                                                                                                                                                                                                                                                                                             |
+| Capture         | Built-in `screenshot` tool: `list` displays and windows; capture the primary, one or all displays, or one window by id or app/title. Covered windows are captured without focus changes; minimized windows are restored without activation, captured and minimized again                                                                                                                                            |
+| Guidance        | Built-in `capture-screenshot` skill: target choice, web-page recipes, headless hosts, privacy. It routes to `screenshot` and `show_image`                                                                                                                                                                                                                                                                           |
+| Storage         | `<data>/screenshots/` (default `~/.local/share/opencode/screenshots/`), outside the project, 7-day retention. The chat keeps its own normalized copy. Project copies only on explicit request                                                                                                                                                                                                                       |
+| Transport       | `data:` URLs in tool attachments (existing convention)                                                                                                                                                                                                                                                                                                                                                              |
+| Browser preview | The browser-facing copy of a shown image carries a small inline JPEG **preview** data URL instead of the full image. The stored full image is untouched and still goes to the model; the full bytes are fetched as JSON through the authenticated API only when the user opens the viewer or runs a file action, and shown through a `blob:` URL. See [Browser preview](#7-browser-preview-thumbnail-first-display) |
+| Model context   | Shown images go to vision models; text-only models get a neutral note instead of the generic error                                                                                                                                                                                                                                                                                                                  |
+| Permissions     | `show_image` follows `read` and `external_directory`. `screenshot` has its own permission, default `ask`, patterns `screen`, `window:<app>` and `list`                                                                                                                                                                                                                                                              |
+| Chat UI         | Inline images for all tools. Click opens an image viewer (zoom, pan, gallery). Right-click, the ⋯ button or a long press opens image actions: Open, Open in new tab, Copy image, Save image, Copy path, Reveal in file manager, Attach to message, Go to message                                                                                                                                                    |
+| Out of scope    | Plugin tool attachments (upstream #21383), server media store, video recording, region picking, annotation                                                                                                                                                                                                                                                                                                          |
 
 ## Guardrails
 
 - Small independent commits; push each milestone to `v2-ui-enhancements`; merge into `dev` only on request; never hand-edit generated clients; never restart a live host.
 - Paths refer to the connected host, not the browser device.
-- No unauthenticated asset route, no credentials in URLs (for example the `auth_token` query), no reverse-proxy media folder.
+- No unauthenticated asset route, no credentials in URLs (for example the `auth_token` query), no reverse-proxy media folder. `<img src>` always points at `data:` or `blob:` — never at a server URL — so no image request ever needs a credential of its own. The one allowed addition is an authenticated JSON route that returns the stored data URL for the full image (M12); it is called with the app's existing `Authorization: Basic` header and its result becomes a `blob:` URL. This narrows nothing: it is not an asset route, no browser element loads it directly, and it carries no URL credential.
 - No new native or npm dependency for capture: spawn OS-provided or commonly installed tools through `AppProcess` (`packages/core/src/process.ts`) with timeouts and output caps.
 - Every new UI string in every locale; reactive JSX props use getters; no app `*.test.tsx`.
 - Timeline rendering changes need the production streaming benchmark before and after.
@@ -68,18 +69,18 @@ Constraints:
 
 ## How other agents do it
 
-| Agent / project | Mechanism | Lesson |
-| --- | --- | --- |
-| MCP specification | Tool result `{ type: "image", data, mimeType }`, optional `annotations.audience` and `priority` | Images are typed result blocks; audience separates user-facing and model-facing content |
-| OpenAI Codex CLI | Built-in `view_image(path)` attaches a local image | A dedicated tool makes the capability discoverable; its wording controls use (openai/codex#12439) |
-| Claude Code / Claude apps | `Read` returns images; screenshots through Playwright or Chrome DevTools MCP; claude.ai collapses MCP images by default (anthropics/claude-code#53256) | Do not hide the deliverable in a collapsed card |
-| Cline / Roo Code | `browser_action` returns a screenshot after each action | Keep images structured; a Roo regression showed base64 as text (RooCodeInc/Roo-Code#8045) |
-| Cursor | Browser tool; generated images saved to the project's `assets/` and shown inline | Deliverables belong in the project; captures are shown inline |
-| Goose | `read_image` in the developer extension | Same local-image primitive |
-| Playwright MCP | `browser_take_screenshot` returns image content and writes files; automatic output goes to `.playwright-mcp` in the workspace unless `--output-dir` is set; `--image-responses allow\|omit\|only` | Large images overflow context (#1185); artifacts in the repository risk accidental commits of private data (#1789) |
-| Peekaboo, screencommander (macOS) | Window capture by id or title in the background; window server for minimized, hidden and other-Space windows; background restore of minimized windows | Background window capture works on macOS without stealing focus |
-| xcap (Rust) | Screen and window capture on Windows, macOS and X11; Wayland only partially supported; its example skips minimized windows | Minimized windows and Wayland need explicit handling |
-| opencode upstream | Requests #21227 and #41038; workaround #16234 (Caddy `/media` plus Markdown) | Confirms the gap; the workaround bypasses auth and must not be copied |
+| Agent / project                   | Mechanism                                                                                                                                                                                         | Lesson                                                                                                             |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| MCP specification                 | Tool result `{ type: "image", data, mimeType }`, optional `annotations.audience` and `priority`                                                                                                   | Images are typed result blocks; audience separates user-facing and model-facing content                            |
+| OpenAI Codex CLI                  | Built-in `view_image(path)` attaches a local image                                                                                                                                                | A dedicated tool makes the capability discoverable; its wording controls use (openai/codex#12439)                  |
+| Claude Code / Claude apps         | `Read` returns images; screenshots through Playwright or Chrome DevTools MCP; claude.ai collapses MCP images by default (anthropics/claude-code#53256)                                            | Do not hide the deliverable in a collapsed card                                                                    |
+| Cline / Roo Code                  | `browser_action` returns a screenshot after each action                                                                                                                                           | Keep images structured; a Roo regression showed base64 as text (RooCodeInc/Roo-Code#8045)                          |
+| Cursor                            | Browser tool; generated images saved to the project's `assets/` and shown inline                                                                                                                  | Deliverables belong in the project; captures are shown inline                                                      |
+| Goose                             | `read_image` in the developer extension                                                                                                                                                           | Same local-image primitive                                                                                         |
+| Playwright MCP                    | `browser_take_screenshot` returns image content and writes files; automatic output goes to `.playwright-mcp` in the workspace unless `--output-dir` is set; `--image-responses allow\|omit\|only` | Large images overflow context (#1185); artifacts in the repository risk accidental commits of private data (#1789) |
+| Peekaboo, screencommander (macOS) | Window capture by id or title in the background; window server for minimized, hidden and other-Space windows; background restore of minimized windows                                             | Background window capture works on macOS without stealing focus                                                    |
+| xcap (Rust)                       | Screen and window capture on Windows, macOS and X11; Wayland only partially supported; its example skips minimized windows                                                                        | Minimized windows and Wayland need explicit handling                                                               |
+| opencode upstream                 | Requests #21227 and #41038; workaround #16234 (Caddy `/media` plus Markdown)                                                                                                                      | Confirms the gap; the workaround bypasses auth and must not be copied                                              |
 
 Common pattern: capture into a file, return it as a typed image block, render image blocks visibly with click-to-zoom, keep images within size and token budgets, and expose a clearly named tool so the model knows it can show images.
 
@@ -99,16 +100,16 @@ Common pattern: capture into a file, return it as a typed image block, render im
 
 Parameters:
 
-| Name | Type | Default | Notes |
-| --- | --- | --- | --- |
-| `action` | `"capture"` or `"list"` | `capture` | `list` returns displays and windows |
-| `target` | `"screen"` or `"window"` | `screen` | |
-| `display` | `"primary"`, `"all"` or a number | `primary` | 1-based index from `list` |
-| `window` | string | none | Required for `target: "window"`: an id from `list`, an app name or a title substring (case-insensitive) |
-| `restore_minimized` | boolean | `true` | Allows a temporary restore of a minimized window |
-| `delay_ms` | integer, 0 to 10000 | `0` | Wait before capturing, for example after launching an app |
-| `x_display` | string | `DISPLAY` | Linux and WSL only, for example `:99` for Xvfb |
-| `caption` | string | none | Caption and alt text in the chat |
+| Name                | Type                             | Default   | Notes                                                                                                   |
+| ------------------- | -------------------------------- | --------- | ------------------------------------------------------------------------------------------------------- |
+| `action`            | `"capture"` or `"list"`          | `capture` | `list` returns displays and windows                                                                     |
+| `target`            | `"screen"` or `"window"`         | `screen`  |                                                                                                         |
+| `display`           | `"primary"`, `"all"` or a number | `primary` | 1-based index from `list`                                                                               |
+| `window`            | string                           | none      | Required for `target: "window"`: an id from `list`, an app name or a title substring (case-insensitive) |
+| `restore_minimized` | boolean                          | `true`    | Allows a temporary restore of a minimized window                                                        |
+| `delay_ms`          | integer, 0 to 10000              | `0`       | Wait before capturing, for example after launching an app                                               |
+| `x_display`         | string                           | `DISPLAY` | Linux and WSL only, for example `:99` for Xvfb                                                          |
+| `caption`           | string                           | none      | Caption and alt text in the chat                                                                        |
 
 Window matching: exact id, then exact app name (process name, macOS owner name, X11 `WM_CLASS`), then title substring. With several matches, capture the frontmost one and list the others with ids in the output. With none, fail with `window_not_found` and up to 10 candidates.
 
@@ -127,17 +128,17 @@ Capture result: the PNG is saved at full resolution in the screenshots directory
 
 Errors carry a stable code in the message and metadata, and each message says what the user can do:
 
-| Code | Typical cause |
-| --- | --- |
-| `no_display` | Headless host; suggests a headless browser or Xvfb |
-| `no_interactive_session` | Windows service or SSH session, macOS SSH session |
-| `permission_required` | macOS Screen Recording or Accessibility; GNOME portal approval |
-| `missing_dependency` | Linux tool missing; includes an install hint |
-| `window_not_found` | No match; lists candidates |
-| `window_not_capturable` | Wayland, elevated window, other virtual desktop, minimized with `restore_minimized: false` |
-| `blank_capture` | Uniform frame: locked screen, disconnected RDP session, protected window, missing permission |
-| `unsupported` | No backend for this platform or desktop |
-| `timeout` | Backend exceeded about 15 s |
+| Code                     | Typical cause                                                                                |
+| ------------------------ | -------------------------------------------------------------------------------------------- |
+| `no_display`             | Headless host; suggests a headless browser or Xvfb                                           |
+| `no_interactive_session` | Windows service or SSH session, macOS SSH session                                            |
+| `permission_required`    | macOS Screen Recording or Accessibility; GNOME portal approval                               |
+| `missing_dependency`     | Linux tool missing; includes an install hint                                                 |
+| `window_not_found`       | No match; lists candidates                                                                   |
+| `window_not_capturable`  | Wayland, elevated window, other virtual desktop, minimized with `restore_minimized: false`   |
+| `blank_capture`          | Uniform frame: locked screen, disconnected RDP session, protected window, missing permission |
+| `unsupported`            | No backend for this platform or desktop                                                      |
+| `timeout`                | Backend exceeded about 15 s                                                                  |
 
 Behavior guarantees:
 
@@ -159,12 +160,12 @@ Module layout:
 
 Platform backends:
 
-| Platform | List | Screen | Window | Needs |
-| --- | --- | --- | --- | --- |
-| Windows; WSL through `powershell.exe` with paths from `wslpath -w` | `EnumWindows`, `GetWindowText`, `GetWindowThreadProcessId`, `IsIconic`, `DwmGetWindowAttribute` (`DWMWA_EXTENDED_FRAME_BOUNDS`, `DWMWA_CLOAKED`), `IVirtualDesktopManager` | `EnumDisplayMonitors`, `CopyFromScreen` per display or virtual screen | `PrintWindow` with `PW_RENDERFULLCONTENT`, cropped to the frame bounds | Interactive desktop; Windows PowerShell 5.1+ with `Add-Type` C# |
-| macOS | JXA `CGWindowListCopyWindowInfo` (owner, name, bounds, layer, on-screen flag) | `screencapture -x [-D n]`; displays from `NSScreen` | `screencapture -x -o -l <id>` (window server) | Screen Recording for the host process (window names are missing without it); Accessibility for restores |
-| Linux X11 | `wmctrl -lpGx` or `_NET_CLIENT_LIST_STACKING` with `xprop` / `xwininfo` (`_NET_WM_STATE_HIDDEN`, `WM_CLASS`, `_NET_WM_PID`) | `xrandr --listmonitors`; `import -window root` with a crop, fallback `xwd`, `maim`, `scrot` | `import -window <id>` | `DISPLAY`; ImageMagick, x11-utils, xdotool, wmctrl |
-| Linux Wayland | Sway and Hyprland IPC only | `grim [-o name]` (wlroots), `spectacle -b -n -f` or `-m` (KDE), screenshot portal (GNOME) | wlroots: `grim -g` of the visible window region; KDE: active window only; GNOME: none | Compositor-specific tools |
+| Platform                                                           | List                                                                                                                                                                       | Screen                                                                                      | Window                                                                                | Needs                                                                                                   |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Windows; WSL through `powershell.exe` with paths from `wslpath -w` | `EnumWindows`, `GetWindowText`, `GetWindowThreadProcessId`, `IsIconic`, `DwmGetWindowAttribute` (`DWMWA_EXTENDED_FRAME_BOUNDS`, `DWMWA_CLOAKED`), `IVirtualDesktopManager` | `EnumDisplayMonitors`, `CopyFromScreen` per display or virtual screen                       | `PrintWindow` with `PW_RENDERFULLCONTENT`, cropped to the frame bounds                | Interactive desktop; Windows PowerShell 5.1+ with `Add-Type` C#                                         |
+| macOS                                                              | JXA `CGWindowListCopyWindowInfo` (owner, name, bounds, layer, on-screen flag)                                                                                              | `screencapture -x [-D n]`; displays from `NSScreen`                                         | `screencapture -x -o -l <id>` (window server)                                         | Screen Recording for the host process (window names are missing without it); Accessibility for restores |
+| Linux X11                                                          | `wmctrl -lpGx` or `_NET_CLIENT_LIST_STACKING` with `xprop` / `xwininfo` (`_NET_WM_STATE_HIDDEN`, `WM_CLASS`, `_NET_WM_PID`)                                                | `xrandr --listmonitors`; `import -window root` with a crop, fallback `xwd`, `maim`, `scrot` | `import -window <id>`                                                                 | `DISPLAY`; ImageMagick, x11-utils, xdotool, wmctrl                                                      |
+| Linux Wayland                                                      | Sway and Hyprland IPC only                                                                                                                                                 | `grim [-o name]` (wlroots), `spectacle -b -n -f` or `-m` (KDE), screenshot portal (GNOME)   | wlroots: `grim -g` of the visible window region; KDE: active window only; GNOME: none | Compositor-specific tools                                                                               |
 
 Windows notes: run `powershell.exe -NoProfile -NonInteractive -EncodedCommand <UTF-16LE base64>`; call `SetProcessDpiAwarenessContext(PER_MONITOR_AWARE_V2)` first; print JSON on stdout; write the PNG to a temporary name and rename it. `PrintWindow` with `PW_RENDERFULLCONTENT` is what Chromium and WebRTC use for covered windows ([Chromium snapshot_win.cc](https://chromium.googlesource.com/chromium/src/+/refs/heads/main/ui/snapshot/snapshot_win.cc), [WebRTC window_capturer_win_gdi.cc](https://webrtc.googlesource.com/src/+/bde80e3c0ec2be96189087cf36e254f9c4bfb144/modules/desktop_capture/win/window_capturer_win_gdi.cc)). Session 0, `UserInteractive == false` and OpenSSH sessions fail with `no_interactive_session`. `Add-Type` costs about 1 to 2 s per call; measure before optimizing.
 
@@ -216,16 +217,16 @@ Image actions:
 - One item list in `packages/session-ui/src/components/image-actions.tsx`, built on `packages/ui/src/components/context-menu.tsx` and `dropdown-menu.tsx`; pure helpers in `image-actions.ts` (data URL to Blob without `fetch`, PNG conversion, file names, availability rules).
 - Platform-specific actions come from optional `DataProvider` callbacks (`onAttachImage`, `onOpenImageInNewTab`, `onRevealPath`); a missing callback hides its item, so session-ui stays platform-agnostic.
 
-| Action | Shown when | Behavior |
-| --- | --- | --- |
-| Open | Always (not inside the viewer) | Opens the viewer at this image |
-| Open in new tab | Browser app (callback present) | Opens a blob URL in a new tab and revokes it after 60 s; hidden in the desktop app |
-| Copy image | Always; disabled with the reason when the page is not a secure context or `ClipboardItem` is missing | `navigator.clipboard.write` with `image/png`, converting other formats through a canvas; create the `ClipboardItem` synchronously with a Blob promise (Safari); toast on success or failure |
-| Save image | Always | Download through `<a download>` named `<caption or tool>-<timestamp>.<ext>` on the browser device; the Electron desktop app shows its save dialog |
-| Copy path | A host path is known (`show_image`, `screenshot`, `read`) | Copies the host path as text with `writeClipboard` (also works over HTTP) |
-| Reveal in file manager | Desktop app with a local server (`platform.revealPath`) | Toast when the file no longer exists (retention) |
-| Attach to message | A composer is available (callback present) | Adds the image to the current draft as an `ImageAttachmentPart` and focuses the composer, for follow-ups such as "what is wrong here?" |
-| Go to message | Inside the viewer | Closes the viewer and scrolls to the source part |
+| Action                 | Shown when                                                                                           | Behavior                                                                                                                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Open                   | Always (not inside the viewer)                                                                       | Opens the viewer at this image                                                                                                                                                              |
+| Open in new tab        | Browser app (callback present)                                                                       | Opens a blob URL in a new tab and revokes it after 60 s; hidden in the desktop app                                                                                                          |
+| Copy image             | Always; disabled with the reason when the page is not a secure context or `ClipboardItem` is missing | `navigator.clipboard.write` with `image/png`, converting other formats through a canvas; create the `ClipboardItem` synchronously with a Blob promise (Safari); toast on success or failure |
+| Save image             | Always                                                                                               | Download through `<a download>` named `<caption or tool>-<timestamp>.<ext>` on the browser device; the Electron desktop app shows its save dialog                                           |
+| Copy path              | A host path is known (`show_image`, `screenshot`, `read`)                                            | Copies the host path as text with `writeClipboard` (also works over HTTP)                                                                                                                   |
+| Reveal in file manager | Desktop app with a local server (`platform.revealPath`)                                              | Toast when the file no longer exists (retention)                                                                                                                                            |
+| Attach to message      | A composer is available (callback present)                                                           | Adds the image to the current draft as an `ImageAttachmentPart` and focuses the composer, for follow-ups such as "what is wrong here?"                                                      |
+| Go to message          | Inside the viewer                                                                                    | Closes the viewer and scrolls to the source part                                                                                                                                            |
 
 Accessibility and localization: images are buttons labeled "Open image: <alt>"; viewer controls have labels and tooltips with shortcuts; menu items are keyboard reachable; strings go into all 62 locale files in `packages/ui/src/i18n`, and app-side strings into `packages/app/src/i18n` (its `parity.test.ts` checks key parity).
 
@@ -250,6 +251,51 @@ Body:
 - Existing `attachment.image` limits. The original stays on disk; the chat and the model get the normalized copy.
 - Vision gating at conversion time in both runtimes (see `show_image`).
 - Later (M10): images count in prune estimates; measure image-heavy sessions; a media store only if the measurements justify it, and only behind the authenticated API.
+
+### 7. Browser preview (thumbnail-first display)
+
+Problem: a shown screenshot is a normalized PNG, often 1-5 MB, and the browser receives the whole base64 string twice — once in the message page (`packages/server/src/handlers/message.ts:71`, `packages/opencode/src/server/routes/instance/httpapi/handlers/session.ts:144` and `:302`) and once in the `tool.success` event frame (`packages/server/src/handlers/event.ts:11`, `packages/opencode/src/server/routes/instance/httpapi/handlers/event.ts:12`). A 20-turn history of screenshots is tens of megabytes of JSON the timeline paints into a box at most 360 px tall.
+
+#### The fact that makes this cheap
+
+The browser is an observer, not a participant. The stored attachment is the model's copy: `packages/core/src/session/runner/to-llm-message.ts:20` lowers `file.uri` straight into the provider request, and the legacy `MessageV2.toModelMessages` does the same from the store. Nothing in an agent turn reads, waits for, or acknowledges anything in the browser. So the preview concern belongs entirely to the read path, and the fix is to shrink **only the browser-facing copy** at the wire boundary while the stored row keeps the full image.
+
+Corollary, and the rule for every step below: no image work may sit on the agent's critical path beyond what the turn already pays.
+
+#### Generation: inside the normalizer, from the already-decoded image
+
+- `Image.Service.normalize` already decodes the full image on every call — `packages/opencode/src/image/image.ts:91-94` calls `PhotonImage.new_from_byteslice` _before_ the "already fits" early return at `:99-100`, and frees it in the `finally` at `:161-162`; the core adapter (`packages/core/src/image/photon.ts:39`) has the same shape. The preview is therefore one `photon.resize` to at most 640 px plus one `get_bytes_jpeg` on a `PhotonImage` that is already in wasm memory: no second decode, no extra wasm load, no new dependency.
+- Opt-in only. `normalize` gains an optional preview request and the callers that mark `shown: true` ask for it: `packages/core/src/tool/show-image.ts:161`, `packages/core/src/tool/screenshot.ts`, `packages/opencode/src/tool/show-image.ts:138`, `packages/opencode/src/tool/screenshot.ts:89`. `read`, `webfetch` and MCP images keep today's cost exactly.
+- Bounded and never fatal: wrap in `Effect.timeout` (~250 ms) plus a catch on every error, and skip entirely when the source is already smaller than the preview would be (under ~32 KB) or absurdly large. A missing preview means "no preview": the projection falls back to the full URI and the card renders exactly as it does today. The turn's worst-case extra latency is a small resize of an image already in memory; the tool result must never fail or hang because of a UI artifact.
+- Output is a JPEG from the existing quality ladder (photon encodes PNG and JPEG only; no new WebP encoder). Transparency flattens — accepted, because these are screen captures. Animated GIF degrades to its first frame; the viewer still gets the animated original.
+- It travels as `metadata.preview = { uri, mime, width, height, bytes }` — plain structured metadata, so no schema or protocol change is needed for it to reach the app (the app already merges `metadata ?? structured ?? {}`).
+
+#### Projection: the read path substitutes, the store never changes
+
+- One pure helper per runtime: for every completed tool file part whose mime is an image and whose URI is a `data:` URL, replace the URI (and mime) with the preview's. Detection is O(1) on the existing `mime` field; there is no decode, and swapping a megabyte string for a few kilobytes makes the existing `JSON.stringify` cheaper, not dearer.
+- v2 is `packages/server/src/browser-image-preview.ts` (`previewMessages` for the page, `previewEvent` for the SSE envelope). Two details the client depends on:
+  - the preview travels **once** — after the swap `structured.preview` keeps `{ mime, width, height, bytes }` and loses `uri`, so the bytes are not sent twice;
+  - the **presence** of `structured.preview` is therefore the client's signal that the displayed URI is a thumbnail and the full bytes still have to be fetched. A tool that wrote no preview produces no `preview` key and the part travels untouched.
+  - The helper never mutates its input and returns the same object identities when nothing substituted, so unchanged pages cost nothing extra.
+- Apply at the four boundaries listed in the problem statement. The v2 and v1 code each get their own helper (the part shapes differ), plus shared unit tests over fixtures.
+- Project at **serialization**, never at publish. `EventV2` is durable and replayed; if the substitution happened before the event was stored, anything rebuilt from replay would lose the full image.
+- The stored row and the model request are untouched, which is the whole point: `to-llm-message.ts:20` keeps reading the full URI.
+- Gate the substitution on a per-request signal from the client: `?imagePreviews=thumbnail` on `GET /api/session/:sessionID/message` and on `GET /api/event` (`SessionMessagesQuery` / `EventSubscribeQuery` in `packages/protocol/src/groups/message.ts` and `groups/event.ts`; a literal rather than a boolean so the query stays a string and the value can grow). Regenerating with `bun run generate` in `packages/client` changed `client.events.subscribe(requestOptions)` to `client.events.subscribe(input?, requestOptions)` — every future caller must pass the query first. The app sends it only when it also has the full-image fetch below. Everything else — the TUI, ACP, RSS, SDK consumers, `packages/app/src/utils/draft-store.ts:66`, which fetches `item.dataUrl` expecting a data URL, and older browsers — keeps receiving inline full data URLs, unchanged.
+
+#### Full bytes on demand
+
+- One authenticated JSON route per runtime returns the stored data URL for one tool file part (`sessionID`, `messageID`, tool call id, file index). Real mime, `ETag`, `Cache-Control: private, immutable`.
+- The app fetches it with its existing Basic header (`packages/app/src/utils/server.ts`) and turns it into a `blob:` URL. The CSP already allows `data:` and `blob:` in `img-src` and `connect-src` (`packages/opencode/src/server/shared/ui.ts`), so nothing there changes.
+- The fetch happens when the viewer opens or a file action runs — never while the timeline paints, and never N+1 inside the message response.
+- `packages/ui/src/components/image-viewer.tsx:389` gains an optional `preview`: paint the preview immediately, swap to the full image when it arrives, keep zoom and `naturalWidth` logic as is. Actions that need bytes — Copy image, Save image, Open in new tab, Attach — use the fetched blob; `packages/app/src/context/image-actions.tsx:52` (`dataUrlToBlob`) and `dataUrlToFile` grow a URL branch, and `tool-media.ts` `isInlineImageUrl` plus `image-gallery.ts` must accept the preview shape.
+- Failure to fetch the full image leaves the preview on screen and reports the error through the existing toast; the timeline is never gated behind an image load.
+
+#### Why not the alternatives
+
+- A server URL in `<img src>` needs a credential the browser cannot attach: a plain `<img>` sends no `Authorization` header, the `oc_creds` cookie exists only after a real `/login`, and `?auth_token=` is banned by [Guardrails](#guardrails). The blob route sidesteps the whole question.
+- Generating the preview lazily in a route keeps the tool clean but puts a megabyte decode on the first browser request and needs a cache, a concurrency bound and an orphan policy — the store-side work M10/M11 said to measure before adding.
+- Generating it at the message-list boundary resizes up to one image per page per request and makes a read endpoint CPU-bound on demand.
+- Client-side downscaling (canvas) renders small but moves zero bytes, and the bytes are the complaint.
 
 ## Milestones (each independently pushable)
 
@@ -318,7 +364,8 @@ Body:
 
 - Done: prune estimates include images (dimension-based token estimate).
 - Pending: image-heavy measurements: session load time, event payload size, memory at 390 px; switch rendered images to
-  blob URLs if memory is high. A browser/host that can measure memory and timeline behavior is required.
+  blob URLs if memory is high. A browser/host that can measure memory and timeline behavior is required. The payload half
+  of this item is now M12a, which must land before any M12 transport change; the memory half stays here.
 - Pending: Windows restore without a visible flash (temporarily near-transparent layered window), only if reliable. A
   real interactive Windows host is required.
 - Pending: optional: honor MCP `annotations.audience`; plugin tool attachments (#21383). A product decision is required
@@ -326,9 +373,48 @@ Body:
 
 ### M11: deferred unless data justifies it
 
-- Media store behind the authenticated API (fetch to blob URL).
+- Media store behind the authenticated API: promoted into [M12](#m12-thumbnail-first-display-browser-bandwidth) for shown images only; a general media store (dedup, refcounting, retention of the stored copy) stays deferred.
 - Built-in URL screenshot tool, if shell or MCP capture of web pages proves unreliable.
 - Region capture, annotation, recordings.
+
+### M12: thumbnail-first display (browser bandwidth)
+
+Spec: [Browser preview](#7-browser-preview-thumbnail-first-display). One commit per item; each is independently revertible.
+
+- M12a (measured 2026-10-28, this box): baseline recorded by two artifacts, both gated so they never run in CI by accident.
+  - `packages/opencode/script/bench-shown-image-preview.ts` — `normalize` with and without `{ preview: true }` (median of 5, photon adapter):
+    - `1280x720` source 82,878 B: normalize 11.7 ms → 68.9 ms with preview (**+57 ms**), full 110,504 B, preview 80,112 B.
+    - `2880x1800` source 462,021 B: normalize 469.6 ms → 567.0 ms (**+97 ms**), full 3,861,860 B, preview **123,648 B** — the noisy synthetic still cannot be squeezed under the 96 KB target even at quality 40, so the ladder's smallest-quality fallback is what ships; a real screenshot compresses far better.
+  - `packages/opencode/test/server/browser-image-preview-measure.test.ts` — 20 shown-image tool results over the real routes, run with `OPENCODE_MEASURE_SHOWN_IMAGE=1` (`OPENCODE_MEASURE_IMAGES` changes the count):
+    - fixture: full 14,201,724 B vs previews 1,822,060 B (**7.8x**)
+    - v2 `GET /api/session/:id/message`: 16,030,381 B / 762 ms → 1,828,497 B / 43 ms with `imagePreviews=thumbnail` (**−88.6%**, ~18x faster)
+    - v1 `GET /session/:id/message`: 16,035,376 B / 273 ms → 1,833,492 B / 42 ms (**−88.6%**)
+    - one v1 `/global/event` frame: 191,239 B → 80,705 B (**−57.8%**)
+  - Still not measured: **time to first timeline paint**, which needs a built `packages/app` in a browser (M12f), and end-to-end wall time over a real LAN link rather than the in-process test server.
+- M12b (implemented): preview generation in both normalizers plus the `shown: true` call sites — `packages/core/src/image.ts` + `packages/core/src/image/photon.ts` (v2) and `packages/opencode/src/image/image.ts` (v1), used by `tool/show-image.ts` and `tool/screenshot.ts` on both runtimes. Bounded (640 px edge, ~96 KB target, skip under ~32 KB, quality ladder 80/85/70/55/40), never fatal: every failure path leaves the tool result byte-identical. Tests: `packages/core/test/tool-show-image.test.ts`, `packages/opencode/test/image/image.test.ts`.
+- M12c (implemented): v2 projection helper + per-request gate on `GET /api/session/:sessionID/message` and `event.subscribe`, applied at `packages/server/src/handlers/message.ts` and at SSE serialization (`handlers/event.ts`), never at publish. Protocol change (`packages/protocol/src/groups/{message,event}.ts`), then `bun run generate` in `packages/client`. Unit tests in `packages/server/test/browser-image-preview.test.ts` cover substitution, the reduced `structured.preview`, no substitution without a preview, non-image and non-`data:` parts untouched, event envelopes, and that the input message is not mutated.
+- M12d (implemented): the same on the legacy runtime — `packages/opencode/src/server/browser-image-preview.ts` gates `handlers/session.ts` (list), `handlers/event.ts` (instance stream) and `handlers/global.ts` (**`/global/event` needs it too**: that is the stream the web app actually subscribes to, and its envelopes are `{ directory, payload }`, so `previewGlobalEvent` reaches into `payload`).
+- M12e (implemented; browser behavior verified by the M12f spec, appearance not yet eyeballed): full-image JSON routes plus app plumbing.
+  - v2 `GET /api/session/:sessionID/message/:messageID/tool/:callID/image?source=content|attachments&index=N` (`packages/server/src/handlers/message.ts`), v1 `GET /session/:sessionID/message/:messageID/tool/:callID/image?index=N` reading `state.attachments` (`packages/opencode/src/server/routes/instance/httpapi/handlers/session.ts`). Both answer `{ uri, mime }` with `cache-control: private, immutable` + a weak `etag`; missing image → `MessageNotFoundError` / `ApiNotFoundError`. `index` counts **file items only**, not raw content positions, so it matches the attachment array the client already renders.
+  - The browser marks a previewed image by the _absence_ of `preview.uri` (`previewedImageAddress` in `packages/session-ui/src/components/shown-image.ts`), carries `{ sessionID, messageID, callID, index }` as `ShownImageAddress` (defined in `packages/ui/src/components/image-viewer.tsx`, no `source` — the protocol decides that), and `withFullImage` in `image-actions-menu.tsx` fetches the full frame before copy/save/open-in-new-tab/attach or a viewer swap. A failed fetch leaves the preview painted and toasts `ui.imageActions.loadFailed`.
+  - `packages/app` resolves the request in `createServerSdkContextBase.loadFullImage` (`context/server-sdk.tsx`) because that route needs Basic auth, `x-opencode-directory` and the resolved protocol; `pages/directory-layout.tsx` hands it to `DataProvider` as `onLoadFullImage`.
+  - **The app does not get the flag from its client.** `packages/app` pins the vendored `@opencode-ai/client` tarball, whose typed v2 input has no `imagePreviews` and whose `event.subscribe` takes only `requestOptions`. `fetchWithImagePreviews` (`packages/app/src/utils/server.ts`) therefore tags the supported paths at fetch time (`/api/event`, `/api/session/:id/message`, `/global/event`, `/event`, `/session/:id/message`). Single-message routes are deliberately **not** tagged: the server does not honor the flag there yet.
+- M12f (browser behavior verified 2026-10-28, timing still open): `packages/app/e2e/regression/session-timeline-shown-image-preview.spec.ts` drives the real app against the E2E mock server with a **projection-shaped** tool result (`attachments[].url` = the small frame, `state.metadata.preview` present with **no `uri`**) and asserts the whole on-demand contract:
+  - every message-list request carries `imagePreviews=thumbnail`, the card paints the preview URI, and **zero** full-image requests exist while only the timeline is open;
+  - opening the viewer fires **exactly one** `GET /session/:id/message/:msg/tool/:call/image?index=0` with the exact `{ sessionID, messageID, callID, index }` identity, and the viewer swaps to the full URI;
+  - a later in-viewer **Save image** reuses the resolved frame (request count stays 1 — the `full: undefined` rule in `withFullImage`);
+  - a part with no `preview` marker paints the stored frame and issues **no** image request at all;
+  - a 503 from that route keeps both the card and the viewer on the preview and toasts `ui.imageActions.loadFailed` ("Could not load the full image").
+  - Two mock hooks make this testable: `sessionImage` (answers the new route, 404 when unset) and `query` on `onMessages`; `setupTimeline` now merges an optional `mock` override while keeping ownership of `pageMessages`.
+  - Hardened after review: the viewer aborts a pending full-frame fetch when it closes (`loadFullImage` takes an optional `signal`) and an aborted load never toasts; `fetchWithImagePreviews` keeps a `Request` input's method, headers, body and signal instead of rebuilding it from the URL; the weak etag hashes the data URL in one pass (no per-character array); and the v1 `show_image` metadata type now names `preview`.
+  - Still open: time-to-first-paint numbers at 390 px / 1280 px, animated-GIF playback, and eyeballing the card/viewer appearance. "The next prompt still carries the full frame" is covered server-side (`packages/opencode/test/image/image.test.ts` — the prompt path reads the stored `content`, never `preview`), not in the browser.
+
+Four traps this item produced:
+
+- **A query parameter on an SDK-facing route changes the generated method's FIRST positional argument.** Adding `imagePreviews` to `/global/event` turned `global.event(options)` into `global.event(parameters, options)`; three production call sites (`packages/tui/src/context/sdk.tsx`, `packages/opencode/src/acp/event.ts`, `packages/opencode/src/cli/cmd/run/stream.transport.ts`) passed `signal` first and would have kept their SSE streams running past teardown with no type error in the packages that build them. Audit `global.event`-style call sites whenever a route gains a query, and note that the checked-in `packages/sdk/js/src/v2/gen` was stale before this regeneration (it lacked `/global/directory/*`, `/global/maintenance`, `/global/restart`), so a regen will show unrelated additions.
+- **A decode failure on a route says nothing about _why_.** `Session.MessageDecodeError` (`packages/core/src/session/error.ts`) carries only `sessionID` + `messageID`, and `handlers/message.ts` logs just a `ref`, so a route answers 500 with no clue. The measurement fixture hit exactly this: `photon.ts` returns the **input content object** when it decides no resize is needed (line 54 `return preview ? { ...content, preview } : content`), so any field the caller forgot propagates as `undefined` and vanishes in JSON. Omitting `mime` from the `FileSystem.Content` passed to `normalize` stored a tool file part with no `mime`, which the client could not decode. Both measurement artifacts now build a full `FileSystem.Content` (`uri`, `content`, `mime`, `encoding`). When this happens again, temporarily annotate the `ParseError` inside `decode` in `packages/core/src/session.ts` — the schema message is the only thing that names the missing key, and it is stripped before the error leaves the service.
+- **The E2E mock answers every unmatched same-port path with `200 {}`,** so a route the client is newly told to call does not 404 in tests — it returns an empty object the client happily tries to use, and the failure surfaces far from the cause. `packages/app/e2e/utils/mock-server.ts` therefore needs an explicit hook per new route (`sessionImage` here). Second gotcha in the same file: it only intercepts requests whose port matches the app/base URL port, which is why the harness fakes `/global/event` through `installSseTransport` instead of a route. Running the suite also needs `bunx playwright install chromium` once per Playwright version (the pinned `chromium_headless_shell` revision changes), and the image-viewer zoom test flakes under the default parallel workers — it passes on its own and in a serial rerun.
+- **Pre-existing red on this Windows box, do not chase it here:** `HttpApi Server.listen > default in-process handler does not emit Effect HTTP response logs` (`/status` 404), the `packages/app` suites that die with `SyntaxError: Export named 'use' not found in solid-js/web` (component tests, ~10 files), and `packages/tui`'s `abbreviates paths within home boundaries`.
 
 ## Validation
 
@@ -337,42 +423,59 @@ Body:
 - Sizes: tiny, 1280x720, 2880x1800 Retina (resized), still over the byte limit after resizing (explicit failure), resizer unavailable.
 - Models and protocols: Anthropic, OpenAI Responses, OpenAI-compatible chat, Gemini, Bedrock, text-only.
 - Sessions: v1 and v2 protocols, reload and reconnect, compacted parts, child sessions, shared sessions.
+- Previews (M12): agent turn latency identical with and without a preview (prove nothing blocks on generation); the next
+  prompt still carries the full image to the provider; a session whose previews are missing renders full images as before;
+  a browser without the gate flag and a non-browser consumer (TUI, ACP, RSS) still receive full inline data URLs; the full
+  image loads once and is cached on re-open; a failed full-image fetch leaves the preview painted and reports the error;
+  replayed events after a reconnect still carry the full stored URI; GIF stays animated in the viewer; SVG, PDF and remote
+  URLs stay chips.
 - UI: 1280 px and 390 px, keyboard only, screen-reader labels, viewer zoom, pan and gallery, every action (HTTP and HTTPS origins, browser and desktop app), long captions, many images, light and dark themes.
 
 Capture matrix (expected behavior; check each row on the platform's milestone):
 
-| Scenario | Windows | macOS | X11 | Wayland |
-| --- | --- | --- | --- | --- |
-| Primary, one or all displays; mixed DPI | Yes | Yes (backing scale) | Yes (`xrandr` crop) | `grim`, Spectacle, portal |
-| Foreground window | Yes | Yes | Yes | wlroots region, KDE active window |
-| Covered window | Yes | Yes | With a compositor; otherwise a warning | `window_not_capturable` |
-| Minimized window | Restore without activation, capture, minimize | Window server; Accessibility restore if blank | Map or activate, capture, minimize, focus restored | `window_not_capturable` |
-| Other virtual desktop or Space | Best effort, blank check | Yes (window server) | `window_not_capturable` | `window_not_capturable` |
-| Protected or capture-excluded window | `blank_capture` | `blank_capture` | n/a | n/a |
-| Elevated window | `window_not_capturable` if the restore fails | n/a | n/a | n/a |
-| Locked screen, disconnected RDP | `blank_capture` | `blank_capture` | n/a | n/a |
-| Service or SSH session | `no_interactive_session` | `no_interactive_session` | `no_display` without `DISPLAY` | `no_display` |
-| Missing permission or tool | n/a | `permission_required` | `missing_dependency` | `permission_required` or `missing_dependency` |
-| Headless host | n/a | n/a | Xvfb through `x_display` | n/a |
+| Scenario                                | Windows                                       | macOS                                         | X11                                                | Wayland                                       |
+| --------------------------------------- | --------------------------------------------- | --------------------------------------------- | -------------------------------------------------- | --------------------------------------------- |
+| Primary, one or all displays; mixed DPI | Yes                                           | Yes (backing scale)                           | Yes (`xrandr` crop)                                | `grim`, Spectacle, portal                     |
+| Foreground window                       | Yes                                           | Yes                                           | Yes                                                | wlroots region, KDE active window             |
+| Covered window                          | Yes                                           | Yes                                           | With a compositor; otherwise a warning             | `window_not_capturable`                       |
+| Minimized window                        | Restore without activation, capture, minimize | Window server; Accessibility restore if blank | Map or activate, capture, minimize, focus restored | `window_not_capturable`                       |
+| Other virtual desktop or Space          | Best effort, blank check                      | Yes (window server)                           | `window_not_capturable`                            | `window_not_capturable`                       |
+| Protected or capture-excluded window    | `blank_capture`                               | `blank_capture`                               | n/a                                                | n/a                                           |
+| Elevated window                         | `window_not_capturable` if the restore fails  | n/a                                           | n/a                                                | n/a                                           |
+| Locked screen, disconnected RDP         | `blank_capture`                               | `blank_capture`                               | n/a                                                | n/a                                           |
+| Service or SSH session                  | `no_interactive_session`                      | `no_interactive_session`                      | `no_display` without `DISPLAY`                     | `no_display`                                  |
+| Missing permission or tool              | n/a                                           | `permission_required`                         | `missing_dependency`                               | `permission_required` or `missing_dependency` |
+| Headless host                           | n/a                                           | n/a                                           | Xvfb through `x_display`                           | n/a                                           |
 
 Also check: focus and stacking unchanged after every capture; the original state is restored after a forced timeout; two concurrent calls serialize; Chromium, Electron (VS Code), UWP and full-screen apps on Windows.
 
 ## Risks
 
 - Token cost and context growth: normalization limits, prune accounting (M10), clear `read` versus `show_image` wording.
-- Payload and storage growth from base64: measure in M10 before any storage change.
+- Payload and storage growth from base64: measured in M12a; the transport half is fixed by M12, storage stays as is.
 - Sensitive screen content: `ask` by default, smallest-target guidance, per-user storage with short retention; images stay inside the existing session and provider trust boundary.
 - Window manipulation side effects: brief flashes, focus changes on X11, failed restores; mitigated by finalizers, the mutex and reporting.
 - OS permission friction for remote users: prompts appear on the host; errors must say exactly what to enable on the host.
 - Platform drift: capture tools and permissions change between OS releases; keep backends isolated and covered by the manual matrix.
 - Virtualized timeline jumps: fixed thumbnail height, reserved aspect ratio, the existing ResizeObserver measurement.
 - Child sessions: images shown by a subagent appear only in its child session; the primary agent can show them again by path.
+- Preview generation turning into turn latency: it lives inside `normalize`, so M12a and M12f measure it and the bound plus
+  the skip rules cap it. If the measurements ever move, move the work off the turn (fork and let the projection fall back to
+  the full URI until the preview exists) rather than raising the bound.
+- Projecting at the wrong layer loses the full image: `EventV2` is durable and replayed, so a substitution before publish
+  would put previews into anything rebuilt from replay and then send a preview to the model. Project only where the browser
+  reads.
+- Clients that assume inline full images: the TUI, ACP, RSS, SDK users, `draft-store.ts` and older browsers break if the
+  substitution is not gated per request. The gate defaults to off, and the app opts in only together with the full-image fetch.
 
 ## Open questions (defaults apply until decided)
 
 1. Windows minimized restore: ship the plain restore without activation (brief flash); adopt a hidden restore in M10 only if it proves reliable.
 2. GNOME on Wayland: use the screenshot portal when a non-interactive capture succeeds; otherwise report `unsupported`.
 3. `display: "all"` on macOS: one `screencapture -R` with the union of display bounds if that works on two displays; otherwise compose per-display captures with photon.
+4. Preview gate: declared query flag on the message page and the event subscribe route (default), or a global `server` config row. The flag is preferred because it is per request and per client; the config row is the fallback if the declared-schema change proves too invasive.
+5. Preview budget: 640 px long edge, the existing JPEG quality ladder, a ~64 KB target, skip under ~32 KB, `Effect.timeout` ~250 ms. Defaults until M12a measures what the 390 px and 1280 px cards actually need (360 px and 240 px caps at 2× DPR).
+6. Alpha sources: flatten previews to JPEG like the normalized copy does (default), or keep PNG for images that carry transparency and accept the size.
 
 ## Handoff
 
@@ -493,7 +596,7 @@ Definition of done for every milestone:
   and `show-image.txt` mirror the legacy contract with `LocationMutation`/`FSUtil` path resolution, external-directory
   then `read` asks, missing/directory/format/20 MB rejection hints, `Image.Service` normalization with explicit
   decode/size failures and `ResizerUnavailableError` fallback, final `{ path, name, mime, width, height, bytes,
-  caption?, resizedFrom?, shown: true, truncated: false }`, and a text + image `file` content result. It is registered
+caption?, resizedFrom?, shown: true, truncated: false }`, and a text + image `file` content result. It is registered
   in `builtins.ts` through `Tool.withPermission(..., "read")`, so a wholly denied `read` hides it. The tool uses
   `LocationMutation` and `FSUtil` directly rather than `ReadToolFileSystem` because the reader maps unsupported formats
   to `BinaryFileError` instead of the requested conversion hints. `SessionRunnerModel` gained an optional
@@ -583,3 +686,25 @@ Definition of done for every milestone:
   location tests; core and opencode typechecks pass. Commit: `fix: include image tokens in prune estimates`. The other
   M10 items remain pending: image-heavy measurements need a measurable browser host, the Windows no-flash restore needs
   an interactive Windows host, and MCP `annotations.audience` needs a decision about user-only tool-content visibility.
+- M12b/M12c/M12d/M12e implemented (working tree, **not committed**). Preview generation is bounded and non-fatal in both
+  normalizers; the browser substitution happens only on read (`packages/server/src/browser-image-preview.ts`,
+  `packages/opencode/src/server/browser-image-preview.ts`) behind the literal `imagePreviews=thumbnail` query, on the v2
+  message-list and `event.subscribe` routes, the v1 message-list, `/event` and `/global/event`; the full frame stays in
+  storage and in every non-gated response (TUI, ACP, RSS, SDK). Full frames come back from the new
+  `.../tool/:callID/image` routes as `{ uri, mime }` with `private, immutable` caching, and the UI fetches them only for
+  copy/save/open/attach and on viewer open (`withFullImage`, `packages/session-ui/src/components/image-actions-menu.tsx`),
+  keying the request on `ShownImageAddress` `{ sessionID, messageID, callID, index }` where `index` counts file items.
+  `packages/app` asks for previews through `fetchWithImagePreviews` (its pinned client cannot pass the parameter) and
+  resolves the full-frame request in `createServerSdkContextBase.loadFullImage`. New string `ui.imageActions.loadFailed`
+  added to `en.ts` and all 61 non-English locales.
+  Validation: `packages/opencode` `bun test test/server/` 349 pass / 1 fail (the pre-existing
+  `default in-process handler does not emit Effect HTTP response logs`), `bun test test/acp test/cli` 521/521,
+  `packages/server` 8/8, `packages/session-ui` 130/130, `packages/ui` 27/27, `packages/tui` 201 pass / 1 pre-existing
+  path-abbreviation fail, `packages/app` 806 pass / the 10 pre-existing solid-js `use` export load failures, and
+  `bun run typecheck` at the root is 30/30. `bun run generate` in `packages/client` is idempotent against this protocol.
+  Not done: the visual/browser matrix — preview paint, one full-image request per opened image, the next prompt still
+  carrying the full frame, GIF animation, preview-less session, failed fetch — and first timeline paint, which needs a
+  built `packages/app`. The M12a byte/latency baseline is recorded above (`script/bench-shown-image-preview.ts` and
+  `test/server/browser-image-preview-measure.test.ts`). Regenerating the vendored SDK also surfaced the pre-existing
+  staleness of `packages/sdk/js/src/v2/gen` and the `global.event(parameters, options)` signature break described in
+  `AGENTS.md`.

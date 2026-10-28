@@ -15,7 +15,7 @@ import type {
 } from "@opencode-ai/sdk/v2/client"
 import { expect, type Page } from "@playwright/test"
 import { Schema } from "effect"
-import { mockOpenCodeServer } from "../../utils/mock-server"
+import { mockOpenCodeServer, type MockServerConfig } from "../../utils/mock-server"
 import { installSseTransport } from "../../utils/sse-transport"
 import { expectSessionTitle } from "../../utils/waits"
 
@@ -111,6 +111,7 @@ export async function setupTimeline(
     deviceScaleFactor?: number
     seedHistory?: boolean
     protocol?: "v1" | "v2"
+    mock?: Partial<MockServerConfig>
   } = {},
 ) {
   const sessions = input.sessions ?? [session()]
@@ -128,6 +129,7 @@ export async function setupTimeline(
     retry: input.eventRetry ?? 20,
   })
   await mockOpenCodeServer(page, {
+    ...input.mock,
     protocol: input.protocol,
     directory,
     project: project(),

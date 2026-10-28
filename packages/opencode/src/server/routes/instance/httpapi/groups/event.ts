@@ -2,17 +2,23 @@ import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
-import { WorkspaceRoutingMiddleware, WorkspaceRoutingQuery } from "../middleware/workspace-routing"
+import { WorkspaceRoutingMiddleware, WorkspaceRoutingQueryFields } from "../middleware/workspace-routing"
 
 export const EventPaths = {
   event: "/event",
 } as const
 
+/** `imagePreviews=thumbnail` serves tool images as the small JPEG from `metadata.preview` instead of the full frame. */
+export const SubscribeQuery = Schema.Struct({
+  ...WorkspaceRoutingQueryFields,
+  imagePreviews: Schema.optional(Schema.Literal("thumbnail")),
+})
+
 export const EventApi = HttpApi.make("event").add(
   HttpApiGroup.make("event")
     .add(
       HttpApiEndpoint.get("subscribe", EventPaths.event, {
-        query: WorkspaceRoutingQuery,
+        query: SubscribeQuery,
         success: Schema.String.pipe(HttpApiSchema.asText({ contentType: "text/event-stream" })),
       }).annotateMerge(
         OpenApi.annotations({

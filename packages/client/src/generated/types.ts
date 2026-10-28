@@ -1770,17 +1770,26 @@ export type MessagesListInput = {
     readonly limit?: number | undefined
     readonly order?: "asc" | "desc" | undefined
     readonly cursor?: string | undefined
+    readonly imagePreviews?: "thumbnail" | undefined
   }["limit"]
   readonly order?: {
     readonly limit?: number | undefined
     readonly order?: "asc" | "desc" | undefined
     readonly cursor?: string | undefined
+    readonly imagePreviews?: "thumbnail" | undefined
   }["order"]
   readonly cursor?: {
     readonly limit?: number | undefined
     readonly order?: "asc" | "desc" | undefined
     readonly cursor?: string | undefined
+    readonly imagePreviews?: "thumbnail" | undefined
   }["cursor"]
+  readonly imagePreviews?: {
+    readonly limit?: number | undefined
+    readonly order?: "asc" | "desc" | undefined
+    readonly cursor?: string | undefined
+    readonly imagePreviews?: "thumbnail" | undefined
+  }["imagePreviews"]
 }
 
 export type MessagesListOutput = {
@@ -1937,6 +1946,22 @@ export type MessagesListOutput = {
   >
   readonly cursor: { readonly previous?: string | null; readonly next?: string | null }
 }
+
+export type MessagesImageInput = {
+  readonly sessionID: { readonly sessionID: string; readonly messageID: string; readonly callID: string }["sessionID"]
+  readonly messageID: { readonly sessionID: string; readonly messageID: string; readonly callID: string }["messageID"]
+  readonly callID: { readonly sessionID: string; readonly messageID: string; readonly callID: string }["callID"]
+  readonly source?: {
+    readonly source?: "content" | "attachments" | undefined
+    readonly index?: number | undefined
+  }["source"]
+  readonly index?: {
+    readonly source?: "content" | "attachments" | undefined
+    readonly index?: number | undefined
+  }["index"]
+}
+
+export type MessagesImageOutput = { readonly uri: string; readonly mime: string }
 
 export type ModelsListInput = {
   readonly location?: {
@@ -2606,6 +2631,10 @@ export type SkillsRemoveInput = {
 }
 
 export type SkillsRemoveOutput = void
+
+export type EventsSubscribeInput = {
+  readonly imagePreviews?: { readonly imagePreviews?: "thumbnail" | undefined }["imagePreviews"]
+}
 
 export type EventsSubscribeOutput = OpenCodeEventEncoded
 

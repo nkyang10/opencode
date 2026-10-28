@@ -1,5 +1,5 @@
-import { For, Show, createMemo, createSignal, type Accessor, type JSX } from "solid-js"
-import type { ImageViewerItem } from "@opencode-ai/ui/image-viewer"
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, type Accessor, type JSX } from "solid-js"
+import type { ImageViewerItem, ShownImageAddress } from "@opencode-ai/ui/image-viewer"
 import { ContextMenu } from "@opencode-ai/ui/context-menu"
 import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { Icon, type IconProps } from "@opencode-ai/ui/icon"
@@ -21,8 +21,9 @@ type ImageActionItem = {
   run: () => void
 }
 
-let preserveExternalFocus = false
+type FullImageLoader = (address: ShownImageAddress, options?: { signal?: AbortSignal }) => Promise<ImageSource>
 
+let preserveExternalFocus = false
 function consumeExternalFocus() {
   if (!preserveExternalFocus) return false
   preserveExternalFocus = false
@@ -44,6 +45,34 @@ function targetSource(item: ImageViewerItem): ImageSource {
     mime: item.mime,
     path: item.path,
   }
+}
+
+/**
+ * Bytes an action should hand over.
+ *
+ * A previewed shown image only carries the small frame in the timeline, so anything leaving the page (clipboard, disk,
+ * new tab, composer) has to fetch the full frame behind it first. The address is dropped from the result: it describes
+ * the preview, and keeping it would make every later action fetch again.
+ */
+function withFullImage(item: ImageViewerItem, load: FullImageLoader | undefined, options?: { signal?: AbortSignal }) {
+  if (!item.full || !load) return Promise.resolve(item)
+  return load(item.full, options).then((full) => ({ ...item, src: full.src, mime: full.mime, full: undefined }))
+}
+
+function showLoadFullImageFailed(i18n: UiI18n) {
+  showToast({
+    description: i18n.t("ui.imageActions.loadFailed"),
+    variant: "error",
+  })
+}
+
+function runWithFullImage(
+  item: ImageViewerItem,
+  load: FullImageLoader | undefined,
+  i18n: UiI18n,
+  next: (full: ImageViewerItem) => unknown,
+) {
+  void withFullImage(item, load).then(next, () => showLoadFullImageFailed(i18n))
 }
 
 function copyImageToClipboard(item: ImageViewerItem, i18n: UiI18n) {
@@ -190,7 +219,10 @@ function useImageActionItems(props: ImageActionItemProps): Accessor<ImageActionI
         id: "openInNewTab",
         label: i18n.t("ui.imageActions.openInNewTab"),
         icon: "square-arrow-top-right",
-        run: () => data.openImageInNewTab?.(targetSource(props.target)),
+        run: () =>
+          runWithFullImage(props.target, data.loadFullImage, i18n, (full) =>
+            data.openImageInNewTab?.(targetSource(full)),
+          ),
       })
     }
 
@@ -201,7 +233,7 @@ function useImageActionItems(props: ImageActionItemProps): Accessor<ImageActionI
         icon: "copy",
         description: reason,
         disabled: !!availability.copyImageDisabledReason,
-        run: () => void copyImageToClipboard(props.target, i18n),
+        run: () => runWithFullImage(props.target, data.loadFullImage, i18n, (full) => copyImageToClipboard(full, i18n)),
       })
     }
 
@@ -210,7 +242,7 @@ function useImageActionItems(props: ImageActionItemProps): Accessor<ImageActionI
         id: "saveImage",
         label: i18n.t("ui.imageActions.saveImage"),
         icon: "download",
-        run: () => saveImage(props.target),
+        run: () => runWithFullImage(props.target, data.loadFullImage, i18n, (full) => saveImage(full)),
       })
     }
 
@@ -252,28 +284,33 @@ function useImageActionItems(props: ImageActionItemProps): Accessor<ImageActionI
         run: () => {
           const attach = data.attachImage
           if (!attach) return
-          void Promise.resolve()
-            .then(() => attach(targetSource(props.target)))
-            .then(
-              () => {
-                showToast({
-                  description: i18n.t("ui.imageActions.attached"),
-                  variant: "success",
-                  icon: "check-small",
-                })
-                if (props.onAttach) {
-                  preserveExternalFocus = true
-                  props.onAttach()
-                }
-              },
-              () => {
-                preserveExternalFocus = false
-                showToast({
-                  description: i18n.t("ui.imageActions.attachFailed"),
-                  variant: "error",
-                })
-              },
-            )
+          void withFullImage(props.target, data.loadFullImage).then(
+            (full) =>
+              Promise.resolve(attach(targetSource(full))).then(
+                () => {
+                  showToast({
+                    description: i18n.t("ui.imageActions.attached"),
+                    variant: "success",
+                    icon: "check-small",
+                  })
+                  if (props.onAttach) {
+                    preserveExternalFocus = true
+                    props.onAttach()
+                  }
+                },
+                () => {
+                  preserveExternalFocus = false
+                  showToast({
+                    description: i18n.t("ui.imageActions.attachFailed"),
+                    variant: "error",
+                  })
+                },
+              ),
+            () => {
+              preserveExternalFocus = false
+              showLoadFullImageFailed(i18n)
+            },
+          )
         },
       })
     }
@@ -506,10 +543,53 @@ export function ImageViewerDialog(props: {
   onCloseAutoFocus?: (event: Event) => void
 }) {
   const i18n = useI18n()
+  const data = useData()
   const [index, setIndex] = createSignal(props.initialIndex)
   const [menuOpen, setMenuOpen] = createSignal(false)
   const [anchor, setAnchor] = createSignal({ left: 0, top: 0 })
-  const current = () => props.items[index()]
+  const [frames, setFrames] = createSignal<Record<number, ImageViewerItem>>({})
+  const items = createMemo(() => props.items.map((item, position) => frames()[position] ?? item))
+  const current = () => items()[index()]
+  const loads = new Map<number, AbortController>()
+
+  onCleanup(() => {
+    for (const abort of loads.values()) abort.abort()
+    loads.clear()
+  })
+
+  createEffect(() => {
+    const position = index()
+    const item = props.items[position]
+    const load = data.loadFullImage
+    if (!item?.full || !load || frames()[position]) return
+    const abort = loads.get(position) ?? new AbortController()
+    loads.set(position, abort)
+    void load(item.full, { signal: abort.signal }).then(
+      (full) =>
+        loadImage(full.src).then(
+          (image) => {
+            if (abort.signal.aborted) return
+            setFrames((value) => ({
+              ...value,
+              [position]: {
+                ...item,
+                src: full.src,
+                mime: full.mime,
+                width: image.naturalWidth,
+                height: image.naturalHeight,
+                full: undefined,
+              },
+            }))
+          },
+          () => {
+            if (!abort.signal.aborted) showLoadFullImageFailed(i18n)
+          },
+        ),
+      () => {
+        if (!abort.signal.aborted) showLoadFullImageFailed(i18n)
+      },
+    )
+  })
 
   const copyDisabledReason = () => {
     if (!current()) return i18n.t("ui.imageActions.copyImageUnavailable")
@@ -532,13 +612,13 @@ export function ImageViewerDialog(props: {
 
   return (
     <ImageViewer
-      items={props.items}
+      items={items()}
       index={index()}
       onIndexChange={setIndex}
       onClose={props.onClose}
       copyDisabledReason={copyDisabledReason()}
-      onCopy={(item) => copyImageToClipboard(item, i18n)}
-      onSave={(item) => saveImage(item)}
+      onCopy={(item) => runWithFullImage(item, data.loadFullImage, i18n, (full) => copyImageToClipboard(full, i18n))}
+      onSave={(item) => runWithFullImage(item, data.loadFullImage, i18n, (full) => saveImage(full))}
       onActions={() => openMenu()}
       onCloseAutoFocus={props.onCloseAutoFocus}
       actionsMenu={(item) => (

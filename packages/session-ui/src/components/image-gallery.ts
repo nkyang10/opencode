@@ -3,6 +3,7 @@ import type { ImageViewerItem } from "@opencode-ai/ui/image-viewer"
 import { absolutePath } from "./image-actions-helpers"
 import { attached, kind } from "./message-file"
 import { isInlineImageUrl, toolMedia, type ToolMediaItem } from "./tool-media"
+import { previewedImageAddress } from "./shown-image"
 
 export type ImageGalleryLabels = {
   image: string
@@ -72,6 +73,7 @@ export function toolImageViewerItem(
     path: absolutePath(toolImagePath(part)),
     messageID: part.messageID,
     partID: part.id,
+    full: previewedImageAddress(part, media.index),
   }
 }
 

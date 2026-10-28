@@ -16,7 +16,11 @@ export interface MockServerConfig {
   vcsDiff?: unknown[]
   messageDelay?: number
   beforeMessagesResponse?: (input: { sessionID: string; before?: string }) => Promise<void>
-  onMessages?: (input: { sessionID: string; before?: string; phase: "start" | "end" }) => void
+  onMessages?: (input: { sessionID: string; before?: string; phase: "start" | "end"; query: URLSearchParams }) => void
+  sessionImage?: (input: { sessionID: string; messageID: string; callID: string; index: number; source?: string }) => {
+    status?: number
+    body: unknown
+  }
   message?: (sessionID: string, messageID: string) => unknown
   onMessage?: (input: { sessionID: string; messageID: string }) => void
   events?: () => unknown[]
@@ -279,11 +283,11 @@ export async function mockOpenCodeServer(page: Page, config: MockServerConfig) {
       const token = url.searchParams.get("cursor") ?? undefined
       const before = token ? cursors.get(token) : undefined
       if (token && !before) return json(route, { error: "Invalid cursor" }, undefined, 400)
-      config.onMessages?.({ sessionID: currentMessagesMatch[1], before, phase: "start" })
+      config.onMessages?.({ sessionID: currentMessagesMatch[1], before, phase: "start", query: url.searchParams })
       await config.beforeMessagesResponse?.({ sessionID: currentMessagesMatch[1]!, before })
       if (config.messageDelay !== undefined) await new Promise((resolve) => setTimeout(resolve, config.messageDelay))
       const pageData = config.pageMessages(currentMessagesMatch[1], Number(url.searchParams.get("limit") ?? 50), before)
-      config.onMessages?.({ sessionID: currentMessagesMatch[1], before, phase: "end" })
+      config.onMessages?.({ sessionID: currentMessagesMatch[1], before, phase: "end", query: url.searchParams })
       const cursor = pageData.cursor ? `cursor_${++nextCursor}` : undefined
       if (cursor) cursors.set(cursor, pageData.cursor!)
       return json(route, {
@@ -297,16 +301,29 @@ export async function mockOpenCodeServer(page: Page, config: MockServerConfig) {
       const token = url.searchParams.get("before") ?? undefined
       const before = token ? cursors.get(token) : undefined
       if (token && !before) return json(route, { error: "Invalid cursor" }, undefined, 400)
-      config.onMessages?.({ sessionID: messagesMatch[1], before, phase: "start" })
+      config.onMessages?.({ sessionID: messagesMatch[1], before, phase: "start", query: url.searchParams })
       await config.beforeMessagesResponse?.({ sessionID: messagesMatch[1]!, before })
       if (config.messageDelay !== undefined) await new Promise((resolve) => setTimeout(resolve, config.messageDelay))
       const limit = Number(url.searchParams.get("limit") ?? 80)
       const pageData = config.pageMessages(messagesMatch[1], limit, before)
-      config.onMessages?.({ sessionID: messagesMatch[1], before, phase: "end" })
+      config.onMessages?.({ sessionID: messagesMatch[1], before, phase: "end", query: url.searchParams })
       if (!pageData.cursor) return json(route, pageData.items)
       const cursor = `cursor_${++nextCursor}`
       cursors.set(cursor, pageData.cursor)
       return json(route, pageData.items, { "x-next-cursor": cursor })
+    }
+
+    const imageMatch = path.match(/^\/(?:api\/)?session\/([^/]+)\/message\/([^/]+)\/tool\/([^/]+)\/image$/)
+    if (imageMatch) {
+      const result = config.sessionImage?.({
+        sessionID: imageMatch[1]!,
+        messageID: imageMatch[2]!,
+        callID: imageMatch[3]!,
+        index: Number(url.searchParams.get("index") ?? 0),
+        source: url.searchParams.get("source") ?? undefined,
+      })
+      if (!result) return json(route, { error: "Image not found" }, undefined, 404)
+      return json(route, result.body, undefined, result.status ?? 200)
     }
 
     if (url.port === targetPort && targetPort !== appPort) return json(route, {})

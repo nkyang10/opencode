@@ -397,6 +397,36 @@ describe("ShowImageTool normalization", () => {
         bytes: fixtures[0].data.length,
       })
       expect(settled.output?.structured).not.toHaveProperty("resizedFrom")
+      expect(settled.output?.structured).not.toHaveProperty("preview")
+    }),
+  )
+
+  it.effect("offers a bounded preview while the tool content keeps the full image", () =>
+    Effect.gen(function* () {
+      const photon = yield* Effect.promise(() => import("@silvia-odwyer/photon-node"))
+      const source = new photon.PhotonImage(
+        new Uint8Array(Array.from({ length: 1_600 * 1_200 * 4 }, (_, index) => (index % 4 === 3 ? 255 : index % 251))),
+        1_600,
+        1_200,
+      )
+      yield* put("preview.png", Buffer.from(source.get_bytes()))
+      source.free()
+
+      const registry = yield* ToolRegistry.Service
+      const settled = yield* settleTool(registry, call({ path: "preview.png" }))
+      const metadata = settled.output?.structured as ShowImageTool.Metadata
+      expect(settled.result.type).toBe("content")
+      if (settled.result.type !== "content") return
+      const media = settled.result.value[1]
+      if (media?.type !== "file") throw new Error("expected the shown image content")
+
+      expect(metadata.preview?.mime).toBe("image/jpeg")
+      expect(metadata.preview?.uri.startsWith("data:image/jpeg;base64,")).toBe(true)
+      expect(metadata.preview?.bytes).toBeLessThanOrEqual(96 * 1024)
+      expect(metadata.preview?.width).toBeLessThanOrEqual(640)
+      expect(metadata.preview?.height).toBeLessThanOrEqual(640)
+      expect(media.uri).not.toBe(metadata.preview?.uri)
+      expect(dataBytes(media.uri).length).toBeGreaterThan(96 * 1024)
     }),
   )
 

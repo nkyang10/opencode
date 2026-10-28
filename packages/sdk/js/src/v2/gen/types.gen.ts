@@ -150,6 +150,11 @@ export type MoveSessionError = {
   }
 }
 
+export type DirectoryPickerRequestError = {
+  _tag: "DirectoryPickerRequestError"
+  message: string
+}
+
 export type SnapshotFileDiff = {
   file?: string
   patch?: string
@@ -1717,16 +1722,6 @@ export type CommentaryConfig = {
   }
 }
 
-export type SearchConfig = {
-  provider?: "auto" | "exa" | "parallel" | "serper"
-  serper?: {
-    key?: string
-    country?: string
-    locale?: string
-    numResults?: number
-  }
-}
-
 export type PermissionActionConfig = "ask" | "allow" | "deny"
 
 export type PermissionObjectConfig = {
@@ -1753,6 +1748,7 @@ export type PermissionConfig =
       lsp?: PermissionRuleConfig
       doom_loop?: PermissionActionConfig
       skill?: PermissionRuleConfig
+      screenshot?: PermissionRuleConfig
       [key: string]: PermissionRuleConfig | PermissionActionConfig | undefined
     }
 
@@ -1961,6 +1957,11 @@ export type AttachmentConfig = {
 
 export type Config = {
   $schema?: string
+  search?: {
+    serper?: {
+      key?: string
+    }
+  }
   shell?: string
   logLevel?: LogLevel
   server?: ServerConfig
@@ -1975,7 +1976,6 @@ export type Config = {
     }
   }
   commentary?: CommentaryConfig
-  search?: SearchConfig
   skills?: {
     paths?: Array<string>
     urls?: Array<string>
@@ -2106,6 +2106,11 @@ export type Config = {
     mcp_timeout?: number
     policies?: Array<ConfigV2ExperimentalPolicy>
   }
+}
+
+export type ServerRestartUnavailable = {
+  _tag: "ServerRestartUnavailable"
+  message: string
 }
 
 export type GlobalLifecycle = {
@@ -2633,6 +2638,11 @@ export type NotFoundError = {
   }
 }
 
+export type SessionImage = {
+  uri: string
+  mime: string
+}
+
 export type TextPartInput = {
   id?: string
   type: "text"
@@ -2869,6 +2879,17 @@ export type SessionMessagesResponse = {
     previous?: string
     next?: string
   }
+}
+
+export type SessionImageResponse = {
+  /**
+   * The stored image as a data URL, exactly as the model receives it.
+   */
+  uri: string
+  /**
+   * Media type of the stored image.
+   */
+  mime: string
 }
 
 export type ProviderNotFoundError = {
@@ -7342,6 +7363,64 @@ export type ExperimentalControlPlaneMoveSessionResponses = {
 export type ExperimentalControlPlaneMoveSessionResponse =
   ExperimentalControlPlaneMoveSessionResponses[keyof ExperimentalControlPlaneMoveSessionResponses]
 
+export type GlobalDirectoryRootsData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/global/directory/roots"
+}
+
+export type GlobalDirectoryRootsErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type GlobalDirectoryRootsError = GlobalDirectoryRootsErrors[keyof GlobalDirectoryRootsErrors]
+
+export type GlobalDirectoryRootsResponses = {
+  /**
+   * Success
+   */
+  200: {
+    windows: boolean
+    roots: Array<string>
+  }
+}
+
+export type GlobalDirectoryRootsResponse = GlobalDirectoryRootsResponses[keyof GlobalDirectoryRootsResponses]
+
+export type GlobalDirectoryCreateData = {
+  body?: {
+    parent: string
+    name: string
+  }
+  path?: never
+  query?: never
+  url: "/global/directory"
+}
+
+export type GlobalDirectoryCreateErrors = {
+  /**
+   * DirectoryPickerRequestError | InvalidRequestError
+   */
+  400: DirectoryPickerRequestError | InvalidRequestError
+}
+
+export type GlobalDirectoryCreateError = GlobalDirectoryCreateErrors[keyof GlobalDirectoryCreateErrors]
+
+export type GlobalDirectoryCreateResponses = {
+  /**
+   * Success
+   */
+  200: {
+    directory: string
+  }
+}
+
+export type GlobalDirectoryCreateResponse = GlobalDirectoryCreateResponses[keyof GlobalDirectoryCreateResponses]
+
 export type GlobalHealthData = {
   body?: never
   path?: never
@@ -7373,7 +7452,9 @@ export type GlobalHealthResponse = GlobalHealthResponses[keyof GlobalHealthRespo
 export type GlobalEventData = {
   body?: never
   path?: never
-  query?: never
+  query?: {
+    imagePreviews?: "thumbnail"
+  }
   url: "/global/event"
 }
 
@@ -7472,6 +7553,8 @@ export type GlobalWebuiResponses = {
     runningHostname: string
     autoStart: boolean
     restartRequired: boolean
+    configFiles: Array<string>
+    configWritePath: string
   }
 }
 
@@ -7501,6 +7584,67 @@ export type GlobalDisposeResponses = {
 }
 
 export type GlobalDisposeResponse = GlobalDisposeResponses[keyof GlobalDisposeResponses]
+
+export type GlobalMaintenanceData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/global/maintenance"
+}
+
+export type GlobalMaintenanceErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type GlobalMaintenanceError = GlobalMaintenanceErrors[keyof GlobalMaintenanceErrors]
+
+export type GlobalMaintenanceResponses = {
+  /**
+   * Success
+   */
+  200: {
+    restartSupported: boolean
+    restarting: boolean
+  }
+}
+
+export type GlobalMaintenanceResponse = GlobalMaintenanceResponses[keyof GlobalMaintenanceResponses]
+
+export type GlobalRestartData = {
+  body?: {
+    [key: string]: unknown
+  }
+  path?: never
+  query?: never
+  url: "/global/restart"
+}
+
+export type GlobalRestartErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * ServerRestartUnavailable
+   */
+  409: ServerRestartUnavailable
+}
+
+export type GlobalRestartError = GlobalRestartErrors[keyof GlobalRestartErrors]
+
+export type GlobalRestartResponses = {
+  /**
+   * Success
+   */
+  200: {
+    accepted: boolean
+  }
+}
+
+export type GlobalRestartResponse = GlobalRestartResponses[keyof GlobalRestartResponses]
 
 export type GlobalLifecycleData = {
   body?: never
@@ -7596,6 +7740,7 @@ export type EventSubscribeData = {
   query?: {
     directory?: string
     workspace?: string
+    imagePreviews?: "thumbnail"
   }
   url: "/event"
 }
@@ -7664,6 +7809,34 @@ export type ConfigUpdateResponses = {
 }
 
 export type ConfigUpdateResponse = ConfigUpdateResponses[keyof ConfigUpdateResponses]
+
+export type ConfigSourcesData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/config/sources"
+}
+
+export type ConfigSourcesErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type ConfigSourcesError = ConfigSourcesErrors[keyof ConfigSourcesErrors]
+
+export type ConfigSourcesResponses = {
+  /**
+   * Success
+   */
+  200: Array<string>
+}
+
+export type ConfigSourcesResponse = ConfigSourcesResponses[keyof ConfigSourcesResponses]
 
 export type ConfigProvidersData = {
   body?: never
@@ -10160,6 +10333,7 @@ export type SessionMessagesData = {
     workspace?: string
     limit?: number
     before?: string
+    imagePreviews?: "thumbnail"
   }
   url: "/session/{sessionID}/message"
 }
@@ -10317,6 +10491,43 @@ export type SessionMessageResponses = {
 }
 
 export type SessionMessageResponse = SessionMessageResponses[keyof SessionMessageResponses]
+
+export type SessionImageData = {
+  body?: never
+  path: {
+    sessionID: string
+    messageID: string
+    callID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+    index?: string
+  }
+  url: "/session/{sessionID}/message/{messageID}/tool/{callID}/image"
+}
+
+export type SessionImageErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionImageError = SessionImageErrors[keyof SessionImageErrors]
+
+export type SessionImageResponses = {
+  /**
+   * The full image behind a previewed tool result
+   */
+  200: SessionImage
+}
+
+export type SessionImageResponse2 = SessionImageResponses[keyof SessionImageResponses]
 
 export type SessionForkData = {
   body?: {
@@ -11983,6 +12194,84 @@ export type V2SessionSwitchModelResponses = {
 
 export type V2SessionSwitchModelResponse = V2SessionSwitchModelResponses[keyof V2SessionSwitchModelResponses]
 
+export type V2SessionPauseGetData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: never
+  url: "/api/session/{sessionID}/pause"
+}
+
+export type V2SessionPauseGetErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * SessionNotFoundError
+   */
+  404: SessionNotFoundError
+}
+
+export type V2SessionPauseGetError = V2SessionPauseGetErrors[keyof V2SessionPauseGetErrors]
+
+export type V2SessionPauseGetResponses = {
+  /**
+   * Success
+   */
+  200: {
+    paused: boolean
+    waiting: boolean
+  }
+}
+
+export type V2SessionPauseGetResponse = V2SessionPauseGetResponses[keyof V2SessionPauseGetResponses]
+
+export type V2SessionPauseSetData = {
+  body: {
+    paused: boolean
+  }
+  path: {
+    sessionID: string
+  }
+  query?: never
+  url: "/api/session/{sessionID}/pause"
+}
+
+export type V2SessionPauseSetErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * SessionNotFoundError
+   */
+  404: SessionNotFoundError
+}
+
+export type V2SessionPauseSetError = V2SessionPauseSetErrors[keyof V2SessionPauseSetErrors]
+
+export type V2SessionPauseSetResponses = {
+  /**
+   * Success
+   */
+  200: {
+    paused: boolean
+    waiting: boolean
+  }
+}
+
+export type V2SessionPauseSetResponse = V2SessionPauseSetResponses[keyof V2SessionPauseSetResponses]
+
 export type V2SessionPromptData = {
   body: {
     id?: string
@@ -12430,6 +12719,7 @@ export type V2SessionMessagesData = {
      * Opaque pagination cursor returned as cursor.previous or cursor.next in the previous response. Do not combine with order.
      */
     cursor?: string
+    imagePreviews?: "thumbnail"
   }
   url: "/api/session/{sessionID}/message"
 }
@@ -12463,6 +12753,46 @@ export type V2SessionMessagesResponses = {
 }
 
 export type V2SessionMessagesResponse = V2SessionMessagesResponses[keyof V2SessionMessagesResponses]
+
+export type V2SessionImageData = {
+  body?: never
+  path: {
+    sessionID: string
+    messageID: string
+    callID: string
+  }
+  query?: {
+    source?: "content" | "attachments"
+    index?: string
+  }
+  url: "/api/session/{sessionID}/message/{messageID}/tool/{callID}/image"
+}
+
+export type V2SessionImageErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * SessionNotFoundError | MessageNotFoundError
+   */
+  404: MessageNotFoundError | SessionNotFoundError
+}
+
+export type V2SessionImageError = V2SessionImageErrors[keyof V2SessionImageErrors]
+
+export type V2SessionImageResponses = {
+  /**
+   * SessionImageResponse
+   */
+  200: SessionImageResponse
+}
+
+export type V2SessionImageResponse = V2SessionImageResponses[keyof V2SessionImageResponses]
 
 export type V2ModelListData = {
   body?: never
@@ -13531,7 +13861,9 @@ export type V2SkillSetEnabledResponse = V2SkillSetEnabledResponses[keyof V2Skill
 export type V2EventSubscribeData = {
   body?: never
   path?: never
-  query?: never
+  query?: {
+    imagePreviews?: "thumbnail"
+  }
   url: "/api/event"
 }
 

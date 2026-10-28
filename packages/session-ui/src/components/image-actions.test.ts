@@ -361,7 +361,11 @@ describe("sessionImageGallery", () => {
         ],
       },
     })
-    const item = toolImageViewerItem(relative, { kind: "image", key: "att", url: PNG, mime: "image/png" }, labels)
+    const item = toolImageViewerItem(
+      relative,
+      { kind: "image", key: "att", url: PNG, mime: "image/png", index: 0 },
+      labels,
+    )
     expect(item.source).toBe("read · src/logo.png")
     expect(item.path).toBeUndefined()
   })

@@ -250,14 +250,34 @@ type Endpoint4_0Input = {
   readonly limit?: Endpoint4_0Request["query"]["limit"]
   readonly order?: Endpoint4_0Request["query"]["order"]
   readonly cursor?: Endpoint4_0Request["query"]["cursor"]
+  readonly imagePreviews?: Endpoint4_0Request["query"]["imagePreviews"]
 }
 const Endpoint4_0 = (raw: RawClient["server.message"]) => (input: Endpoint4_0Input) =>
   raw["session.messages"]({
     params: { sessionID: input["sessionID"] },
-    query: { limit: input["limit"], order: input["order"], cursor: input["cursor"] },
+    query: {
+      limit: input["limit"],
+      order: input["order"],
+      cursor: input["cursor"],
+      imagePreviews: input["imagePreviews"],
+    },
   }).pipe(Effect.mapError(mapClientError))
 
-const adaptGroup4 = (raw: RawClient["server.message"]) => ({ list: Endpoint4_0(raw) })
+type Endpoint4_1Request = Parameters<RawClient["server.message"]["session.image"]>[0]
+type Endpoint4_1Input = {
+  readonly sessionID: Endpoint4_1Request["params"]["sessionID"]
+  readonly messageID: Endpoint4_1Request["params"]["messageID"]
+  readonly callID: Endpoint4_1Request["params"]["callID"]
+  readonly source?: Endpoint4_1Request["query"]["source"]
+  readonly index?: Endpoint4_1Request["query"]["index"]
+}
+const Endpoint4_1 = (raw: RawClient["server.message"]) => (input: Endpoint4_1Input) =>
+  raw["session.image"]({
+    params: { sessionID: input["sessionID"], messageID: input["messageID"], callID: input["callID"] },
+    query: { source: input["source"], index: input["index"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+const adaptGroup4 = (raw: RawClient["server.message"]) => ({ list: Endpoint4_0(raw), image: Endpoint4_1(raw) })
 
 type Endpoint5_0Request = Parameters<RawClient["server.model"]["model.list"]>[0]
 type Endpoint5_0Input = { readonly location?: Endpoint5_0Request["query"]["location"] }
@@ -566,9 +586,11 @@ const adaptGroup12 = (raw: RawClient["server.skill"]) => ({
   remove: Endpoint12_3(raw),
 })
 
-const Endpoint13_0 = (raw: RawClient["server.event"]) => () =>
+type Endpoint13_0Request = Parameters<RawClient["server.event"]["event.subscribe"]>[0]
+type Endpoint13_0Input = { readonly imagePreviews?: Endpoint13_0Request["query"]["imagePreviews"] }
+const Endpoint13_0 = (raw: RawClient["server.event"]) => (input?: Endpoint13_0Input) =>
   Stream.unwrap(
-    raw["event.subscribe"]({}).pipe(
+    raw["event.subscribe"]({ query: { imagePreviews: input?.["imagePreviews"] } }).pipe(
       Effect.mapError(mapClientError),
       Effect.map((stream) => stream.pipe(Stream.mapError(mapClientError))),
     ),

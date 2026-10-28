@@ -22,6 +22,8 @@ import type {
   ConfigGetResponses,
   ConfigProvidersErrors,
   ConfigProvidersResponses,
+  ConfigSourcesErrors,
+  ConfigSourcesResponses,
   ConfigUpdateErrors,
   ConfigUpdateResponses,
   EventSubscribeResponses,
@@ -80,6 +82,10 @@ import type {
   GlobalConfigGetResponses,
   GlobalConfigUpdateErrors,
   GlobalConfigUpdateResponses,
+  GlobalDirectoryCreateErrors,
+  GlobalDirectoryCreateResponses,
+  GlobalDirectoryRootsErrors,
+  GlobalDirectoryRootsResponses,
   GlobalDisposeErrors,
   GlobalDisposeResponses,
   GlobalEventErrors,
@@ -90,6 +96,10 @@ import type {
   GlobalLifecycleArmResponses,
   GlobalLifecycleErrors,
   GlobalLifecycleResponses,
+  GlobalMaintenanceErrors,
+  GlobalMaintenanceResponses,
+  GlobalRestartErrors,
+  GlobalRestartResponses,
   GlobalUpgradeErrors,
   GlobalUpgradeResponses,
   GlobalWebuiErrors,
@@ -209,6 +219,8 @@ import type {
   SessionForkResponses,
   SessionGetErrors,
   SessionGetResponses,
+  SessionImageErrors,
+  SessionImageResponses,
   SessionInitErrors,
   SessionInitResponses,
   SessionListErrors,
@@ -365,6 +377,8 @@ import type {
   V2SessionGetResponses,
   V2SessionHistoryErrors,
   V2SessionHistoryResponses,
+  V2SessionImageErrors,
+  V2SessionImageResponses,
   V2SessionInterruptErrors,
   V2SessionInterruptResponses,
   V2SessionListErrors,
@@ -373,6 +387,10 @@ import type {
   V2SessionMessageResponses,
   V2SessionMessagesErrors,
   V2SessionMessagesResponses,
+  V2SessionPauseGetErrors,
+  V2SessionPauseGetResponses,
+  V2SessionPauseSetErrors,
+  V2SessionPauseSetResponses,
   V2SessionPermissionCreateErrors,
   V2SessionPermissionCreateResponses,
   V2SessionPermissionGetErrors,
@@ -1301,6 +1319,60 @@ export class Experimental extends HeyApiClient {
   }
 }
 
+export class Directory extends HeyApiClient {
+  /**
+   * List server filesystem roots
+   *
+   * List accessible drive roots on Windows, or the POSIX filesystem root.
+   */
+  public roots<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<
+      GlobalDirectoryRootsResponses,
+      GlobalDirectoryRootsErrors,
+      ThrowOnError
+    >({ url: "/global/directory/roots", ...options })
+  }
+
+  /**
+   * Create one subdirectory
+   *
+   * Create a new directory directly inside an absolute server parent, without recursive creation or overwriting.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters?: {
+      parent?: string
+      name?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "body", key: "parent" },
+            { in: "body", key: "name" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      GlobalDirectoryCreateResponses,
+      GlobalDirectoryCreateErrors,
+      ThrowOnError
+    >({
+      url: "/global/directory",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
 export class Config extends HeyApiClient {
   /**
    * Get global configuration
@@ -1343,7 +1415,7 @@ export class Lifecycle extends HeyApiClient {
   /**
    * Announce a restart window
    *
-   * Arm the drain window before stopping the server, so connected clients can count down, stop sending new prompts, and hold what the reader was trying to send.
+   * Arm the drain window before stopping the server, so connected clients can display an advisory countdown. Clients may still submit prompts.
    */
   public arm<ThrowOnError extends boolean = false>(
     parameters?: {
@@ -1394,10 +1466,17 @@ export class Global extends HeyApiClient {
    *
    * Subscribe to global events from the OpenCode system using server-sent events.
    */
-  public event<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+  public event<ThrowOnError extends boolean = false>(
+    parameters?: {
+      imagePreviews?: "thumbnail"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "imagePreviews" }] }])
     return (options?.client ?? this.client).sse.get<GlobalEventResponses, GlobalEventErrors, ThrowOnError>({
       url: "/global/event",
       ...options,
+      ...params,
     })
   }
 
@@ -1422,6 +1501,39 @@ export class Global extends HeyApiClient {
     return (options?.client ?? this.client).post<GlobalDisposeResponses, GlobalDisposeErrors, ThrowOnError>({
       url: "/global/dispose",
       ...options,
+    })
+  }
+
+  public maintenance<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<GlobalMaintenanceResponses, GlobalMaintenanceErrors, ThrowOnError>({
+      url: "/global/maintenance",
+      ...options,
+    })
+  }
+
+  /**
+   * Restart the standalone CLI host
+   *
+   * Request an idempotent server-side restart after a bounded drain. Unsupported on embedded hosts. Requires the same authentication as other global administration routes.
+   */
+  public restart<ThrowOnError extends boolean = false>(
+    parameters?: {
+      body?: {
+        [key: string]: unknown
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ key: "body", map: "body" }] }])
+    return (options?.client ?? this.client).post<GlobalRestartResponses, GlobalRestartErrors, ThrowOnError>({
+      url: "/global/restart",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 
@@ -1461,6 +1573,11 @@ export class Global extends HeyApiClient {
     })
   }
 
+  private _directory?: Directory
+  get directory(): Directory {
+    return (this._directory ??= new Directory({ client: this.client }))
+  }
+
   private _config?: Config
   get config(): Config {
     return (this._config ??= new Config({ client: this.client }))
@@ -1482,6 +1599,7 @@ export class Event extends HeyApiClient {
     parameters?: {
       directory?: string
       workspace?: string
+      imagePreviews?: "thumbnail"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1492,6 +1610,7 @@ export class Event extends HeyApiClient {
           args: [
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
+            { in: "query", key: "imagePreviews" },
           ],
         },
       ],
@@ -1569,6 +1688,36 @@ export class Config2 extends HeyApiClient {
         ...options?.headers,
         ...params.headers,
       },
+    })
+  }
+
+  /**
+   * List active configuration files
+   *
+   * List existing file-backed configuration sources loaded for this directory, highest precedence first. Inline environment configuration is not a file.
+   */
+  public sources<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<ConfigSourcesResponses, ConfigSourcesErrors, ThrowOnError>({
+      url: "/config/sources",
+      ...options,
+      ...params,
     })
   }
 
@@ -3997,6 +4146,7 @@ export class Session2 extends HeyApiClient {
       workspace?: string
       limit?: number
       before?: string
+      imagePreviews?: "thumbnail"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -4010,6 +4160,7 @@ export class Session2 extends HeyApiClient {
             { in: "query", key: "workspace" },
             { in: "query", key: "limit" },
             { in: "query", key: "before" },
+            { in: "query", key: "imagePreviews" },
           ],
         },
       ],
@@ -4148,6 +4299,44 @@ export class Session2 extends HeyApiClient {
     )
     return (options?.client ?? this.client).get<SessionMessageResponses, SessionMessageErrors, ThrowOnError>({
       url: "/session/{sessionID}/message/{messageID}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Get a stored tool image
+   *
+   * Return the full image a browser was served as a thumbnail, addressed by the tool call that produced it.
+   */
+  public image<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      messageID: string
+      callID: string
+      directory?: string
+      workspace?: string
+      index?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "messageID" },
+            { in: "path", key: "callID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "index" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<SessionImageResponses, SessionImageErrors, ThrowOnError>({
+      url: "/session/{sessionID}/message/{messageID}/tool/{callID}/image",
       ...options,
       ...params,
     })
@@ -5407,6 +5596,62 @@ export class Agent extends HeyApiClient {
   }
 }
 
+export class Pause extends HeyApiClient {
+  /**
+   * Get pause state
+   *
+   * Read this process's session pause request and whether it reached a safe provider-turn boundary.
+   */
+  public get<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "sessionID" }] }])
+    return (options?.client ?? this.client).get<V2SessionPauseGetResponses, V2SessionPauseGetErrors, ThrowOnError>({
+      url: "/api/session/{sessionID}/pause",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Pause or resume a session
+   *
+   * Idempotently request pause before the next provider turn without interrupting current tools, or release that pause. Inactive sessions cannot be paused.
+   */
+  public set<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      paused?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "body", key: "paused" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<V2SessionPauseSetResponses, V2SessionPauseSetErrors, ThrowOnError>({
+      url: "/api/session/{sessionID}/pause",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
 export class Revert extends HeyApiClient {
   /**
    * Stage session revert
@@ -6158,6 +6403,7 @@ export class Session3 extends HeyApiClient {
       limit?: number
       order?: "asc" | "desc"
       cursor?: string
+      imagePreviews?: "thumbnail"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -6170,6 +6416,7 @@ export class Session3 extends HeyApiClient {
             { in: "query", key: "limit" },
             { in: "query", key: "order" },
             { in: "query", key: "cursor" },
+            { in: "query", key: "imagePreviews" },
           ],
         },
       ],
@@ -6179,6 +6426,47 @@ export class Session3 extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  /**
+   * Get the full image of a shown tool result
+   *
+   * Return the stored full image behind one file of a completed tool result, for clients that received the thumbnail preview instead. Responses are immutable and cached privately; this is not an asset route, and callers are expected to turn the data URL into a blob URL.
+   */
+  public image<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      messageID: string
+      callID: string
+      source?: "content" | "attachments"
+      index?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "path", key: "messageID" },
+            { in: "path", key: "callID" },
+            { in: "query", key: "source" },
+            { in: "query", key: "index" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<V2SessionImageResponses, V2SessionImageErrors, ThrowOnError>({
+      url: "/api/session/{sessionID}/message/{messageID}/tool/{callID}/image",
+      ...options,
+      ...params,
+    })
+  }
+
+  private _pause?: Pause
+  get pause(): Pause {
+    return (this._pause ??= new Pause({ client: this.client }))
   }
 
   private _revert?: Revert
@@ -6989,10 +7277,17 @@ export class Event2 extends HeyApiClient {
    *
    * Subscribe to native event payloads for the server.
    */
-  public subscribe<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+  public subscribe<ThrowOnError extends boolean = false>(
+    parameters?: {
+      imagePreviews?: "thumbnail"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "imagePreviews" }] }])
     return (options?.client ?? this.client).sse.get<V2EventSubscribeResponses, V2EventSubscribeErrors, ThrowOnError>({
       url: "/api/event",
       ...options,
+      ...params,
     })
   }
 }

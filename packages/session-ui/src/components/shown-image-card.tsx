@@ -54,6 +54,7 @@ export function ShownImageCard(props: { part: ToolPart }) {
       path: current.path,
       messageID: props.part.messageID,
       partID: props.part.id,
+      full: current.full,
     }
   })
   let imageRef: HTMLButtonElement | undefined

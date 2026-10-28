@@ -64,6 +64,43 @@ export function createApiForServer(input: {
 export type ServerApi = OpenCodeClient
 
 /**
+ * Routes that swap a shown image for the small JPEG the tool generated beside it when the request asks for it.
+ *
+ * The v2 client this app is pinned to (`vendor/opencode-ai-client-*.tgz`) predates `imagePreviews`, so its typed input
+ * cannot carry the flag; tagging the request here keeps the fetch the one place that knows the server supports it.
+ */
+const IMAGE_PREVIEW_PATHS = [
+  /^\/api\/event$/,
+  /^\/api\/session\/[^/]+\/message$/,
+  /^\/global\/event$/,
+  /^\/event$/,
+  /^\/session\/[^/]+\/message$/,
+]
+
+export function fetchWithImagePreviews(base?: typeof globalThis.fetch): typeof globalThis.fetch {
+  const fetchImpl = base ?? globalThis.fetch
+  const wrapped = (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = requestUrl(input)
+    if (!url || !IMAGE_PREVIEW_PATHS.some((path) => path.test(url.pathname))) return fetchImpl(input, init)
+    if (!url.searchParams.has("imagePreviews")) url.searchParams.set("imagePreviews", "thumbnail")
+    // A Request carries its own method, headers, body and signal; rebuilding it from the URL would drop them.
+    if (input instanceof Request) return fetchImpl(new Request(url.toString(), input), init)
+    return fetchImpl(url.toString(), init)
+  }
+  // The `fetch` type also carries `preconnect`, which this wrapper has no reason to intercept.
+  return wrapped as unknown as typeof globalThis.fetch
+}
+
+function requestUrl(input: RequestInfo | URL) {
+  const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
+  try {
+    return new URL(href)
+  } catch {
+    return
+  }
+}
+
+/**
  * Directories the server recorded for one project.
  *
  * `GET /project/{projectID}/directories` is a server route the generated client does not

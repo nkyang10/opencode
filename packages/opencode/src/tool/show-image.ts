@@ -36,6 +36,7 @@ type Metadata = {
   bytes: number
   caption?: string
   resizedFrom?: { width: number; height: number; bytes: number }
+  preview?: Image.Preview
   shown: true
   truncated: false
 }
@@ -135,10 +136,10 @@ export const ShowImageTool = Tool.define<
         filename: name,
         url: `data:${original.mime};base64,${Buffer.from(bytes).toString("base64")}`,
       }
-      const normalized = yield* image.normalize(input).pipe(
+      const normalized = yield* image.normalize(input, { preview: true }).pipe(
         Effect.catchIf(
           (error) => error instanceof Image.ResizerUnavailableError,
-          () => Effect.succeed(input),
+          () => Effect.succeed({ ...input, preview: undefined }),
         ),
         Effect.catch((error) => Effect.fail(new Error(`Could not normalize image ${name}: ${error.message}`))),
       )
@@ -168,6 +169,7 @@ export const ShowImageTool = Tool.define<
           ...(resized
             ? { resizedFrom: { width: original.width, height: original.height, bytes: bytes.length } }
             : {}),
+          ...(normalized.preview === undefined ? {} : { preview: normalized.preview }),
           shown: true as const,
           truncated: false as const,
         },

@@ -129,9 +129,13 @@ const layer = Layer.effectDiscard(
                   encoding: "base64",
                   mime: result.mime,
                 }
-                const normalized = yield* image.normalize("screenshot", rawContent).pipe(
-                  Effect.catchTag("Image.ResizerUnavailableError", () => Effect.succeed(rawContent)),
-                )
+                const normalized = yield* image
+                  .normalize("screenshot", rawContent, { preview: true })
+                  .pipe(
+                    Effect.catchTag("Image.ResizerUnavailableError", () =>
+                      Effect.succeed({ ...rawContent, preview: undefined }),
+                    ),
+                  )
                 const saved = yield* storage.write({ data: result.data, slug: screenshotSlug(input) })
                 const shownBytes = Buffer.from(normalized.content, "base64")
                 const parsed = imageDimensions(new Uint8Array(shownBytes))
@@ -171,6 +175,7 @@ const layer = Layer.effectDiscard(
                     platform: result.platform,
                     ...(input.caption === undefined ? {} : { caption: input.caption }),
                     ...(result.others === undefined ? {} : { others: result.others }),
+                    ...(normalized.preview === undefined ? {} : { preview: normalized.preview }),
                     shown: true as const,
                     truncated: false as const,
                   },

@@ -8,7 +8,7 @@ import { useImageActions, openImageInNewTab } from "@/context/image-actions"
 import { useLanguage } from "@/context/language"
 import { LocalProvider } from "@/context/local"
 import { usePlatform } from "@/context/platform"
-import { SDKProvider } from "@/context/sdk"
+import { SDKProvider, useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { decode64 } from "@/utils/base64"
 import { Schema } from "effect"
@@ -34,6 +34,7 @@ export function DirectoryDataProvider(
   const server = useServer()
   const settings = useSettings()
   const imageActions = useImageActions()
+  const sdk = useSDK()
   const language = useLanguage()
   const directory = () => (typeof props.directory === "function" ? props.directory() : props.directory)
   const slug = createMemo(() => base64Encode(directory()))
@@ -156,6 +157,7 @@ export function DirectoryDataProvider(
           onSessionHref={href}
           onAttachImage={settings.general.newLayoutDesigns() ? attachImage : undefined}
           onOpenImageInNewTab={platform.platform === "web" ? openImage : undefined}
+          onLoadFullImage={(image) => sdk().loadFullImage(image)}
           onRevealPath={
             platform.platform === "desktop" && server.isLocal() && platform.revealPath ? reveal : undefined
           }

@@ -43,6 +43,8 @@ import type {
   SessionsMessageOutput,
   MessagesListInput,
   MessagesListOutput,
+  MessagesImageInput,
+  MessagesImageOutput,
   ModelsListInput,
   ModelsListOutput,
   ProvidersListInput,
@@ -95,6 +97,7 @@ import type {
   SkillsSetEnabledOutput,
   SkillsRemoveInput,
   SkillsRemoveOutput,
+  EventsSubscribeInput,
   EventsSubscribeOutput,
   PtysListInput,
   PtysListOutput,
@@ -532,9 +535,26 @@ export function make(options: ClientOptions) {
           {
             method: "GET",
             path: `/api/session/${encodeURIComponent(input.sessionID)}/message`,
-            query: { limit: input["limit"], order: input["order"], cursor: input["cursor"] },
+            query: {
+              limit: input["limit"],
+              order: input["order"],
+              cursor: input["cursor"],
+              imagePreviews: input["imagePreviews"],
+            },
             successStatus: 200,
             declaredStatuses: [400, 404, 500, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      image: (input: MessagesImageInput, requestOptions?: RequestOptions) =>
+        request<MessagesImageOutput>(
+          {
+            method: "GET",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/message/${encodeURIComponent(input.messageID)}/tool/${encodeURIComponent(input.callID)}/image`,
+            query: { source: input["source"], index: input["index"] },
+            successStatus: 200,
+            declaredStatuses: [404, 400, 401],
             empty: false,
           },
           requestOptions,
@@ -880,9 +900,19 @@ export function make(options: ClientOptions) {
         ),
     },
     events: {
-      subscribe: (requestOptions?: RequestOptions): AsyncIterable<EventsSubscribeOutput> =>
+      subscribe: (
+        input?: EventsSubscribeInput,
+        requestOptions?: RequestOptions,
+      ): AsyncIterable<EventsSubscribeOutput> =>
         sse<EventsSubscribeOutput>(
-          { method: "GET", path: `/api/event`, successStatus: 200, declaredStatuses: [401, 400], empty: false },
+          {
+            method: "GET",
+            path: `/api/event`,
+            query: { imagePreviews: input?.["imagePreviews"] },
+            successStatus: 200,
+            declaredStatuses: [401, 400],
+            empty: false,
+          },
           requestOptions,
         ),
     },

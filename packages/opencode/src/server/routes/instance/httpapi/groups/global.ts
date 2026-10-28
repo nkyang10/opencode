@@ -13,6 +13,13 @@ const GlobalHealth = Schema.Struct({
   healthy: Schema.Literal(true),
   version: Schema.String,
 })
+/**
+ * The stream has to carry the flag itself: a browser that can re-fetch a full image later is the only reader that wants
+ * the small JPEG swapped in, and the swap cannot happen where the event is published.
+ */
+export const GlobalEventQuery = Schema.Struct({
+  imagePreviews: Schema.optional(Schema.Literal("thumbnail")),
+})
 
 // FE-023: what the Admin settings section needs to render honest rows — the port
 // stored in the global config, the port the listener actually bound, and whether
@@ -154,6 +161,7 @@ export const GlobalApi = HttpApi.make("global").add(
         }),
       ),
       HttpApiEndpoint.get("event", GlobalPaths.event, {
+        query: GlobalEventQuery,
         success: GlobalEventSchema,
       }).annotateMerge(
         OpenApi.annotations({

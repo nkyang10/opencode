@@ -6,6 +6,8 @@ export type ToolMediaItem = {
   url: string
   mime: string
   filename?: string
+  /** Position among the attachments of the tool result, which is also where the server keeps it. */
+  index: number
 }
 
 const INLINE_IMAGE = /^data:image\/(png|jpeg|gif|webp);base64,/i
@@ -25,5 +27,6 @@ export function toolMedia(part: ToolPart | undefined): ToolMediaItem[] {
     url: file.url,
     mime: file.mime,
     filename: file.filename,
+    index,
   }))
 }

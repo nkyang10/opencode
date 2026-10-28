@@ -1,6 +1,7 @@
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Agent } from "@/agent/agent"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
+import { BrowserImagePreview } from "@/server/browser-image-preview"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Command } from "@/command"
 import { Permission } from "@/permission"
@@ -35,6 +36,7 @@ import {
   PermissionResponsePayload,
   PromptPayload,
   RevertPayload,
+  SessionImageQuery,
   ShellPayload,
   SummarizePayload,
   UpdatePayload,
@@ -140,8 +142,10 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
         })
       }
       yield* requireSession(ctx.params.sessionID)
+      const previews = ctx.query.imagePreviews === "thumbnail"
       if (ctx.query.limit === undefined || ctx.query.limit === 0) {
-        return yield* SessionError.mapStorageNotFound(session.messages({ sessionID: ctx.params.sessionID }))
+        const all = yield* SessionError.mapStorageNotFound(session.messages({ sessionID: ctx.params.sessionID }))
+        return previews ? BrowserImagePreview.previewMessages(all) : all
       }
 
       const page = yield* SessionError.mapStorageNotFound(
@@ -151,7 +155,8 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
           before: ctx.query.before,
         }),
       )
-      if (!page.cursor) return page.items
+      const items = previews ? BrowserImagePreview.previewMessages(page.items) : page.items
+      if (!page.cursor) return items
 
       const request = yield* HttpServerRequest.HttpServerRequest
       // toURL() honors the Host + x-forwarded-proto headers, so the Link
@@ -159,7 +164,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       const url = Option.getOrElse(HttpServerRequest.toURL(request), () => new URL(request.url, "http://localhost"))
       url.searchParams.set("limit", ctx.query.limit.toString())
       url.searchParams.set("before", page.cursor)
-      return HttpServerResponse.jsonUnsafe(page.items, {
+      return HttpServerResponse.jsonUnsafe(items, {
         headers: {
           "Access-Control-Expose-Headers": "Link, X-Next-Cursor",
           Link: `<${url.toString()}>; rel="next"`,
@@ -173,6 +178,25 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     }) {
       return yield* SessionError.mapStorageNotFound(
         MessageV2.get({ sessionID: ctx.params.sessionID, messageID: ctx.params.messageID }),
+      )
+    })
+
+    const image = Effect.fn("SessionHttpApi.image")(function* (ctx: {
+      params: { sessionID: SessionID; messageID: MessageID; callID: string }
+      query: typeof SessionImageQuery.Type
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      const found = yield* SessionError.mapStorageNotFound(
+        MessageV2.get({ sessionID: ctx.params.sessionID, messageID: ctx.params.messageID }),
+      )
+      const file = storedAttachment(found.parts, ctx.params.callID, ctx.query.index ?? 0)
+      if (!file) return yield* notFound("no stored image behind that tool result")
+      // A completed tool part never changes, so the browser may keep the full image for as long as the message.
+      return HttpServerResponse.jsonUnsafe(
+        { uri: file.url, mime: file.mime },
+        {
+          headers: { etag: imageValidator(file.url), "cache-control": "private, immutable" },
+        },
       )
     })
 
@@ -563,6 +587,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("diff", diff)
       .handle("messages", messages)
       .handle("message", message)
+      .handle("image", image)
       .handleRaw("create", createRaw)
       .handle("remove", remove)
       .handle("update", update)
@@ -590,3 +615,24 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("updatePart", updatePart)
   }),
 )
+
+/**
+ * The stored attachment behind one completed tool part, which is what a client that was served a thumbnail has to
+ * re-fetch. Mirrors the mime guard of `BrowserImagePreview`, which is the only thing that would have replaced it.
+ */
+function storedAttachment(parts: readonly SessionV1.Part[], callID: string, index: number) {
+  const part = parts.find((item) => item.type === "tool" && item.callID === callID)
+  if (part?.type !== "tool" || part.state.status !== "completed") return undefined
+  const file = part.state.attachments?.[index]
+  if (!file || !file.mime.startsWith("image/") || !file.url.startsWith("data:image/")) return undefined
+  return { url: file.url, mime: file.mime }
+}
+
+/** Weak validator over the data URL. The stored part is immutable, so any stable digest of it is enough. */
+function imageValidator(url: string) {
+  let digest = 0x811c9dc5
+  for (let index = 0; index < url.length; index++) {
+    digest = Math.imul(digest ^ url.charCodeAt(index), 0x01000193) >>> 0
+  }
+  return `W/"${url.length.toString(16)}-${digest.toString(16)}"`
+}

@@ -1,5 +1,6 @@
 - To regenerate the legacy JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit `src/generated` or `src/generated-effect` directly.
+- Regenerating the vendored `packages/sdk/js` SDK too: a route that gains a query parameter changes the generated method's **first positional argument** (`global.event(options)` becomes `global.event(parameters, options)`), which silently drops `signal` at call sites that still pass options first. Audit those call sites in `packages/tui`, `packages/opencode/src/acp` and `packages/opencode/src/cli/cmd/run`.
 - Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk-next` composes Client, Core, and Server.
 - The default branch in this repo is `dev`. `origin` is `https://github.com/nkyang10/opencode.git`. Do not add extra local branches.
 - Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.

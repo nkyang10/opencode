@@ -10,6 +10,19 @@ const MAX_ZOOM = 800
 const FIT_PADDING = 32
 const INLINE_IMAGE_SRC = /^data:image\/(png|jpeg|gif|webp);base64,/i
 
+/**
+ * Locates the full frame behind a preview on the server that stored it.
+ *
+ * Which field of the stored tool result holds the image is a property of the protocol speaking to that server, so it is
+ * not part of the address. `index` counts the image among the file items of the tool result, in order.
+ */
+export type ShownImageAddress = {
+  sessionID: string
+  messageID: string
+  callID: string
+  index: number
+}
+
 export type ImageViewerItem = {
   src: string
   alt: string
@@ -22,6 +35,8 @@ export type ImageViewerItem = {
   path?: string
   messageID?: string
   partID?: string
+  /** Set when `src` is only the small preview the tool generated, so the full frame has to be fetched. */
+  full?: ShownImageAddress
 }
 
 function clamp(value: number, min: number, max: number) {

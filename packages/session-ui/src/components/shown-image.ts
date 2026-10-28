@@ -1,4 +1,5 @@
 import type { ToolPart } from "@opencode-ai/sdk/v2"
+import type { ShownImageAddress } from "@opencode-ai/ui/image-viewer"
 import { toolMedia } from "./tool-media"
 
 export type ShownImage = {
@@ -12,6 +13,8 @@ export type ShownImage = {
   width?: number
   height?: number
   bytes?: number
+  /** Where the server keeps the full frame, when `url` is only the preview it served in its place. */
+  full?: ShownImageAddress
 }
 
 function stringValue(value: unknown): string | undefined {
@@ -64,5 +67,22 @@ export function shownImage(part: ToolPart | undefined): ShownImage | undefined {
     width: positiveNumber(metadata.width),
     height: positiveNumber(metadata.height),
     bytes: nonNegativeNumber(metadata.bytes),
+    full: previewedImageAddress(part, image.index),
   }
+}
+
+/**
+ * Address of the full frame behind a tool image, when the server's browser projection served a preview in its place.
+ *
+ * That projection keeps `preview` as a description and strips its `uri`, because the preview itself is what travelled in
+ * place of the full image, so a `preview` without a uri is the marker. `index` is the position among the file items of
+ * the tool result, which is where the server keeps it.
+ */
+export function previewedImageAddress(part: ToolPart, index: number): ShownImageAddress | undefined {
+  if (part.state.status !== "completed") return
+  const metadata = part.state.metadata
+  const preview = typeof metadata === "object" && metadata ? (metadata as Record<string, unknown>).preview : undefined
+  if (!preview || typeof preview !== "object" || Array.isArray(preview) || "uri" in preview) return
+  if (!part.sessionID || !part.messageID || !part.callID) return
+  return { sessionID: part.sessionID, messageID: part.messageID, callID: part.callID, index }
 }

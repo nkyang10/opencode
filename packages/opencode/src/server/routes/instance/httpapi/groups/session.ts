@@ -45,7 +45,21 @@ export const MessagesQuery = Schema.Struct({
   ...WorkspaceRoutingQueryFields,
   limit: Schema.optional(Schema.NumberFromString.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
   before: Schema.optional(Schema.String),
+  /** Serve agent-shown images as the small JPEG from `state.metadata.preview` instead of the full stored frame. */
+  imagePreviews: Schema.optional(Schema.Literal("thumbnail")),
 })
+/**
+ * Addresses one attachment inside one completed tool result, which is what a previewed client has to re-fetch. v1 keeps
+ * tool files only in `state.attachments`, so unlike the v2 route there is no `source` to pick.
+ */
+export const SessionImageQuery = Schema.Struct({
+  ...WorkspaceRoutingQueryFields,
+  index: Schema.optional(Schema.NumberFromString.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
+})
+export const SessionImage = Schema.Struct({
+  uri: Schema.String,
+  mime: Schema.String,
+}).annotate({ identifier: "SessionImage" })
 export const StatusMap = Schema.Record(Schema.String, SessionStatus.Info)
 // FE-028. `limit` is the initial paint size for the commentary panel; the running list arrives over SSE.
 export const CommentaryQuery = Schema.Struct({
@@ -163,6 +177,7 @@ export const SessionPaths = {
   diff: `${root}/:sessionID/diff`,
   messages: `${root}/:sessionID/message`,
   message: `${root}/:sessionID/message/:messageID`,
+  image: `${root}/:sessionID/message/:messageID/tool/:callID/image`,
   create: root,
   remove: `${root}/:sessionID`,
   update: `${root}/:sessionID`,
@@ -347,6 +362,19 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.message",
             summary: "Get message",
             description: "Retrieve a specific message from a session by its message ID.",
+          }),
+        ),
+        HttpApiEndpoint.get("image", SessionPaths.image, {
+          params: { sessionID: SessionID, messageID: MessageID, callID: Schema.String },
+          query: SessionImageQuery,
+          success: described(SessionImage, "The full image behind a previewed tool result"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.image",
+            summary: "Get a stored tool image",
+            description:
+              "Return the full image a browser was served as a thumbnail, addressed by the tool call that produced it.",
           }),
         ),
         HttpApiEndpoint.post("create", SessionPaths.create, {

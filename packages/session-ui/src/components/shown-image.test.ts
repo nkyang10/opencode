@@ -220,4 +220,26 @@ describe("shownImage", () => {
     expect(image?.key).toBe("file_first")
     expect(image?.filename).toBe("first.png")
   })
+
+  test("carries the address of the full frame when the served url is a preview", () => {
+    const image = shownImage(
+      completed({ shown: true, preview: { mime: "image/jpeg", width: 320, height: 160, bytes: 40_000 } }, [
+        attachment({ id: "file_pdf", mime: "application/pdf", url: "data:application/pdf;base64,JVBERi0=" }),
+        attachment({ url: JPEG, mime: "image/jpeg" }),
+      ]),
+    )
+
+    expect(image?.url).toBe(JPEG)
+    expect(image?.full).toEqual({ sessionID: "ses_1", messageID: "msg_1", callID: "call_1", index: 1 })
+  })
+
+  test("keeps no address while the preview still carries its own uri", () => {
+    const image = shownImage(
+      completed({ shown: true, preview: { uri: JPEG, mime: "image/jpeg" } }, [
+        attachment({ url: JPEG, mime: "image/jpeg" }),
+      ]),
+    )
+
+    expect(image?.full).toBeUndefined()
+  })
 })

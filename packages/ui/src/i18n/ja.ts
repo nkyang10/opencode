@@ -141,6 +141,7 @@ export const dict = {
   "ui.imageActions.copyFailed": "Could not copy image",
   "ui.imageActions.attached": "Image attached to the message",
   "ui.imageActions.attachFailed": "Could not attach the image",
+  "ui.imageActions.loadFailed": "Could not load the full image",
   "ui.imageActions.revealFailed": "Could not reveal the file",
   "ui.imageActions.actions": "Image actions",
 

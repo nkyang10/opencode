@@ -108,6 +108,15 @@ const ResizedFrom = Schema.Struct({
   bytes: Schema.Number,
 })
 
+/** A small JPEG of the shown image. Only the browser copy uses it; the stored attachment keeps the full frame. */
+const Preview = Schema.Struct({
+  uri: Schema.String,
+  mime: Schema.String,
+  width: Schema.Number,
+  height: Schema.Number,
+  bytes: Schema.Number,
+})
+
 export const CaptureMetadata = Schema.Struct({
   action: Schema.Literal("capture"),
   path: Schema.String,
@@ -127,6 +136,7 @@ export const CaptureMetadata = Schema.Struct({
   platform: Schema.Literals(["linux", "darwin", "win32", "unknown"]),
   caption: Schema.optional(Schema.String),
   others: Schema.optional(Schema.Array(Schema.String)),
+  preview: Schema.optional(Preview),
   shown: Schema.Literal(true),
   truncated: Schema.Literal(false),
 })

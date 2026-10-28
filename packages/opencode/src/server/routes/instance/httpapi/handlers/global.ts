@@ -3,6 +3,7 @@ import { SessionV2 } from "@opencode-ai/core/session"
 import { ActiveTurns } from "@/session/active-turns"
 import { Config } from "@/config/config"
 import { GlobalBus, type GlobalEvent as GlobalBusEvent } from "@/bus/global"
+import { BrowserImagePreview } from "@/server/browser-image-preview"
 import { EffectBridge } from "@/effect/bridge"
 import { EventV2 } from "@opencode-ai/core/event"
 import { Installation } from "@/installation"
@@ -17,18 +18,18 @@ import { HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import * as Sse from "effect/unstable/encoding/Sse"
 import { RootHttpApi } from "../api"
-import { DirectoryPickerRequestError, GlobalUpgradeInput, ServerRestartUnavailable } from "../groups/global"
+import { DirectoryPickerRequestError, GlobalEventQuery, GlobalUpgradeInput, ServerRestartUnavailable } from "../groups/global"
 
-function eventData(data: unknown): Sse.Event {
+function eventData(data: unknown, imagePreviews: boolean): Sse.Event {
   return {
     _tag: "Event",
     event: "message",
     id: undefined,
-    data: JSON.stringify(data),
+    data: JSON.stringify(imagePreviews ? BrowserImagePreview.previewGlobalEvent(data) : data),
   }
 }
 
-function eventResponse() {
+function eventResponse(imagePreviews: boolean) {
   return Effect.gen(function* () {
     yield* Effect.logInfo("global event connected")
     const events = Stream.callback<GlobalBusEvent>((queue) => {
@@ -46,7 +47,7 @@ function eventResponse() {
     return HttpServerResponse.stream(
       Stream.make({ payload: { id: EventV2.ID.create(), type: "server.connected", properties: {} } }).pipe(
         Stream.concat(events.pipe(Stream.merge(heartbeat, { haltStrategy: "left" }))),
-        Stream.map(eventData),
+        Stream.map((event) => eventData(event, imagePreviews)),
         Stream.pipeThroughChannel(Sse.encode()),
         Stream.encodeText,
         Stream.ensuring(Effect.logInfo("global event disconnected")),
@@ -74,8 +75,8 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       return { healthy: true as const, version: InstallationVersion }
     })
 
-    const event = Effect.fn("GlobalHttpApi.event")(function* () {
-      return yield* eventResponse()
+    const event = Effect.fn("GlobalHttpApi.event")(function* (ctx: { query: typeof GlobalEventQuery.Type }) {
+      return yield* eventResponse(ctx.query.imagePreviews === "thumbnail")
     })
 
     const configGet = Effect.fn("GlobalHttpApi.configGet")(function* () {

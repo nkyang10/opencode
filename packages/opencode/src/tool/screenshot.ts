@@ -86,10 +86,10 @@ export const ScreenshotTool = Tool.define<
         filename: "screenshot.png",
         url: `data:${result.mime};base64,${raw}`,
       }
-      const normalized = yield* image.normalize(rawInput).pipe(
+      const normalized = yield* image.normalize(rawInput, { preview: true }).pipe(
         Effect.catchIf(
           (error) => error instanceof Image.ResizerUnavailableError,
-          () => Effect.succeed(rawInput),
+          () => Effect.succeed({ ...rawInput, preview: undefined }),
         ),
       )
       const saved = yield* storage.write({ data: result.data, slug: screenshotSlug(input) })
@@ -127,6 +127,7 @@ export const ScreenshotTool = Tool.define<
           platform: result.platform,
           ...(params.caption === undefined ? {} : { caption: params.caption }),
           ...(result.others === undefined ? {} : { others: result.others }),
+          ...(normalized.preview === undefined ? {} : { preview: normalized.preview }),
           shown: true as const,
           truncated: false as const,
         },
