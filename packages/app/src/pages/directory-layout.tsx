@@ -1,16 +1,19 @@
-import { DataProvider } from "@opencode-ai/session-ui/context"
+import { DataProvider, type ImageSource } from "@opencode-ai/session-ui/context"
 import { showToast } from "@/utils/toast"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { useLocation, useNavigate, useParams } from "@solidjs/router"
 import { type Accessor, createEffect, createMemo, createResource, onCleanup, onMount, type ParentProps, Show } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
+import { useImageActions, openImageInNewTab } from "@/context/image-actions"
 import { useLanguage } from "@/context/language"
 import { LocalProvider } from "@/context/local"
+import { usePlatform } from "@/context/platform"
 import { SDKProvider } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { decode64 } from "@/utils/base64"
 import { Schema } from "effect"
-import type { ServerConnection } from "@/context/server"
+import { useServer, type ServerConnection } from "@/context/server"
+import { useSettings } from "@/context/settings"
 import { sessionHref } from "@/utils/session-route"
 import { useServerSync } from "@/context/server-sync"
 import { debugLog } from "@/utils/foreground-debug"
@@ -27,12 +30,32 @@ export function DirectoryDataProvider(
   const params = useParams()
   const sync = useSync()
   const serverSync = useServerSync()
+  const platform = usePlatform()
+  const server = useServer()
+  const settings = useSettings()
+  const imageActions = useImageActions()
+  const language = useLanguage()
   const directory = () => (typeof props.directory === "function" ? props.directory() : props.directory)
   const slug = createMemo(() => base64Encode(directory()))
   const href = (sessionID: string) => {
     const server = props.server?.()
     if (server) return sessionHref(server, sessionID)
     return `/${slug()}/session/${sessionID}`
+  }
+
+  const attachImage = (image: ImageSource) => imageActions.attachImage(image)
+
+  const openImage = (image: ImageSource) => {
+    try {
+      openImageInNewTab(image)
+    } catch {
+      showToast({ variant: "error", title: language.t("imageActions.openFailed.title") })
+    }
+  }
+
+  const reveal = (path: string) => {
+    if (!platform.revealPath) return false
+    return platform.revealPath(path).catch(() => false)
   }
 
   createEffect(() => {
@@ -131,6 +154,11 @@ export function DirectoryDataProvider(
           sessionID={params.id}
           onNavigateToSession={(sessionID: string) => navigate(href(sessionID))}
           onSessionHref={href}
+          onAttachImage={settings.general.newLayoutDesigns() ? attachImage : undefined}
+          onOpenImageInNewTab={platform.platform === "web" ? openImage : undefined}
+          onRevealPath={
+            platform.platform === "desktop" && server.isLocal() && platform.revealPath ? reveal : undefined
+          }
         >
           <LocalProvider>{props.children}</LocalProvider>
         </DataProvider>

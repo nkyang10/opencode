@@ -26,6 +26,12 @@ export const userID = "msg_1000_timeline_user"
 export const assistantID = "msg_1001_timeline_assistant"
 export const title = "Timeline visual stability"
 export const model = { providerID: "opencode", modelID: "claude-opus-4-6", variant: "max" }
+export const smallPng =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP4z8DwHwAFAAH/VscvDQAAAABJRU5ErkJggg=="
+export const widePng =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAECAYAAACzzX7wAAAAFklEQVR42mNkaPj/nwEPYGIgAChXAABDogKGwRRGqQAAAABJRU5ErkJggg=="
+
+type ToolAttachment = { id: string; type: "file"; mime: string; filename?: string; url: string }
 
 type TimelinePayload = Extract<
   GlobalEvent["payload"],
@@ -67,7 +73,14 @@ type ToolOptions<State extends ToolStatus> = State extends "pending"
     ? { title?: string; metadata?: Record<string, unknown>; output?: never; error?: never }
     : State extends "error"
       ? { error?: string; metadata?: Record<string, unknown>; output?: never; title?: never }
-      : { output?: string; title?: string; metadata?: Record<string, unknown>; error?: never }
+      : {
+          output?: string
+          title?: string
+          metadata?: Record<string, unknown>
+          error?: never
+          attachments?: ToolAttachment[]
+          compacted?: number
+        }
 
 const decodeOptions = { errors: "all", onExcessProperty: "error" } as const
 const decodeMessage = Schema.decodeUnknownSync(SessionV1.WithParts)
@@ -486,15 +499,21 @@ export function toolPart(
         time: { start: 1700000001000, end: 1700000002000 },
       },
     }
+  const completed = options as ToolOptions<"completed">
   return {
     ...base,
     state: {
       status: state,
       input,
-      output: options.output ?? "Completed",
-      title: options.title ?? tool,
-      metadata: options.metadata ?? {},
-      time: { start: 1700000001000, end: 1700000002000 },
+      output: completed.output ?? "Completed",
+      title: completed.title ?? tool,
+      metadata: completed.metadata ?? {},
+      time: {
+        start: 1700000001000,
+        end: 1700000002000,
+        ...(completed.compacted === undefined ? {} : { compacted: completed.compacted }),
+      },
+      attachments: completed.attachments?.map((file) => ({ ...file, sessionID, messageID: assistantID })),
     },
   }
 }

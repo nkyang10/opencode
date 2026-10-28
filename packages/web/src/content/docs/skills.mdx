@@ -31,6 +31,28 @@ Global definitions are also loaded from `~/.config/opencode/skills/*/SKILL.md`, 
 
 ---
 
+## Built-in skills
+
+OpenCode ships with two built-in skills:
+
+- `customize-opencode` helps with OpenCode's own configuration files, agents, commands, skills, plugins, MCP servers, and permission rules.
+- `capture-screenshot` helps capture or show the screen, an application window, a web page or a test artifact, and routes to `show_image` (and the `screenshot` tool where available). It saves captures under the default screenshots directory (`~/.local/share/opencode/screenshots/`) unless the user asks for a project copy.
+
+Built-in skills appear in the same list as discovered skills. A user skill with the same name overrides the built-in one. To hide a built-in skill from agents, deny it in `permission.skill`:
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "skill": {
+      "capture-screenshot": "deny"
+    }
+  }
+}
+```
+
+---
+
 ## Write frontmatter
 
 Each `SKILL.md` must start with YAML frontmatter.

@@ -1,0 +1,462 @@
+(function () {
+  ObjC.import("Foundation")
+  ObjC.import("AppKit")
+  try {
+    ObjC.import("CoreGraphics")
+  } catch (error) {
+    void error
+  }
+  try {
+    ObjC.import("ApplicationServices")
+  } catch (error) {
+    void error
+  }
+
+  var OPTION_ON_SCREEN_ONLY = 1
+  var OPTION_EXCLUDE_DESKTOP_ELEMENTS = 16
+  var OPTION_INCLUDING_WINDOW = 8
+  var LIST_OPTIONS = OPTION_EXCLUDE_DESKTOP_ELEMENTS
+  var ALL_ON_SCREEN_OPTIONS = OPTION_ON_SCREEN_ONLY | OPTION_EXCLUDE_DESKTOP_ELEMENTS
+
+  function fail(code, reason, candidates) {
+    var payload = { code: code, reason: reason }
+    if (candidates && candidates.length) payload.candidates = candidates
+    throw new Error(JSON.stringify(payload))
+  }
+
+  function text(value) {
+    if (value === undefined || value === null) return ""
+    if (typeof value === "string") return value
+    try {
+      return String(ObjC.unwrap(value))
+    } catch (error) {
+      void error
+      try {
+        return String(value.js)
+      } catch (inner) {
+        void inner
+        return String(value)
+      }
+    }
+  }
+
+  function number(value) {
+    var parsed = typeof value === "number" ? value : Number(ObjC.unwrap(value))
+    return isFinite(parsed) ? parsed : undefined
+  }
+
+  function bool(value) {
+    return value === true || Number(ObjC.unwrap(value)) === 1
+  }
+
+  function rounded(value) {
+    return Math.round(number(value) || 0)
+  }
+
+  function preflightScreenCapture() {
+    var mainDisplayID
+    try {
+      if ($.CGMainDisplayID) mainDisplayID = Number($.CGMainDisplayID())
+    } catch (error) {
+      void error
+    }
+    if (mainDisplayID === 0) fail("no_interactive_session", "No macOS window server display is available.")
+
+    var session = undefined
+    try {
+      if ($.CGSessionCopyCurrentDictionary) session = $.CGSessionCopyCurrentDictionary()
+    } catch (error) {
+      void error
+    }
+    var onConsole
+    try {
+      if (session) onConsole = number(session.objectForKey("kCGSSessionOnConsoleKey"))
+    } catch (error) {
+      void error
+    }
+    if (onConsole !== undefined && onConsole !== 1)
+      fail("no_interactive_session", "macOS screenshot capture requires an interactive console session.")
+
+    var screenCaptureAccess
+    try {
+      if ($.CGPreflightScreenCaptureAccess) screenCaptureAccess = $.CGPreflightScreenCaptureAccess()
+    } catch (error) {
+      void error
+    }
+    if (screenCaptureAccess === false)
+      fail("permission_required", "macOS Screen Recording permission is required for screenshot capture.")
+  }
+
+  function screenName(screen, index) {
+    try {
+      var name = text(screen.localizedName)
+      if (name) return name
+    } catch (error) {
+      void error
+    }
+    return "Display " + String(index + 1)
+  }
+
+  function listDisplays() {
+    var screens = $.NSScreen.screens
+    var count = screens ? screens.count : 0
+    var out = []
+    if (count === 0) return out
+
+    var top = 0
+    for (var i = 0; i < count; i++) {
+      var frame = screens.objectAtIndex(i).frame
+      top = Math.max(top, number(frame.origin.y) + number(frame.size.height))
+    }
+
+    var main = 0
+    try {
+      if ($.CGMainDisplayID) main = Number($.CGMainDisplayID())
+    } catch (error) {
+      void error
+    }
+
+    for (var j = 0; j < count; j++) {
+      var screen = screens.objectAtIndex(j)
+      var f = screen.frame
+      var displayID = 0
+      try {
+        displayID = Number(screen.displayID)
+      } catch (error) {
+        void error
+      }
+      out.push({
+        index: j + 1,
+        name: screenName(screen, j),
+        primary: main !== 0 ? displayID === main : j === 0,
+        bounds: {
+          width: rounded(f.size.width),
+          height: rounded(f.size.height),
+          x: rounded(f.origin.x),
+          y: rounded(top - f.origin.y - f.size.height),
+        },
+        scale: number(screen.backingScaleFactor) || 1,
+      })
+    }
+
+    if (!out.some(function (display) { return display.primary })) out[0].primary = true
+    return out
+  }
+
+  function rawWindowInfos(options, windowId) {
+    var infos = $.CGWindowListCopyWindowInfo(options, windowId === undefined ? 0 : windowId)
+    if (!infos) return []
+    return ObjC.deepUnwrap(infos) || []
+  }
+
+  function windowBounds(info) {
+    var bounds = info.kCGWindowBounds
+    if (!bounds) return undefined
+    var width = number(bounds.Width)
+    var height = number(bounds.Height)
+    if (!width || !height || width <= 0 || height <= 0) return undefined
+    return {
+      width: rounded(width),
+      height: rounded(height),
+      x: rounded(bounds.X),
+      y: rounded(bounds.Y),
+    }
+  }
+
+  function displayForWindow(window, displays) {
+    if (!displays.length) return 1
+    if (!window.bounds) return displays[0].index
+    var center = {
+      x: window.bounds.x + Math.floor(window.bounds.width / 2),
+      y: window.bounds.y + Math.floor(window.bounds.height / 2),
+    }
+    for (var i = 0; i < displays.length; i++) {
+      var bounds = displays[i].bounds
+      if (!bounds) continue
+      if (
+        center.x >= bounds.x &&
+        center.x < bounds.x + bounds.width &&
+        center.y >= bounds.y &&
+        center.y < bounds.y + bounds.height
+      )
+        return displays[i].index
+    }
+    for (var j = 0; j < displays.length; j++) if (displays[j].primary) return displays[j].index
+    return displays[0].index
+  }
+
+  function normalizeWindow(info, displays) {
+    var id = number(info.kCGWindowNumber)
+    var layer = number(info.kCGWindowLayer)
+    var bounds = windowBounds(info)
+    var owner = text(info.kCGWindowOwnerName)
+    if (!id || !bounds || !owner || (layer !== undefined && layer > 0)) return undefined
+    var title = text(info.kCGWindowName)
+    var pid = number(info.kCGWindowOwnerPID)
+    var window = {
+      id: "0x" + id.toString(16),
+      app: owner,
+      pid: pid === undefined ? undefined : pid,
+      title: title || undefined,
+      bounds: bounds,
+      display: displayForWindow({ bounds: bounds }, displays),
+      minimized: !bool(info.kCGWindowIsOnscreen),
+    }
+    return window
+  }
+
+  function listWindows(displays) {
+    var infos = rawWindowInfos(LIST_OPTIONS)
+    var out = []
+    for (var i = 0; i < infos.length; i++) {
+      var window = normalizeWindow(infos[i], displays)
+      if (window) out.push(window)
+    }
+    return out
+  }
+
+  function parseWindowId(value) {
+    var selector = String(value || "").trim()
+    var parsed = /^0x/i.test(selector) ? parseInt(selector, 16) : Number(selector)
+    if (!isFinite(parsed) || parsed <= 0) fail("window_not_found", "Invalid macOS window id " + selector)
+    return parsed
+  }
+
+  function targetWindowInfo(id) {
+    var wanted = "0x" + id.toString(16)
+    var displays = listDisplays()
+    var infos = rawWindowInfos(OPTION_INCLUDING_WINDOW | OPTION_EXCLUDE_DESKTOP_ELEMENTS, id)
+    for (var i = 0; i < infos.length; i++) {
+      var normalized = normalizeWindow(infos[i], displays)
+      if (normalized && normalized.id === wanted) return normalized
+    }
+    var all = rawWindowInfos(ALL_ON_SCREEN_OPTIONS)
+    for (var j = 0; j < all.length; j++) {
+      var window = normalizeWindow(all[j], displays)
+      if (window && window.id === wanted) return window
+    }
+    return undefined
+  }
+
+  function collectionLength(collection) {
+    try {
+      return Number(collection.length || 0)
+    } catch (error) {
+      void error
+      try {
+        return Number(collection.count || 0)
+      } catch (inner) {
+        void inner
+        return 0
+      }
+    }
+  }
+
+  function collectionAt(collection, index) {
+    try {
+      return collection[index]
+    } catch (error) {
+      void error
+      try {
+        return collection.objectAtIndex(index)
+      } catch (inner) {
+        void inner
+        return undefined
+      }
+    }
+  }
+
+  function collectionArray(collection) {
+    var out = []
+    var length = collectionLength(collection)
+    for (var i = 0; i < length; i++) {
+      var item = collectionAt(collection, i)
+      if (item) out.push(item)
+    }
+    return out
+  }
+
+  function accessibilityTrusted() {
+    try {
+      return Boolean($.AXIsProcessTrusted && $.AXIsProcessTrusted())
+    } catch (error) {
+      void error
+      return false
+    }
+  }
+
+  function processUnixId(process) {
+    try {
+      return Number(process.unixId())
+    } catch (error) {
+      void error
+      return 0
+    }
+  }
+
+  function findProcess(systemEvents, owner, pid) {
+    try {
+      var byId = collectionArray(systemEvents.applicationProcesses.whose({ unixId: pid }))
+      if (byId[0]) return byId[0]
+    } catch (error) {
+      void error
+    }
+
+    try {
+      var byName = collectionArray(systemEvents.applicationProcesses.whose({ name: owner }))
+      for (var i = 0; i < byName.length; i++) if (processUnixId(byName[i]) === pid) return byName[i]
+      if (byName[0]) return byName[0]
+    } catch (error) {
+      void error
+    }
+    return undefined
+  }
+
+  function windowMinimized(window) {
+    try {
+      var value = window.minimized
+      if (typeof value === "function") return Boolean(value.call(window))
+      return Boolean(value)
+    } catch (error) {
+      void error
+      return false
+    }
+  }
+
+  function setWindowMinimized(window, value) {
+    try {
+      window.minimized = value
+      return
+    } catch (error) {
+      void error
+    }
+    try {
+      window.minimized.setValue(value)
+    } catch (inner) {
+      void inner
+      fail("permission_required", "macOS Accessibility permission could not change the minimized window state.")
+    }
+  }
+
+  function windowArray(process) {
+    try {
+      return collectionArray(process.windows())
+    } catch (error) {
+      void error
+      return []
+    }
+  }
+
+  function windowNumber(window) {
+    try {
+      return Number(window.windowNumber())
+    } catch (error) {
+      void error
+      return 0
+    }
+  }
+
+  function windowText(window) {
+    try {
+      return String(window.title())
+    } catch (error) {
+      void error
+      return ""
+    }
+  }
+
+  function windowPosition(window) {
+    try {
+      var position = window.position()
+      return { x: Number(position[0]), y: Number(position[1]) }
+    } catch (error) {
+      void error
+      return undefined
+    }
+  }
+
+  function windowSize(window) {
+    try {
+      var size = window.size()
+      return { width: Number(size[0]), height: Number(size[1]) }
+    } catch (error) {
+      void error
+      return undefined
+    }
+  }
+
+  function scoreSystemWindow(window, target) {
+    var score = 0
+    var title = windowText(window)
+    if (target.title) {
+      if (title === target.title) score += 4
+      else if (title.indexOf(target.title) >= 0) score += 3
+    }
+    if (windowNumber(window) > 0 && target.id === "0x" + windowNumber(window).toString(16)) score += 5
+
+    var size = windowSize(window)
+    if (size && target.bounds && Math.abs(size.width - target.bounds.width) <= 2 && Math.abs(size.height - target.bounds.height) <= 2)
+      score += 2
+    var position = windowPosition(window)
+    if (position && target.bounds && Math.abs(position.x - target.bounds.x) <= 2 && Math.abs(position.y - target.bounds.y) <= 2)
+      score += 1
+    return score
+  }
+
+  function selectSystemWindow(process, target, sourceMinimized) {
+    var windows = windowArray(process)
+    var candidates = []
+    for (var i = 0; i < windows.length; i++) {
+      if (windowMinimized(windows[i]) === sourceMinimized)
+        candidates.push({ score: scoreSystemWindow(windows[i], target), window: windows[i] })
+    }
+    if (!candidates.length) {
+      for (var j = 0; j < windows.length; j++)
+        if (windowMinimized(windows[j]) === sourceMinimized)
+          candidates.push({ score: 0, window: windows[j] })
+    }
+    candidates.sort(function (left, right) {
+      return right.score - left.score
+    })
+    if (!candidates.length) return undefined
+    return candidates[0].window
+  }
+
+  function restoreMinimized(input) {
+    if (!accessibilityTrusted())
+      fail("permission_required", "macOS Accessibility permission is required to restore a minimized window.")
+
+    var id = parseWindowId(input.id)
+    var target = targetWindowInfo(id)
+    if (!target) fail("window_not_found", "No macOS window was found for id " + String(input.id))
+
+    var systemEvents = undefined
+    try {
+      systemEvents = Application("System Events")
+    } catch (error) {
+      void error
+      fail("permission_required", "macOS System Events is unavailable; Accessibility permission may be disabled.")
+    }
+
+    var process = findProcess(systemEvents, target.app, target.pid || 0)
+    if (!process) fail("window_not_found", "The macOS application for window " + target.id + " was not found.")
+
+    var desired = Boolean(input.minimized)
+    var sourceMinimized = !desired
+    var window = selectSystemWindow(process, target, sourceMinimized)
+    if (!window) fail("window_not_found", "No macOS System Events window matched " + target.id)
+
+    setWindowMinimized(window, desired)
+    return { ok: true, focusChanged: false }
+  }
+
+  return {
+    list: function () {
+      preflightScreenCapture()
+      var displays = listDisplays()
+      if (!displays.length) fail("no_interactive_session", "No macOS displays are available.")
+      return { displays: displays, windows: listWindows(displays) }
+    },
+    restore: restoreMinimized,
+  }
+})()

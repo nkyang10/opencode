@@ -1,8 +1,9 @@
-import { NodeHttpServer } from "@effect/platform-node"
+import { NodeHttpServer, NodeServices } from "@effect/platform-node"
 import { describe, expect } from "bun:test"
 import { Context, Effect, Layer, Option } from "effect"
 import { HttpBody, HttpClient, HttpClientRequest, HttpRouter } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { SessionV2 } from "@opencode-ai/core/session"
 import { Auth } from "../../src/auth"
 import { Config } from "../../src/config/config"
 import { Installation } from "../../src/installation"
@@ -29,6 +30,7 @@ const apiLayer = HttpRouter.serve(
   { disableListenLog: true, disableLogger: true },
 ).pipe(
   Layer.provideMerge(NodeHttpServer.layerTest),
+  Layer.provideMerge(NodeServices.layer),
   Layer.provide(Layer.mock(Auth.Service)({})),
   Layer.provide(Layer.mock(Config.Service)({})),
   // globalHandlers yields SessionV2 for the whole group, so the route tree cannot be built
@@ -45,6 +47,15 @@ const apiLayer = HttpRouter.serve(
     }),
   ),
   Layer.provide(Layer.mock(MoveSession.Service)({})),
+  Layer.provide(
+    Layer.mock(SessionV2.Service)({
+      revert: {
+        stage: () => Effect.die(new Error("not used")),
+        clear: () => Effect.die(new Error("not used")),
+        commit: () => Effect.die(new Error("not used")),
+      },
+    }),
+  ),
   Layer.provide(
     Layer.mock(Installation.Service)({
       method: () => Effect.succeed("npm"),

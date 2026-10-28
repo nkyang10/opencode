@@ -7,8 +7,10 @@ import { AgentV2 } from "../agent"
 import { Global } from "../global"
 import { Location } from "../location"
 import { PermissionV2 } from "../permission"
+import { ScreenshotStorage } from "../screen-capture/storage"
 
 const TRUNCATION_GLOB = path.join(Global.Path.data, "tool-output", "*")
+const SCREENSHOTS_GLOB = ScreenshotStorage.glob(Global.make())
 const BUILD_SYSTEM =
   "You are an AI coding agent. Help the user accomplish software engineering tasks by inspecting the workspace, making targeted changes, and using tools according to the configured permissions."
 
@@ -98,7 +100,7 @@ export const Plugin = define({
   effect: Effect.fn(function* (ctx) {
     const location = yield* Location.Service
     const worktree = location.directory
-    const whitelistedDirs = [TRUNCATION_GLOB, path.join(Global.Path.tmp, "*")]
+    const whitelistedDirs = [TRUNCATION_GLOB, SCREENSHOTS_GLOB, path.join(Global.Path.tmp, "*")]
     const readonlyExternalDirectory: PermissionV2.Ruleset = [
       { action: "external_directory", resource: "*", effect: "ask" },
       ...whitelistedDirs.map(
@@ -108,6 +110,7 @@ export const Plugin = define({
     const defaults: PermissionV2.Ruleset = [
       { action: "*", resource: "*", effect: "allow" },
       ...readonlyExternalDirectory,
+      { action: "screenshot", resource: "*", effect: "ask" },
       { action: "question", resource: "*", effect: "deny" },
       { action: "plan_enter", resource: "*", effect: "deny" },
       { action: "plan_exit", resource: "*", effect: "deny" },

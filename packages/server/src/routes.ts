@@ -6,6 +6,7 @@ import { EventV2 } from "@opencode-ai/core/event"
 import { Credential } from "@opencode-ai/core/credential"
 import { PermissionSaved } from "@opencode-ai/core/permission/saved"
 import { PtyTicket } from "@opencode-ai/core/pty/ticket"
+import { ScreenshotStorage } from "@opencode-ai/core/screen-capture/storage"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { SessionPause } from "@opencode-ai/core/session/pause"
 import { SessionExecution } from "@opencode-ai/core/session/execution"
@@ -29,6 +30,7 @@ const applicationServices = LayerNode.group([
   EventV2.node,
   httpClient,
   ToolOutputStore.cleanupNode,
+  ScreenshotStorage.cleanupNode,
   SessionV2.node,
   SessionPause.node,
   PermissionSaved.node,

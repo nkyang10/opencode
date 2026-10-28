@@ -1375,4 +1375,5 @@ export const dict = {
   "menu.maintenance.confirm": "Restart {{server}} for everyone connected? Running work can finish for up to 60 seconds; any remaining work will be interrupted. You can keep submitting while it drains, but requests may fail during the restart.",
   "menu.maintenance.accepted": "Host restart requested",
   "session.child.notice": "This is a child agent session. New messages are sent to this session.",
+  "imageActions.openFailed.title": "Could not open the image",
 }

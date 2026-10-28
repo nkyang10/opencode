@@ -2,6 +2,7 @@ import { describe, expect } from "bun:test"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Effect, Layer } from "effect"
 import { Skill } from "../../src/skill"
+import { Agent } from "../../src/agent/agent"
 import { Discovery } from "../../src/skill/discovery"
 import { RuntimeFlags } from "../../src/effect/runtime-flags"
 import { EventV2Bridge } from "../../src/event-v2-bridge"
@@ -9,6 +10,7 @@ import { Config } from "../../src/config/config"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Global } from "@opencode-ai/core/global"
+import { ScreenshotStorage } from "@opencode-ai/core/screen-capture/storage"
 import { provideInstance, provideTmpdirInstance, testInstanceStoreLayer, tmpdir } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
 import path from "path"
@@ -578,6 +580,78 @@ description: A skill in the .opencode/skills directory.
 
           const skill = yield* Skill.Service
           expect((yield* skill.dirs()).length).toBe(4)
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("registers the built-in capture-screenshot skill", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          const item = (yield* skill.all()).find((s) => s.name === "capture-screenshot")
+          expect(item).toBeDefined()
+          expect(item!.location).toBe("<built-in>")
+          expect(item!.description).toBe(
+            "Use when the user wants to see, capture or visually check something: the screen, an application window, a web page or a test artifact.",
+          )
+          expect(item!.content).toContain(ScreenshotStorage.directory(Global.make()))
+          expect(item!.content).not.toContain("{{screenshots_dir}}")
+
+          const loaded = yield* skill.get("capture-screenshot")
+          expect(loaded).toEqual(item)
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("allows a disk skill to override the built-in capture-screenshot skill", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "skill", "capture-screenshot", "SKILL.md"),
+              `---
+name: capture-screenshot
+description: Use when the user wants to see, capture or visually check something: the screen, an application window, a web page or a test artifact.
+---
+
+# Disk Capture Screenshot
+
+Disk override body.
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          const item = (yield* skill.get("capture-screenshot"))!
+          expect(item.location).toContain(path.join("skill", "capture-screenshot", "SKILL.md"))
+          expect(item.description).toBe(
+            "Use when the user wants to see, capture or visually check something: the screen, an application window, a web page or a test artifact.",
+          )
+          expect(item.content).toContain("Disk override body.")
+          expect(item.content).not.toContain(ScreenshotStorage.directory(Global.make()))
+        }),
+      { git: true },
+    ),
+  )
+
+  it.live("hides capture-screenshot from an agent whose skill permission denies it", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          const agent = {
+            name: "build",
+            mode: "primary" as const,
+            permission: [{ permission: "skill", pattern: "capture-screenshot", action: "deny" as const }],
+            options: {},
+          }
+          const names = (yield* skill.available(agent)).map((s) => s.name)
+          expect(names).not.toContain("capture-screenshot")
+          expect(names).toContain("customize-opencode")
         }),
       { git: true },
     ),

@@ -370,6 +370,18 @@ function currentMessage(value: unknown) {
     parts: Array<Record<string, unknown> & { type: string }>
   }
   if (item.info.role === "user") {
+    const files = item.parts.flatMap((part) =>
+      part.type === "file" && typeof part.url === "string" && typeof part.mime === "string"
+        ? [
+            {
+              data: "",
+              mime: part.mime,
+              source: { type: "uri", uri: part.url },
+              name: typeof part.filename === "string" ? part.filename : undefined,
+            },
+          ]
+        : [],
+    )
     return {
       id: item.info.id,
       type: "user",
@@ -377,6 +389,7 @@ function currentMessage(value: unknown) {
       text: item.parts
         .flatMap((part) => (part.type === "text" && typeof part.text === "string" ? [part.text] : []))
         .join("\n"),
+      ...(files.length ? { files } : {}),
     }
   }
   return {
@@ -406,7 +419,18 @@ function currentMessage(value: unknown) {
                     status: "completed",
                     input: state.input ?? {},
                     structured: state.metadata ?? {},
-                    content: [{ type: "text", text: state.output ?? "" }],
+                    content: [
+                      { type: "text", text: state.output ?? "" },
+                      ...(Array.isArray(state.attachments)
+                        ? (state.attachments as Array<{ url?: string; mime?: string; filename?: string }>)
+                        : []
+                      ).map((attachment) => ({
+                        type: "file",
+                        uri: attachment.url,
+                        mime: attachment.mime,
+                        name: attachment.filename,
+                      })),
+                    ],
                   }
                 : state.status === "error"
                   ? {

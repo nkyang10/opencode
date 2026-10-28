@@ -103,6 +103,14 @@ test("fromConfig - mixed string and object values", () => {
   ])
 })
 
+test("fromConfig - screenshot accepts string and object rules", () => {
+  const result = Permission.fromConfig({ screenshot: { "*": "allow", "window:foo": "deny" } })
+  expect(result).toEqual([
+    { permission: "screenshot", pattern: "*", action: "allow" },
+    { permission: "screenshot", pattern: "window:foo", action: "deny" },
+  ])
+})
+
 test("fromConfig - empty object", () => {
   const result = Permission.fromConfig({})
   expect(result).toEqual([])
@@ -531,6 +539,30 @@ test("disabled - disables multiple tools", () => {
   expect(result.has("bash")).toBe(true)
   expect(result.has("edit")).toBe(true)
   expect(result.has("webfetch")).toBe(true)
+})
+
+test("disabled - disables screenshot when denied", () => {
+  const result = Permission.disabled(
+    ["screenshot", "read"],
+    [
+      { permission: "*", pattern: "*", action: "allow" },
+      { permission: "screenshot", pattern: "*", action: "deny" },
+    ],
+  )
+  expect(result.has("screenshot")).toBe(true)
+  expect(result.has("read")).toBe(false)
+})
+
+test("disabled - does not alias screenshot to read", () => {
+  const result = Permission.disabled(
+    ["screenshot", "read"],
+    [
+      { permission: "*", pattern: "*", action: "allow" },
+      { permission: "read", pattern: "*", action: "deny" },
+    ],
+  )
+  expect(result.has("screenshot")).toBe(false)
+  expect(result.has("read")).toBe(true)
 })
 
 test("disabled - wildcard permission denies all tools", () => {

@@ -16,6 +16,7 @@ import {
 
 type TimelineStreamOptions = {
   newLayoutDesigns?: boolean
+  withImages?: boolean
   reviewDiffs?: boolean
   reviewPane?: boolean
 }
@@ -60,6 +61,12 @@ benchmark.describe("performance: session timeline streaming", () => {
   benchmark("streams assistant text in v2 with review pane open", async ({ page, report }) => {
     benchmark.setTimeout(Number(process.env.TIMELINE_COMPLETION_TIMEOUT_MS ?? 420_000) + 60_000)
     const result = await runTimelineStreamBenchmark(page, { newLayoutDesigns: true, reviewPane: true })
+    report(result.metrics, result.context)
+  })
+
+  benchmark("streams assistant text in v2 with image history", async ({ page, report }) => {
+    benchmark.setTimeout(Number(process.env.TIMELINE_COMPLETION_TIMEOUT_MS ?? 420_000) + 60_000)
+    const result = await runTimelineStreamBenchmark(page, { newLayoutDesigns: true, withImages: true })
     report(result.metrics, result.context)
   })
 })
@@ -113,6 +120,7 @@ async function runTimelineStreamBenchmark(page: Page, options: TimelineStreamOpt
     historyTurns,
     eventBatch,
     newLayoutDesigns: options.newLayoutDesigns,
+    withImages: options.withImages,
     // Turn diffs exercise timeline data cost; the pane-open scenario serves the same
     // diffs through the default git mode so it works across review implementations.
     turnDiffs: options.reviewDiffs ? diffs : undefined,

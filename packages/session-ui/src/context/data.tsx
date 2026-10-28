@@ -46,6 +46,13 @@ export type NavigateToSessionFn = (sessionID: string) => void
 
 export type SessionHrefFn = (sessionID: string) => string
 
+export type ImageSource = {
+  src: string
+  filename?: string
+  mime?: string
+  path?: string
+}
+
 export const { use: useData, provider: DataProvider } = createSimpleContext({
   name: "Data",
   init: (props: {
@@ -54,6 +61,9 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
     sessionID?: string
     onNavigateToSession?: NavigateToSessionFn
     onSessionHref?: SessionHrefFn
+    onAttachImage?: (image: ImageSource) => void | Promise<void>
+    onOpenImageInNewTab?: (image: ImageSource) => void
+    onRevealPath?: (path: string) => boolean | Promise<boolean>
   }) => {
     return {
       get store() {
@@ -67,6 +77,9 @@ export const { use: useData, provider: DataProvider } = createSimpleContext({
       },
       navigateToSession: props.onNavigateToSession,
       sessionHref: props.onSessionHref,
+      attachImage: props.onAttachImage,
+      openImageInNewTab: props.onOpenImageInNewTab,
+      revealPath: props.onRevealPath,
     }
   },
 })

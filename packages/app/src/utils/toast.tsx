@@ -15,8 +15,14 @@ export function setV2Toast(value: boolean) {
 }
 
 export function ToastRegion(props: { v2: boolean }) {
-  if (props.v2) return <ToastV2.Region />
-  return <Toast.Region />
+  // session-ui toasts use the legacy toaster, so its region must stay mounted
+  // even when the app routes its own toasts through the v2 region.
+  return (
+    <>
+      <Toast.Region />
+      {props.v2 ? <ToastV2.Region /> : null}
+    </>
+  )
 }
 
 export function showToast(options: ToastOptions | string) {

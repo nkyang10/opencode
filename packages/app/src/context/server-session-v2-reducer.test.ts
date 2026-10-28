@@ -91,32 +91,40 @@ describe("v2 session reducer", () => {
     apply({
       ...base,
       id: "evt_tool_start",
-      type: "session.tool.input.started",
-      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", callID: "call_1", name: "bash" },
+      type: "session.next.tool.input.started",
+      data: { timestamp: 2, sessionID: "ses_1", assistantMessageID: "msg_assistant", callID: "call_1", name: "bash" },
     })
     apply({
       ...base,
       id: "evt_tool_delta",
-      type: "session.tool.input.delta",
-      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", callID: "call_1", delta: "{}" },
+      type: "session.next.tool.input.delta",
+      data: { timestamp: 3, sessionID: "ses_1", assistantMessageID: "msg_assistant", callID: "call_1", delta: "{}" },
     })
     apply({
       ...base,
       id: "evt_tool_called",
-      type: "session.tool.called",
-      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", callID: "call_1", input: {}, executed: true },
+      type: "session.next.tool.called",
+      data: {
+        timestamp: 4,
+        sessionID: "ses_1",
+        assistantMessageID: "msg_assistant",
+        callID: "call_1",
+        input: {},
+        provider: { executed: true },
+      },
     })
     apply({
       ...base,
       id: "evt_tool_success",
-      type: "session.tool.success",
+      type: "session.next.tool.success",
       data: {
+        timestamp: 5,
         sessionID: "ses_1",
         assistantMessageID: "msg_assistant",
         callID: "call_1",
-        metadata: {},
+        structured: {},
         content: [{ type: "text", text: "done" }],
-        executed: true,
+        provider: { executed: true },
       },
     })
     apply({
@@ -137,6 +145,144 @@ describe("v2 session reducer", () => {
       type: "assistant",
       retry: undefined,
       content: [{ type: "tool", id: "call_1", state: { status: "completed", content: [{ text: "done" }] } }],
+    })
+  })
+
+  test("maps structured tool success metadata", () => {
+    const reducer = createV2SessionReducer()
+    let messages: SessionMessageInfo[] = []
+    const apply = (input: object) => {
+      const result = reducer.reduce(messages, event(input))
+      if (result) messages = result.messages
+    }
+
+    apply({
+      ...base,
+      id: "evt_step",
+      type: "session.step.started",
+      data: {
+        sessionID: "ses_1",
+        assistantMessageID: "msg_assistant",
+        agent: "build",
+        model: { id: "model", providerID: "provider" },
+      },
+    })
+    apply({
+      ...base,
+      id: "evt_tool_start",
+      type: "session.next.tool.input.started",
+      data: {
+        timestamp: 2,
+        sessionID: "ses_1",
+        assistantMessageID: "msg_assistant",
+        callID: "call_1",
+        name: "show_image",
+      },
+    })
+    apply({
+      ...base,
+      id: "evt_tool_called",
+      type: "session.next.tool.called",
+      data: {
+        timestamp: 3,
+        sessionID: "ses_1",
+        assistantMessageID: "msg_assistant",
+        callID: "call_1",
+        input: {},
+        provider: { executed: false },
+      },
+    })
+    apply({
+      ...base,
+      id: "evt_tool_success",
+      type: "session.next.tool.success",
+      data: {
+        timestamp: 4,
+        sessionID: "ses_1",
+        assistantMessageID: "msg_assistant",
+        callID: "call_1",
+        structured: { shown: true },
+        content: [
+          { type: "text", text: "Shown to the user: shot.png" },
+          { type: "file", uri: "data:image/png;base64,Zm9v", mime: "image/png", name: "shot.png" },
+        ],
+        provider: { executed: false },
+      },
+    })
+
+    expect(messages[0]).toMatchObject({
+      type: "assistant",
+      content: [{ type: "tool", id: "call_1", state: { status: "completed", metadata: { shown: true } } }],
+    })
+  })
+
+  test("drops large structured output from tool metadata", () => {
+    const reducer = createV2SessionReducer()
+    let messages: SessionMessageInfo[] = []
+    const apply = (input: object) => {
+      const result = reducer.reduce(messages, event(input))
+      if (result) messages = result.messages
+    }
+
+    apply({
+      ...base,
+      id: "evt_step",
+      type: "session.step.started",
+      data: {
+        sessionID: "ses_1",
+        assistantMessageID: "msg_assistant",
+        agent: "build",
+        model: { id: "model", providerID: "provider" },
+      },
+    })
+    apply({
+      ...base,
+      id: "evt_tool_start",
+      type: "session.next.tool.input.started",
+      data: { timestamp: 2, sessionID: "ses_1", assistantMessageID: "msg_assistant", callID: "call_1", name: "read" },
+    })
+    apply({
+      ...base,
+      id: "evt_tool_called",
+      type: "session.next.tool.called",
+      data: {
+        timestamp: 3,
+        sessionID: "ses_1",
+        assistantMessageID: "msg_assistant",
+        callID: "call_1",
+        input: {},
+        provider: { executed: true },
+      },
+    })
+    apply({
+      ...base,
+      id: "evt_tool_success",
+      type: "session.next.tool.success",
+      data: {
+        timestamp: 4,
+        sessionID: "ses_1",
+        assistantMessageID: "msg_assistant",
+        callID: "call_1",
+        structured: {
+          shown: true,
+          content: "A".repeat(5000),
+          data: "data:image/png;base64,Zm9v",
+          file: { path: "shot.png", data: "data:image/png;base64,Zm9v" },
+        },
+        content: [{ type: "text", text: "done" }],
+        provider: { executed: true },
+      },
+    })
+
+    expect(messages[0]).toMatchObject({
+      type: "assistant",
+      content: [
+        {
+          type: "tool",
+          id: "call_1",
+          state: { status: "completed", metadata: { shown: true, file: { path: "shot.png" } } },
+        },
+      ],
     })
   })
 

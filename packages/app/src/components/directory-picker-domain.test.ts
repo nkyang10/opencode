@@ -22,6 +22,7 @@ import {
   pickerRootSelection,
   pickerAbsoluteInput,
   pickerInputPath,
+  pickerLocationRoots,
 } from "./directory-picker-domain"
 
 test("maps server directory entries into Pierre paths", () => {
@@ -345,4 +346,12 @@ test("file URLs cannot escape a constrained file picker", () => {
   const file = pickerMode("file", "C:/Repo")
   expect(file.navigation(pickerAbsoluteInput("file:///C:/Repo/../Other", "C:/Users/luke", "C:/Repo"))).toBeUndefined()
   expect(pickerFileSearchQuery("C:/Repo", "file:///C:/Repo/src/my%20file", "C:/Users/luke")).toBe("src/my file")
+})
+
+test("location roots keep all drives available and include an active UNC share", () => {
+  expect(pickerLocationRoots(["C:/", "D:/"], "C:/Users/test")).toEqual(["C:/", "D:/"])
+  expect(pickerLocationRoots(["C:/", "D:/"], "D:/work")).toEqual(["C:/", "D:/"])
+  expect(pickerLocationRoots(["C:/"], "//server/share/work")).toEqual(["C:/", "//server/share"])
+  expect(pickerLocationRoots(["/"], "/mnt/data/work")).toEqual(["/"])
+  expect(pickerLocationRoots([], "/home/test")).toEqual(["/"])
 })

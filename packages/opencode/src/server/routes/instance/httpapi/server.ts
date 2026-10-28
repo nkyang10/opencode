@@ -49,6 +49,7 @@ import { Snapshot } from "@/snapshot"
 import { Storage } from "@/storage/storage"
 import { ToolRegistry } from "@/tool/registry"
 import { Truncate } from "@/tool/truncate"
+import { ScreenshotStorage } from "@opencode-ai/core/screen-capture/storage"
 import { Worktree } from "@/worktree"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { MoveSession } from "@opencode-ai/core/control-plane/move-session"
@@ -283,6 +284,7 @@ const app = LayerNode.group([
   McpAuth.node,
   Command.node,
   Truncate.node,
+  ScreenshotStorage.cleanupNode,
   ToolRegistry.node,
   Format.node,
   Project.node,

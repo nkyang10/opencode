@@ -1,8 +1,9 @@
 import { describe, expect } from "bun:test"
 import { LLM } from "@opencode-ai/llm"
 import { LLMClient } from "@opencode-ai/llm/route"
-import { DateTime, Effect } from "effect"
+import { DateTime, Effect, Layer } from "effect"
 import { Headers } from "effect/unstable/http"
+import { Catalog } from "@opencode-ai/core/catalog"
 import { Credential } from "@opencode-ai/core/credential"
 import { Integration } from "@opencode-ai/core/integration"
 import { ModelV2 } from "@opencode-ai/core/model"
@@ -344,4 +345,66 @@ describe("SessionRunnerModel", () => {
       expect(SessionRunnerModel.supported(model({ type: "native", settings: {} }))).toBe(false)
     }),
   )
+
+  it.effect("returns the selected model's input capabilities", () => {
+    const selected = ModelV2.Info.make({
+      ...model({ type: "aisdk", package: "@ai-sdk/openai", url: "https://openai.example/v1" }),
+      capabilities: { tools: true, input: ["text", "image"], output: ["text"] },
+    })
+    const catalog = Layer.succeed(
+      Catalog.Service,
+      Catalog.Service.of({
+        transform: () => Effect.die("unused"),
+        reload: () => Effect.void,
+        provider: {
+          get: () => Effect.succeed(undefined),
+          all: () => Effect.succeed([]),
+          available: () => Effect.succeed([]),
+        },
+        model: {
+          get: () => Effect.succeed(undefined),
+          all: () => Effect.succeed([selected]),
+          available: () => Effect.succeed([selected]),
+          default: () => Effect.succeed(undefined),
+          small: () => Effect.succeed(undefined),
+        },
+      }),
+    )
+    const layer = SessionRunnerModel.locationLayer.pipe(
+      Layer.provide(catalog),
+      Layer.provide(
+        Layer.mock(Integration.Service, {
+          connection: {
+            active: () => Effect.succeed(undefined),
+            resolve: () => Effect.succeed(undefined),
+            key: () => Effect.void,
+            oauth: () => Effect.die("unused"),
+            update: () => Effect.void,
+            remove: () => Effect.void,
+          },
+          attempt: {
+            status: () => Effect.die("unused"),
+            complete: () => Effect.void,
+            cancel: () => Effect.void,
+          },
+        }),
+      ),
+    )
+    const session = SessionV2.Info.make({
+      id: SessionV2.ID.make("ses_model_capabilities"),
+      projectID: ProjectV2.ID.global,
+      title: "test",
+      model: { id: selected.id, providerID: selected.providerID },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+      time: { created: DateTime.makeUnsafe(0), updated: DateTime.makeUnsafe(0) },
+      location: { directory: AbsolutePath.make("/project") },
+    })
+
+    return Effect.gen(function* () {
+      const models = yield* SessionRunnerModel.Service
+      const capabilities = yield* models.capabilities!(session)
+      expect(capabilities.input).toEqual(["text", "image"])
+    }).pipe(Effect.provide(layer))
+  })
 })

@@ -24,6 +24,11 @@ function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value)
 }
 
+function toolMetadata(state: { metadata?: unknown; structured?: unknown }) {
+  const metadata = state.metadata ?? state.structured
+  return record(metadata) ? metadata : {}
+}
+
 function normalizeToolInput(name: string, input: Record<string, unknown>) {
   if (!["edit", "write"].includes(name) || typeof input.path !== "string" || typeof input.filePath === "string")
     return input
@@ -312,8 +317,7 @@ function toolPart(sessionID: string, messageID: string, tool: SessionMessageAssi
       return {
         status: "running" as const,
         input: normalizeToolInput(tool.name, tool.state.input),
-        // metadata: normalizeToolMetadata(tool.name, tool.state.structured),
-        metadata: normalizeToolMetadata(tool.name, tool.state.metadata ?? {}),
+        metadata: normalizeToolMetadata(tool.name, toolMetadata(tool.state)),
         time: { start },
       }
     }
@@ -322,8 +326,7 @@ function toolPart(sessionID: string, messageID: string, tool: SessionMessageAssi
         status: "error" as const,
         input: normalizeToolInput(tool.name, tool.state.input),
         error: tool.state.error.message,
-        // metadata: normalizeToolMetadata(tool.name, tool.state.structured),
-        metadata: normalizeToolMetadata(tool.name, tool.state.metadata ?? {}),
+        metadata: normalizeToolMetadata(tool.name, toolMetadata(tool.state)),
         time: { start, end: tool.time.completed ?? start },
       }
     }
@@ -347,8 +350,7 @@ function toolPart(sessionID: string, messageID: string, tool: SessionMessageAssi
       input: normalizeToolInput(tool.name, tool.state.input),
       output: tool.state.content.flatMap((item) => (item.type === "text" ? [item.text] : [])).join("\n"),
       title: tool.name,
-      // metadata: normalizeToolMetadata(tool.name, tool.state.structured),
-      metadata: normalizeToolMetadata(tool.name, tool.state.metadata ?? {}),
+      metadata: normalizeToolMetadata(tool.name, toolMetadata(tool.state)),
       time: { start, end: tool.time.completed ?? start },
       attachments: attachments.length ? attachments : undefined,
     }

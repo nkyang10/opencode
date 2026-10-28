@@ -18,6 +18,7 @@ import PROMPT_TITLE from "./prompt/title.txt"
 import { Permission } from "@/permission"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@opencode-ai/core/global"
+import { ScreenshotStorage } from "@opencode-ai/core/screen-capture/storage"
 import path from "path"
 import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
@@ -108,6 +109,7 @@ const layer = Layer.effect(
           : []
         const whitelistedDirs = [
           Truncate.GLOB,
+          ScreenshotStorage.glob(Global.make()),
           path.join(Global.Path.tmp, "*"),
           ...skillDirs.map((dir) => path.join(dir, "*")),
           ...referenceDirs.map((dir) => path.join(dir, "*")),
@@ -124,6 +126,7 @@ const layer = Layer.effect(
             "*": "ask",
             ...Object.fromEntries(whitelistedDirs.map((dir) => [dir, "allow"])),
           },
+          screenshot: "ask",
           question: "deny",
           plan_enter: "deny",
           plan_exit: "deny",

@@ -120,7 +120,7 @@ export function PromptInputV2(props: PromptInputV2Props) {
       <form
         data-component="prompt-input-v2"
         data-dock-border-underlay={props.borderUnderlay ? "v2" : undefined}
-        class="group/prompt-input relative min-h-[96px] w-full overflow-clip rounded-xl bg-v2-background-bg-base"
+        class="group/prompt-input relative grid min-h-[96px] w-full grid-cols-[minmax(0,1fr)_44px] overflow-clip rounded-xl bg-v2-background-bg-base"
         classList={{
           "shadow-[var(--v2-elevation-raised)]": !props.borderUnderlay,
           "border border-v2-icon-icon-info border-dashed": state.drag === "active",
@@ -141,19 +141,21 @@ export function PromptInputV2(props: PromptInputV2Props) {
         </Show>
 
         <Show when={state.mode === "normal"}>
-          <PromptInputV2Attachments
-            attachments={props.controller.attachments()}
-            comments={props.controller.comments()}
-            activeCommentID={state.activeContextID}
-            removeLabel={i18n.t("ui.promptInput.removeAttachment")}
-            onAttachmentClick={props.controller.openAttachment}
-            onAttachmentRemove={(attachment) => props.controller.removeAttachment(attachment.id)}
-            onCommentClick={(comment) => props.controller.toggleContext(comment.key)}
-            onCommentRemove={(comment) => props.controller.removeContext(comment.key)}
-          />
+          <div class="col-span-2 row-start-1">
+            <PromptInputV2Attachments
+              attachments={props.controller.attachments()}
+              comments={props.controller.comments()}
+              activeCommentID={state.activeContextID}
+              removeLabel={i18n.t("ui.promptInput.removeAttachment")}
+              onAttachmentClick={props.controller.openAttachment}
+              onAttachmentRemove={(attachment) => props.controller.removeAttachment(attachment.id)}
+              onCommentClick={(comment) => props.controller.toggleContext(comment.key)}
+              onCommentRemove={(comment) => props.controller.removeContext(comment.key)}
+            />
+          </div>
         </Show>
 
-        <div class="relative min-h-[60px]">
+        <div class="relative col-start-1 row-start-2 min-h-[60px]">
           <div
             ref={(element) => {
               editor = element
@@ -206,7 +208,7 @@ export function PromptInputV2(props: PromptInputV2Props) {
           </Show>
         </div>
 
-        <div class="flex h-11 items-center px-2">
+        <div class="col-start-1 row-start-3 flex h-11 min-w-0 items-center px-2">
           <div
             class="flex min-w-0 flex-1 items-center gap-1"
             aria-hidden={state.mode === "shell"}
@@ -265,18 +267,21 @@ export function PromptInputV2(props: PromptInputV2Props) {
               )}
             </Show>
           </div>
-          <div class="flex items-center gap-2">
-            {props.submitExtra}
-            <PromptInputV2SubmitButton
-              mode={state.mode}
-              stopping={view.submit.stopping()}
-              disabled={!props.controller.canSubmit()}
-              sendLabel={i18n.t("ui.promptInput.send")}
-              stopLabel={i18n.t("ui.promptInput.stop")}
-              onSubmit={props.controller.submit}
-              onStop={props.controller.stop}
-            />
-          </div>
+        </div>
+        <div
+          data-slot="prompt-actions"
+          class="col-start-2 row-span-2 row-start-2 flex flex-col items-center gap-2 border-l border-v2-border-border-muted py-3"
+        >
+          <PromptInputV2SubmitButton
+            mode={state.mode}
+            stopping={view.submit.stopping()}
+            disabled={!props.controller.canSubmit()}
+            sendLabel={i18n.t("ui.promptInput.send")}
+            stopLabel={i18n.t("ui.promptInput.stop")}
+            onSubmit={props.controller.submit}
+            onStop={props.controller.stop}
+          />
+          {props.submitExtra}
         </div>
       </form>
     </div>

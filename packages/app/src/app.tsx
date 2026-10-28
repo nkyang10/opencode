@@ -45,6 +45,7 @@ import { ServerSDKProvider } from "@/context/server-sdk"
 import { ServerSyncProvider, useServerSync } from "@/context/server-sync"
 import { GlobalProvider, useGlobal } from "@/context/global"
 import { HighlightsProvider } from "@/context/highlights"
+import { ImageActionsProvider } from "@/context/image-actions"
 import { LanguageProvider, type Locale, useLanguage } from "@/context/language"
 import { LayoutProvider } from "@/context/layout"
 import { ModelsProvider } from "@/context/models"
@@ -321,10 +322,12 @@ function SharedProviders(props: ParentProps) {
       <CommandProvider>
         <DesktopCommands />
         <HighlightsProvider>
-          <RestartProvider>
-            <RestartBanner />
-            {props.children}
-          </RestartProvider>
+          <ImageActionsProvider>
+            <RestartProvider>
+              <RestartBanner />
+              {props.children}
+            </RestartProvider>
+          </ImageActionsProvider>
         </HighlightsProvider>
       </CommandProvider>
     </>

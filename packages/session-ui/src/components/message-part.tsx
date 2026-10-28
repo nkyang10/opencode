@@ -33,7 +33,6 @@ import {
 } from "@opencode-ai/sdk/v2"
 import { useData } from "../context"
 import { useFileComponent } from "@opencode-ai/ui/context/file"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { type UiI18n, useI18n } from "@opencode-ai/ui/context/i18n"
 import { BasicTool, GenericTool } from "./basic-tool"
 import { Accordion } from "@opencode-ai/ui/accordion"
@@ -42,10 +41,14 @@ import { Collapsible } from "@opencode-ai/ui/collapsible"
 import { FileIcon } from "@opencode-ai/ui/file-icon"
 import { Icon } from "@opencode-ai/ui/icon"
 import { ToolErrorCard } from "./tool-error-card"
+import { ToolMedia } from "./tool-media-view"
+import { ShownImageCard } from "./shown-image-card"
+import { shownImage } from "./shown-image"
+import { ImageActionsContext, ImageActionsDropdown, useImageGallery } from "./image-actions-menu"
+import { userImageViewerItem } from "./image-gallery"
 import { Checkbox } from "@opencode-ai/ui/checkbox"
 import { DiffChanges } from "@opencode-ai/ui/diff-changes"
 import { Markdown } from "./markdown"
-import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import { getDirectory as _getDirectory, getFilename } from "@opencode-ai/core/util/path"
 import { AttachmentCardV2 } from "../v2/components/attachment-card-v2"
 import { CommentCardV2 } from "../v2/components/comment-card-v2"
@@ -1074,7 +1077,7 @@ export function ContextToolGroup(props: {
         <div data-component="context-tool-group-trigger">
           <span
             data-slot="context-tool-group-title"
-            class="min-w-0 flex items-center gap-2 text-14-medium text-text-strong"
+            class="min-w-0 flex items-center"
           >
             <span data-slot="context-tool-group-label" class="shrink-0">
               <ToolStatusTitle
@@ -1086,7 +1089,7 @@ export function ContextToolGroup(props: {
             </span>
             <span
               data-slot="context-tool-group-summary"
-              class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-normal text-text-base"
+              class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-normal"
             >
               <AnimatedCountList
                 items={[
@@ -1141,6 +1144,9 @@ export function ContextToolGroup(props: {
                       </div>
                     </div>
                   </div>
+                  <Show when={partAccessor().state.status === "completed"}>
+                    <ToolMedia part={partAccessor()} compact />
+                  </Show>
                 </div>
               )
             }}
@@ -1187,8 +1193,8 @@ export function UserMessageDisplay(props: {
   comments?: UserMessageComment[]
 }) {
   const data = useData()
-  const dialog = useDialog()
   const i18n = useI18n()
+  const gallery = useImageGallery()
   const [state, setState] = createStore({
     copied: false,
     busy: false,
@@ -1235,10 +1241,6 @@ export function UserMessageDisplay(props: {
 
   const metaTail = stamp
 
-  const openImagePreview = (url: string, alt?: string) => {
-    dialog.show(() => <ImagePreview src={url} alt={alt} />)
-  }
-
   const handleCopy = async () => {
     const content = text()
     if (!content) return
@@ -1269,32 +1271,56 @@ export function UserMessageDisplay(props: {
           {(file) => {
             const type = kind(file)
             const name = file.filename ?? i18n.t("ui.message.attachment.alt")
+            const target = userImageViewerItem(file, props.message.id, {
+              image: i18n.t("ui.toolMedia.image"),
+              attachment: i18n.t("ui.message.attachment.alt"),
+              you: i18n.t("ui.imageViewer.source.you"),
+            })
+            let imageRef: HTMLButtonElement | undefined
+            const open = (source?: HTMLElement | null) => {
+              if (!target) return
+              gallery.open({ sessionID: props.message.sessionID, target, source })
+            }
 
             return (
               <Show
                 when={newLayout() && type === "file"}
                 fallback={
-                  <div
-                    data-slot="user-message-attachment"
-                    data-type={type}
-                    data-clickable={type === "image" ? "true" : undefined}
-                    title={type === "file" ? name : undefined}
-                    onClick={() => {
-                      if (type === "image") openImagePreview(file.url, name)
-                    }}
-                  >
-                    <Show
-                      when={type === "image"}
-                      fallback={
+                  <Show
+                    when={target}
+                    fallback={
+                      <div data-slot="user-message-attachment" data-type={type} title={name}>
                         <div data-slot="user-message-attachment-file">
                           <FileIcon node={{ path: name, type: "file" }} />
                           <span data-slot="user-message-attachment-name">{name}</span>
                         </div>
-                      }
-                    >
-                      <img data-slot="user-message-attachment-image" src={file.url} alt={name} />
-                    </Show>
-                  </div>
+                      </div>
+                    }
+                  >
+                    {(item) => (
+                      <div data-slot="user-message-attachment-image-group">
+                        <ImageActionsContext target={item()} onOpen={(source) => open(source)}>
+                          <button
+                            ref={imageRef}
+                            type="button"
+                            data-slot="user-message-attachment"
+                            data-type="image"
+                            data-clickable="true"
+                            aria-label={i18n.t("ui.toolMedia.openImage", { name })}
+                            title={name}
+                            onClick={(event) => open(event.currentTarget)}
+                          >
+                            <img data-slot="user-message-attachment-image" src={file.url} alt={name} />
+                          </button>
+                        </ImageActionsContext>
+                        <ImageActionsDropdown
+                          target={item()}
+                          onOpen={(source) => open(source)}
+                          source={() => imageRef}
+                        />
+                      </div>
+                    )}
+                  </Show>
                 }
               >
                 <AttachmentCardV2
@@ -1537,6 +1563,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   const i18n = useI18n()
   const part = () => props.part as ToolPart
   if (part().tool === "todowrite") return null
+  const shown = createMemo(() => shownImage(part()))
 
   const hideQuestion = createMemo(
     () => part().tool === "question" && (part().state.status === "pending" || part().state.status === "running"),
@@ -1571,6 +1598,9 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   return (
     <Show when={!hideQuestion()}>
       <div data-component="tool-part-wrapper" data-tool={part().tool} data-timeline-part-id={part().id}>
+        <Show when={shown()}>
+          <ShownImageCard part={part()} />
+        </Show>
         <Switch>
           <Match when={part().state.status === "error" && (part().state as any).error}>
             {(error) => {
@@ -1626,6 +1656,9 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
               virtualizeDiff={props.virtualizeDiff}
               onContentRendered={props.onContentRendered}
             />
+            <Show when={part().state.status === "completed" && !shown()}>
+              <ToolMedia part={part()} />
+            </Show>
           </Match>
         </Switch>
       </div>

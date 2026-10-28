@@ -7,6 +7,7 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { InstanceState } from "@/effect/instance-state"
 import { Global } from "@opencode-ai/core/global"
 import { SkillPlugin } from "@opencode-ai/core/plugin/skill"
+import { ScreenshotStorage } from "@opencode-ai/core/screen-capture/storage"
 import { Permission } from "@/permission"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Config } from "@/config/config"
@@ -33,6 +34,11 @@ const CUSTOMIZE_OPENCODE_SKILL_NAME = "customize-opencode"
 const CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION =
   "Use ONLY when the user is editing or creating opencode's own configuration: opencode.json, opencode.jsonc, files under .opencode/, or files under ~/.config/opencode/. Also use when creating or fixing opencode agents, subagents, skills, plugins, MCP servers, or permission rules. Do not use for the user's own application code, or for any project that is not configuring opencode itself."
 const CUSTOMIZE_OPENCODE_SKILL_BODY = SkillPlugin.CustomizeOpencodeContent
+
+const CAPTURE_SCREENSHOT_SKILL_NAME = "capture-screenshot"
+const CAPTURE_SCREENSHOT_SKILL_DESCRIPTION =
+  "Use when the user wants to see, capture or visually check something: the screen, an application window, a web page or a test artifact."
+const CAPTURE_SCREENSHOT_SKILL_BODY = SkillPlugin.CaptureScreenshotContent
 
 export const Info = Schema.Struct({
   name: Schema.String,
@@ -280,6 +286,15 @@ const layer = Layer.effect(
           description: CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION,
           location: "<built-in>",
           content: CUSTOMIZE_OPENCODE_SKILL_BODY,
+        }
+        s.skills[CAPTURE_SCREENSHOT_SKILL_NAME] = {
+          name: CAPTURE_SCREENSHOT_SKILL_NAME,
+          description: CAPTURE_SCREENSHOT_SKILL_DESCRIPTION,
+          location: "<built-in>",
+          content: CAPTURE_SCREENSHOT_SKILL_BODY.replaceAll(
+            "{{screenshots_dir}}",
+            ScreenshotStorage.directory(global),
+          ),
         }
         yield* loadSkills(s, yield* InstanceState.get(discovered), events)
         return s
