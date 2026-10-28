@@ -26,20 +26,15 @@
 | `0f549842ee` | 2026-09-24 | fix(stats): attribute Hy4 preview traffic to Tencent (#51050) | clean |
 | `6df0d5d951` | 2026-09-24 | fix(stats): use capability fallbacks in comparison radar (#51161) | clean |
 | `16c56fe5ec` | 2026-09-24 | fix(ci): use GPT-6 Luna for issue automation (#51261) | clean |
-## Skipped as large
+| `f5ce4f881e` | 2026-09-21 | fix(core): break filesystem search import cycle (#50439) | upstream file applied after verification; core typecheck and 29 filesystem tests pass |
 
+## Skipped as large
 | Upstream commit | Date | Subject | Size |
 | --- | --- | --- | --- |
 | `e059ac5918` | 2026-09-21 | feat: add Grok 4.7 to Zen and Go (#50288) | 239 lines, 39 files |
 | `1b4a6dbc65` | 2026-09-23 | feat(go): add Space Bunny promotion (#50572) | 281 lines, 61 files |
 | `1d6c3c0e29` | 2026-09-24 | feat(go): add GPT 6 Luna to Go pages (#50947) | 169 lines, 21 files |
 | `543c686c0d` | 2026-09-26 | fix(go): make DeepSeek $60 allowance permanent (#51364) | 122 lines, 21 files |
-## Skipped as already present
-
-| Upstream commit | Date | Subject | Reason |
-| --- | --- | --- | --- |
-| `f5ce4f881e` | 2026-09-21 | fix(core): break filesystem search import cycle (#50439) | Verified: all six `Entry`/`Match` hunks are present and the runtime `../filesystem` import is gone. Fork uses `FindInput`/`GlobInput`/`GrepInput` instead of upstream's type-only `FileSystem` import, so the upstream import is unnecessary. Core typecheck and 29 filesystem/search tests pass. |
-
 ## Skipped needing skipped prerequisite
 
 | Upstream commit | Date | Subject | Reason |
