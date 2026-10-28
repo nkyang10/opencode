@@ -23,6 +23,9 @@
 | `fe51b0b19a` | 2026-09-22 | fix(console): restrict legacy access to Black (#50716) | clean |
 | `610df0b566` | 2026-09-24 | fix(gemini): switch thinking default logic (#50841) | clean |
 | `82d4c89031` | 2026-09-23 | fix(opencode): redact credentials in debug config (#50956) | clean |
+| `0f549842ee` | 2026-09-24 | fix(stats): attribute Hy4 preview traffic to Tencent (#51050) | clean |
+| `6df0d5d951` | 2026-09-24 | fix(stats): use capability fallbacks in comparison radar (#51161) | clean |
+| `16c56fe5ec` | 2026-09-24 | fix(ci): use GPT-6 Luna for issue automation (#51261) | clean |
 ## Skipped as large
 
 | Upstream commit | Date | Subject | Size |
@@ -30,6 +33,7 @@
 | `e059ac5918` | 2026-09-21 | feat: add Grok 4.7 to Zen and Go (#50288) | 239 lines, 39 files |
 | `1b4a6dbc65` | 2026-09-23 | feat(go): add Space Bunny promotion (#50572) | 281 lines, 61 files |
 | `1d6c3c0e29` | 2026-09-24 | feat(go): add GPT 6 Luna to Go pages (#50947) | 169 lines, 21 files |
+| `543c686c0d` | 2026-09-26 | fix(go): make DeepSeek $60 allowance permanent (#51364) | 122 lines, 21 files |
 ## Skipped as already present
 
 | Upstream commit | Date | Subject | Reason |
@@ -46,3 +50,4 @@
 
 | Upstream commit | Date | Subject | Conflicted paths |
 | --- | --- | --- | --- |
+| `29f07e0c69` | 2026-09-25 | refactor(core): share a browser opener across opencode and tui (#51414) | packages/opencode/src/cli/cmd/web.ts |
