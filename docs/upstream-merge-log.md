@@ -27,19 +27,15 @@
 | `6df0d5d951` | 2026-09-24 | fix(stats): use capability fallbacks in comparison radar (#51161) | clean |
 | `16c56fe5ec` | 2026-09-24 | fix(ci): use GPT-6 Luna for issue automation (#51261) | clean |
 | `f5ce4f881e` | 2026-09-21 | fix(core): break filesystem search import cycle (#50439) | upstream file applied after verification; core typecheck and 29 filesystem tests pass |
-
-## Skipped as large
-| Upstream commit | Date | Subject | Size |
-| --- | --- | --- | --- |
-| `e059ac5918` | 2026-09-21 | feat: add Grok 4.7 to Zen and Go (#50288) | 239 lines, 39 files |
-| `1b4a6dbc65` | 2026-09-23 | feat(go): add Space Bunny promotion (#50572) | 281 lines, 61 files |
-| `1d6c3c0e29` | 2026-09-24 | feat(go): add GPT 6 Luna to Go pages (#50947) | 169 lines, 21 files |
-| `543c686c0d` | 2026-09-26 | fix(go): make DeepSeek $60 allowance permanent (#51364) | 122 lines, 21 files |
-## Skipped needing skipped prerequisite
+## Skipped intentionally
 
 | Upstream commit | Date | Subject | Reason |
 | --- | --- | --- | --- |
-| `0027387dc5` | 2026-09-24 | fix(go): include DeepSeek V4 Flash in chart (#51032) | File is unchanged locally; context depends on skipped large Go-page commits. |
+| `e059ac5918` | 2026-09-21 | feat: add Grok 4.7 to Zen and Go (#50288) | Local LLM only; Zen/Go catalog change not needed. |
+| `1b4a6dbc65` | 2026-09-23 | feat(go): add Space Bunny promotion (#50572) | Local LLM only; Zen/Go promotion not needed. |
+| `1d6c3c0e29` | 2026-09-24 | feat(go): add GPT 6 Luna to Go pages (#50947) | Local LLM only; Zen/Go page change not needed. |
+| `543c686c0d` | 2026-09-26 | fix(go): make DeepSeek $60 allowance permanent (#51364) | Local LLM only; Go allowance not needed. |
+| `0027387dc5` | 2026-09-24 | fix(go): include DeepSeek V4 Flash in chart (#51032) | Local LLM only; Go chart change not needed. Also depends on skipped Go-page commits. |
 
 ## Hard conflicts
 
