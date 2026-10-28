@@ -38,7 +38,7 @@
 
 | Upstream commit | Date | Subject | Reason |
 | --- | --- | --- | --- |
-| `f5ce4f881e` | 2026-09-21 | fix(core): break filesystem search import cycle (#50439) | Fork already has the `Entry`/`Match` import split; conflict is textual only. |
+| `f5ce4f881e` | 2026-09-21 | fix(core): break filesystem search import cycle (#50439) | Verified: all six `Entry`/`Match` hunks are present and the runtime `../filesystem` import is gone. Fork uses `FindInput`/`GlobInput`/`GrepInput` instead of upstream's type-only `FileSystem` import, so the upstream import is unnecessary. Core typecheck and 29 filesystem/search tests pass. |
 
 ## Skipped needing skipped prerequisite
 
