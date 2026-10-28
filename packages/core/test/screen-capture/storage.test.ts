@@ -46,6 +46,7 @@ describe("ScreenshotStorage naming", () => {
         "20260102-030405-my-app-test-a1b2.png",
       )
       expect(ScreenshotStorage.FILE_PATTERN.test("20260102-030405-my-app-test-a1b2.png")).toBe(true)
+      expect(ScreenshotStorage.FILE_PATTERN.test("20260102-030405-headless-browser.png")).toBe(true)
       expect(ScreenshotStorage.FILE_PATTERN.test(ScreenshotStorage.filename({ date, slug: "hello" }))).toBe(true)
       expect(ScreenshotStorage.slug("日本語")).toBe("screenshot")
       expect(ScreenshotStorage.slug("!!!")).toBe("screenshot")
@@ -105,6 +106,7 @@ describe("ScreenshotStorage cleanup", () => {
         const dir = ScreenshotStorage.directory(global)
         const old = path.join(dir, "20260101-000000-old-a1b2.png")
         const recent = path.join(dir, "20260101-000000-new-b2c3.png")
+        const browser = path.join(dir, "20260101-000000-browser.png")
         const unrelated = path.join(dir, "notes.txt")
         const directory = path.join(dir, "20260101-000000-dir-c3d4.png")
         const link = path.join(dir, "20260101-000000-link-d4e5.png")
@@ -113,6 +115,7 @@ describe("ScreenshotStorage cleanup", () => {
         yield* fs.makeDirectory(dir, { recursive: true })
         yield* fs.writeFile(old, Uint8Array.from([1]))
         yield* fs.writeFile(recent, Uint8Array.from([2]))
+        yield* fs.writeFile(browser, Uint8Array.from([5]))
         yield* fs.writeFile(unrelated, Uint8Array.from([3]))
         yield* fs.writeFile(target, Uint8Array.from([4]))
         yield* fs.makeDirectory(directory)
@@ -120,11 +123,13 @@ describe("ScreenshotStorage cleanup", () => {
 
         const expired = new Date(Date.now() - Duration.toMillis(ScreenshotStorage.RETENTION) - 1_000)
         yield* fs.utimes(old, expired, expired)
+        yield* fs.utimes(browser, expired, expired)
         yield* fs.utimes(unrelated, expired, expired)
 
         yield* store.cleanup()
 
         expect(yield* fs.exists(old)).toBe(false)
+        expect(yield* fs.exists(browser)).toBe(false)
         expect(yield* fs.exists(recent)).toBe(true)
         expect(yield* fs.exists(unrelated)).toBe(true)
         expect(yield* fs.exists(directory)).toBe(true)

@@ -72,7 +72,14 @@ const SWAY_TREE = {
     },
   ],
   floating_nodes: [
-    { id: 33, type: "floating_con", app_id: "Code", name: "Beta Project", pid: 103, rect: { x: 500, y: 100, width: 700, height: 500 } },
+    {
+      id: 33,
+      type: "floating_con",
+      app_id: "Code",
+      name: "Beta Project",
+      pid: 103,
+      rect: { x: 500, y: 100, width: 700, height: 500 },
+    },
   ],
 }
 
@@ -100,7 +107,11 @@ type Call = { readonly command: string; readonly args: readonly string[] }
 type Response = { stdout: Buffer; stderr?: Buffer; exitCode?: number }
 
 const jsonResponse = (value: unknown): Response => ({ stdout: Buffer.from(JSON.stringify(value), "utf8") })
-const errorResponse = (stderr: string): Response => ({ stdout: Buffer.alloc(0), stderr: Buffer.from(stderr, "utf8"), exitCode: 1 })
+const errorResponse = (stderr: string): Response => ({
+  stdout: Buffer.alloc(0),
+  stderr: Buffer.from(stderr, "utf8"),
+  exitCode: 1,
+})
 
 const fakeProcess = (calls: Call[], respond: (command: string, args: readonly string[]) => Response) =>
   AppProcess.Service.of({
@@ -189,7 +200,10 @@ describe("ScreenCapture Wayland backend", () => {
       ),
     )
 
-    expect(calls.map((call) => call.args)).toEqual([["-t", "get_outputs"], ["-o", "eDP-1"]])
+    expect(calls.map((call) => call.args)).toEqual([
+      ["-t", "get_outputs"],
+      ["-o", "eDP-1", "-"],
+    ])
     expect(result).toMatchObject({
       mime: "image/png",
       width: 2,
@@ -200,6 +214,53 @@ describe("ScreenCapture Wayland backend", () => {
       platform: "linux",
       focusChanged: false,
     })
+  })
+
+  test("uses the active Sway output when primary is false", async () => {
+    const calls: Call[] = []
+    const outputs = [
+      { name: "eDP-1", primary: false, active: false, rect: { x: 0, y: 0, width: 1920, height: 1080 } },
+      { name: "DP-1", primary: false, active: true, rect: { x: 1920, y: 0, width: 1200, height: 800 } },
+    ]
+    await Effect.runPromise(
+      ScreenCaptureWayland.capture(
+        fakeProcess(calls, (command, args) => {
+          if (args.includes("get_outputs")) return jsonResponse(outputs)
+          if (command === GRIM) return { stdout: PNG }
+          throw new Error(`unexpected command ${command} ${args.join(" ")}`)
+        }),
+        swayBackend(),
+        input(),
+      ),
+    )
+
+    expect(calls.at(-1)?.args).toEqual(["-o", "DP-1", "-"])
+  })
+
+  test("ignores Sway split containers without a view", async () => {
+    const result = await Effect.runPromise(
+      ScreenCaptureWayland.list(
+        fakeProcess([], (command, args) => {
+          if (args.includes("get_outputs")) return jsonResponse(SWAY_OUTPUTS)
+          if (args.includes("get_tree"))
+            return jsonResponse({
+              nodes: [
+                {
+                  id: 44,
+                  type: "con",
+                  name: "split",
+                  rect: { x: 0, y: 0, width: 800, height: 600 },
+                  nodes: [],
+                },
+              ],
+            })
+          throw new Error(`unexpected command ${command} ${args.join(" ")}`)
+        }),
+        swayBackend(),
+      ),
+    )
+
+    expect(result.windows).toEqual([])
   })
 
   test("captures numeric Hyprland outputs with grim -o", async () => {
@@ -216,7 +277,7 @@ describe("ScreenCapture Wayland backend", () => {
       ),
     )
 
-    expect(calls.at(-1)?.args).toEqual(["-o", "HDMI-A-1"])
+    expect(calls.at(-1)?.args).toEqual(["-o", "HDMI-A-1", "-"])
   })
 
   test("captures all outputs with the union geometry", async () => {
@@ -233,7 +294,7 @@ describe("ScreenCapture Wayland backend", () => {
       ),
     )
 
-    expect(calls.at(-1)?.args).toEqual(["-g", "3120x1080+0+0"])
+    expect(calls.at(-1)?.args).toEqual(["-g", "0,0 3120x1080", "-"])
   })
 
   test("fails window capture without invoking grim", async () => {

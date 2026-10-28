@@ -94,7 +94,7 @@ export function screenArgs(selector: Input["display"], displays: ReadonlyArray<D
   const chosen =
     typeof selector === "number"
       ? displays.find((display) => display.index === selector)
-      : displays.find((display) => display.primary) ?? displays[0]
+      : (displays.find((display) => display.primary) ?? displays[0])
   if (!chosen)
     return new CaptureError({
       code: typeof selector === "number" ? "unsupported" : "no_interactive_session",
@@ -173,11 +173,7 @@ function captureWindow(
       window: { id: window.id, app: window.app, pid: window.pid, title: window.title },
       others: selected.match.others.slice(0, MAX_OTHERS).map(summarize),
     }
-    const first = yield* captureToFile(process, backend, args)
-    if (!window.minimized || !input.restore_minimized || !isLikelyBlankPng(first))
-      return yield* captureResult({ data: first, ...fallback })
-
-    const data = yield* Effect.acquireUseRelease(
+    const restoredCapture = Effect.acquireUseRelease(
       restoreWindow(process, backend, window.id, false).pipe(Effect.mapError(restoreFailure)),
       () => captureToFile(process, backend, args),
       () =>
@@ -185,8 +181,18 @@ function captureWindow(
           Effect.tapError((error) => Effect.logWarning("failed to re-minimize captured window", { error })),
           Effect.ignore,
         ),
-    )
-    return yield* captureResult({ data, ...fallback, restored: true })
+    ).pipe(Effect.map((data) => ({ data, restored: true as const })))
+    const first =
+      window.minimized && input.restore_minimized
+        ? yield* captureToFile(process, backend, args).pipe(
+            Effect.map((data) => ({ data, restored: false as const })),
+            Effect.catch(() => restoredCapture),
+            Effect.flatMap((result) =>
+              !result.restored && isLikelyBlankPng(result.data) ? restoredCapture : Effect.succeed(result),
+            ),
+          )
+        : { data: yield* captureToFile(process, backend, args), restored: false as const }
+    return yield* captureResult({ data: first.data, ...fallback, ...(first.restored ? { restored: true } : {}) })
   })
 }
 
@@ -206,7 +212,12 @@ function restoreWindow(
     Effect.flatMap((ok) =>
       ok
         ? Effect.succeed(ok)
-        : Effect.fail(new CaptureError({ code: "window_not_capturable", reason: "macOS could not change the minimized window state" })),
+        : Effect.fail(
+            new CaptureError({
+              code: "window_not_capturable",
+              reason: "macOS could not change the minimized window state",
+            }),
+          ),
     ),
   )
 }
@@ -284,7 +295,10 @@ function invokeJXA(
 
     if (result.exitCode !== 0) return yield* jxaFailure(result)
     if (result.stdoutTruncated)
-      return yield* new CaptureError({ code: "unsupported", reason: "macOS JXA output is larger than the capture limit" })
+      return yield* new CaptureError({
+        code: "unsupported",
+        reason: "macOS JXA output is larger than the capture limit",
+      })
     return yield* parseJson(result.stdout.toString("utf8"), "osascript produced no JSON")
   })
 }

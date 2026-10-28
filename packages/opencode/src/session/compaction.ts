@@ -66,7 +66,7 @@ function prunePartEstimate(part: SessionV1.ToolPart) {
 function attachmentEstimate(attachment: SessionV1.FilePart) {
   if (!attachment.mime.startsWith("image/") || attachment.mime === "image/svg+xml") return 0
   const dimensions = dimensionsFromDataUrl(attachment.url)
-  return dimensions ? Token.estimateImage(dimensions) : Token.estimate(attachment.url)
+  return dimensions ? Token.estimateImage(dimensions) : 0
 }
 
 function dimensionsFromDataUrl(url: string) {

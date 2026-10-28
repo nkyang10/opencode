@@ -32,6 +32,7 @@ import { LLMEvent, Usage } from "@opencode-ai/llm"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
+import { createPng } from "../../../core/test/fixture/png"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 
 const summary = Layer.succeed(
@@ -1099,7 +1100,7 @@ describe("session.compaction.process", () => {
           type: "file",
           mime: "image/png",
           filename: "big.png",
-          url: `data:image/png;base64,${"a".repeat(4_000)}`,
+          url: `data:image/png;base64,${createPng(500, 500, [128, 128, 128, 255]).toString("base64")}`,
         })
         yield* createSummaryCompaction(session.id)
 

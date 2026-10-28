@@ -14,7 +14,7 @@
 
   var OPTION_ON_SCREEN_ONLY = 1
   var OPTION_EXCLUDE_DESKTOP_ELEMENTS = 16
-  var OPTION_INCLUDING_WINDOW = 2
+  var OPTION_INCLUDING_WINDOW = 8
   var LIST_OPTIONS = OPTION_EXCLUDE_DESKTOP_ELEMENTS
   var ALL_ON_SCREEN_OPTIONS = OPTION_ON_SCREEN_ONLY | OPTION_EXCLUDE_DESKTOP_ELEMENTS
 
@@ -54,13 +54,13 @@
   }
 
   function preflightScreenCapture() {
+    var mainDisplayID
     try {
-      if ($.CGMainDisplayID && Number($.CGMainDisplayID()) === 0) {
-        fail("no_interactive_session", "No macOS window server display is available.")
-      }
+      if ($.CGMainDisplayID) mainDisplayID = Number($.CGMainDisplayID())
     } catch (error) {
       void error
     }
+    if (mainDisplayID === 0) fail("no_interactive_session", "No macOS window server display is available.")
 
     var session = undefined
     try {
@@ -68,20 +68,23 @@
     } catch (error) {
       void error
     }
-    if (session) {
-      var onConsole = number(session.objectForKey("kCGSSessionOnConsoleKey"))
-      if (onConsole !== undefined && onConsole !== 1) {
-        fail("no_interactive_session", "macOS screenshot capture requires an interactive console session.")
-      }
-    }
-
+    var onConsole
     try {
-      if ($.CGPreflightScreenCaptureAccess && !$.CGPreflightScreenCaptureAccess()) {
-        fail("permission_required", "macOS Screen Recording permission is required for screenshot capture.")
-      }
+      if (session) onConsole = number(session.objectForKey("kCGSSessionOnConsoleKey"))
     } catch (error) {
       void error
     }
+    if (onConsole !== undefined && onConsole !== 1)
+      fail("no_interactive_session", "macOS screenshot capture requires an interactive console session.")
+
+    var screenCaptureAccess
+    try {
+      if ($.CGPreflightScreenCaptureAccess) screenCaptureAccess = $.CGPreflightScreenCaptureAccess()
+    } catch (error) {
+      void error
+    }
+    if (screenCaptureAccess === false)
+      fail("permission_required", "macOS Screen Recording permission is required for screenshot capture.")
   }
 
   function screenName(screen, index) {
@@ -140,8 +143,8 @@
     return out
   }
 
-  function rawWindowInfos(options) {
-    var infos = $.CGWindowListCopyWindowInfo(options, 0)
+  function rawWindowInfos(options, windowId) {
+    var infos = $.CGWindowListCopyWindowInfo(options, windowId === undefined ? 0 : windowId)
     if (!infos) return []
     return ObjC.deepUnwrap(infos) || []
   }
@@ -220,15 +223,16 @@
   }
 
   function targetWindowInfo(id) {
-    var infos = rawWindowInfos(OPTION_INCLUDING_WINDOW | OPTION_EXCLUDE_DESKTOP_ELEMENTS)
-    if (infos.length) {
-      var normalized = normalizeWindow(infos[0], listDisplays())
-      if (normalized) return normalized
+    var wanted = "0x" + id.toString(16)
+    var displays = listDisplays()
+    var infos = rawWindowInfos(OPTION_INCLUDING_WINDOW | OPTION_EXCLUDE_DESKTOP_ELEMENTS, id)
+    for (var i = 0; i < infos.length; i++) {
+      var normalized = normalizeWindow(infos[i], displays)
+      if (normalized && normalized.id === wanted) return normalized
     }
     var all = rawWindowInfos(ALL_ON_SCREEN_OPTIONS)
-    var wanted = "0x" + id.toString(16)
-    for (var i = 0; i < all.length; i++) {
-      var window = normalizeWindow(all[i], listDisplays())
+    for (var j = 0; j < all.length; j++) {
+      var window = normalizeWindow(all[j], displays)
       if (window && window.id === wanted) return window
     }
     return undefined

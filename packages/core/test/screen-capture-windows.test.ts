@@ -119,7 +119,12 @@ function record(value: string): RawRecord {
 describe("ScreenCapture Windows backend", () => {
   test("runs powershell through an encoded command and sends the PowerShell source as stdin JSON", async () => {
     const calls: Call[] = []
-    await Effect.runPromise(ScreenCaptureWindows.list(fakeProcess(calls, () => jsonResponse(LIST)), backend()))
+    await Effect.runPromise(
+      ScreenCaptureWindows.list(
+        fakeProcess(calls, () => jsonResponse(LIST)),
+        backend(),
+      ),
+    )
 
     expect(calls[0]?.command).toBe(NATIVE_PROGRAM)
     expect(calls[0]?.args).toEqual(ScreenCaptureWindows.powershellArgs())
@@ -127,7 +132,9 @@ describe("ScreenCapture Windows backend", () => {
 
     const payload = record(calls[0]?.stdin ?? "")
     expect(payload).toMatchObject({ operation: "list" })
-    expect(Buffer.from(String(payload.script), "base64").toString("utf8")).toContain("OpenCodeScreenCapture")
+    const script = Buffer.from(String(payload.script), "base64").toString("utf8")
+    expect(script).toContain("OpenCodeScreenCapture")
+    expect(script).toContain("PrintWindow failed for the target window")
   })
 
   test("lists displays and front-to-back windows", async () => {
@@ -253,7 +260,7 @@ describe("ScreenCapture Windows backend", () => {
           return errorResponse({
             code: "window_not_found",
             reason: "the window is no longer available",
-            candidates: ["0x10 firefox \"Alpha Project\""],
+            candidates: ['0x10 firefox "Alpha Project"'],
           })
         }),
         backend(),

@@ -9,10 +9,13 @@ describe("ScreenCaptureDetect", () => {
   test("detects Windows through powershell.exe", () => {
     expect(
       Option.getOrNull(
-        ScreenCaptureDetect.detect({
-          platform: "win32",
-          env: {},
-        }, lookup({ "powershell.exe": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" })),
+        ScreenCaptureDetect.detect(
+          {
+            platform: "win32",
+            env: {},
+          },
+          lookup({ "powershell.exe": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" }),
+        ),
       ),
     ).toEqual({
       kind: "windows",
@@ -42,10 +45,7 @@ describe("ScreenCaptureDetect", () => {
   test("does not detect macOS without screencapture", () => {
     expect(
       Option.isNone(
-        ScreenCaptureDetect.detect(
-          { platform: "darwin", env: {} },
-          lookup({ osascript: "/usr/bin/osascript" }),
-        ),
+        ScreenCaptureDetect.detect({ platform: "darwin", env: {} }, lookup({ osascript: "/usr/bin/osascript" })),
       ),
     ).toBe(true)
   })
@@ -53,15 +53,18 @@ describe("ScreenCaptureDetect", () => {
   test("prefers WSL PowerShell over an available X11 display", () => {
     expect(
       Option.getOrNull(
-        ScreenCaptureDetect.detect({
-          platform: "linux",
-          env: { DISPLAY: ":0", WSL_DISTRO_NAME: "Ubuntu" },
-        }, lookup({
-          xwininfo: "/usr/bin/xwininfo",
-          import: "/usr/bin/import",
-          "powershell.exe": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
-          wslpath: "/usr/bin/wslpath",
-        })),
+        ScreenCaptureDetect.detect(
+          {
+            platform: "linux",
+            env: { DISPLAY: ":0", WSL_DISTRO_NAME: "Ubuntu" },
+          },
+          lookup({
+            xwininfo: "/usr/bin/xwininfo",
+            import: "/usr/bin/import",
+            "powershell.exe": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+            wslpath: "/usr/bin/wslpath",
+          }),
+        ),
       ),
     ).toEqual({
       kind: "windows",
@@ -71,19 +74,60 @@ describe("ScreenCaptureDetect", () => {
     })
   })
 
+  test("detects WSL without wslpath", () => {
+    expect(
+      Option.getOrNull(
+        ScreenCaptureDetect.detect(
+          {
+            platform: "linux",
+            env: { WSL_DISTRO_NAME: "Ubuntu" },
+          },
+          lookup({
+            "powershell.exe": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+          }),
+        ),
+      ),
+    ).toEqual({
+      kind: "windows",
+      transport: "wsl",
+      program: "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+    })
+  })
+
+  test("registers X11 support for a headless display without DISPLAY", () => {
+    expect(
+      ScreenCaptureDetect.supported(
+        { platform: "linux", env: {} },
+        lookup({ xwininfo: "/usr/bin/xwininfo", import: "/usr/bin/import" }),
+      ),
+    ).toBe(true)
+  })
+
+  test("registers WSL support without wslpath", () => {
+    expect(
+      ScreenCaptureDetect.supported(
+        { platform: "linux", env: { WSL_DISTRO_NAME: "Ubuntu" } },
+        lookup({ "powershell.exe": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe" }),
+      ),
+    ).toBe(true)
+  })
+
   test("honors an explicit x_display on WSL", () => {
     expect(
       Option.getOrNull(
-        ScreenCaptureDetect.detect({
-          platform: "linux",
-          env: { WSL_DISTRO_NAME: "Ubuntu" },
-          x_display: ":99",
-        }, lookup({
-          xwininfo: "/usr/bin/xwininfo",
-          import: "/usr/bin/import",
-          "powershell.exe": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
-          wslpath: "/usr/bin/wslpath",
-        })),
+        ScreenCaptureDetect.detect(
+          {
+            platform: "linux",
+            env: { WSL_DISTRO_NAME: "Ubuntu" },
+            x_display: ":99",
+          },
+          lookup({
+            xwininfo: "/usr/bin/xwininfo",
+            import: "/usr/bin/import",
+            "powershell.exe": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+            wslpath: "/usr/bin/wslpath",
+          }),
+        ),
       ),
     ).toEqual({
       kind: "x11",
@@ -115,15 +159,23 @@ describe("ScreenCaptureDetect", () => {
   test("prefers Wayland over X11 on a Wayland session", () => {
     expect(
       Option.getOrNull(
-        ScreenCaptureDetect.detect({
-          platform: "linux",
-          env: { WAYLAND_DISPLAY: "wayland-0", DISPLAY: ":0", XDG_SESSION_TYPE: "wayland", SWAYSOCK: "/tmp/sway.sock" },
-        }, lookup({
-          xwininfo: "/usr/bin/xwininfo",
-          import: "/usr/bin/import",
-          grim: "/usr/bin/grim",
-          swaymsg: "/usr/bin/swaymsg",
-        })),
+        ScreenCaptureDetect.detect(
+          {
+            platform: "linux",
+            env: {
+              WAYLAND_DISPLAY: "wayland-0",
+              DISPLAY: ":0",
+              XDG_SESSION_TYPE: "wayland",
+              SWAYSOCK: "/tmp/sway.sock",
+            },
+          },
+          lookup({
+            xwininfo: "/usr/bin/xwininfo",
+            import: "/usr/bin/import",
+            grim: "/usr/bin/grim",
+            swaymsg: "/usr/bin/swaymsg",
+          }),
+        ),
       ),
     ).toEqual({
       kind: "wayland",
@@ -137,16 +189,19 @@ describe("ScreenCaptureDetect", () => {
   test("honors an explicit x_display over Wayland", () => {
     expect(
       Option.getOrNull(
-        ScreenCaptureDetect.detect({
-          platform: "linux",
-          env: { WAYLAND_DISPLAY: "wayland-0", XDG_SESSION_TYPE: "wayland", HYPRLAND_INSTANCE_SIGNATURE: "abc" },
-          x_display: ":99",
-        }, lookup({
-          xwininfo: "/usr/bin/xwininfo",
-          import: "/usr/bin/import",
-          grim: "/usr/bin/grim",
-          hyprctl: "/usr/bin/hyprctl",
-        })),
+        ScreenCaptureDetect.detect(
+          {
+            platform: "linux",
+            env: { WAYLAND_DISPLAY: "wayland-0", XDG_SESSION_TYPE: "wayland", HYPRLAND_INSTANCE_SIGNATURE: "abc" },
+            x_display: ":99",
+          },
+          lookup({
+            xwininfo: "/usr/bin/xwininfo",
+            import: "/usr/bin/import",
+            grim: "/usr/bin/grim",
+            hyprctl: "/usr/bin/hyprctl",
+          }),
+        ),
       ),
     ).toEqual({
       kind: "x11",
@@ -161,15 +216,18 @@ describe("ScreenCaptureDetect", () => {
   test("prefers WSL over Wayland", () => {
     expect(
       Option.getOrNull(
-        ScreenCaptureDetect.detect({
-          platform: "linux",
-          env: { WAYLAND_DISPLAY: "wayland-0", WSL_DISTRO_NAME: "Ubuntu", SWAYSOCK: "/tmp/sway.sock" },
-        }, lookup({
-          "powershell.exe": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
-          wslpath: "/usr/bin/wslpath",
-          grim: "/usr/bin/grim",
-          swaymsg: "/usr/bin/swaymsg",
-        })),
+        ScreenCaptureDetect.detect(
+          {
+            platform: "linux",
+            env: { WAYLAND_DISPLAY: "wayland-0", WSL_DISTRO_NAME: "Ubuntu", SWAYSOCK: "/tmp/sway.sock" },
+          },
+          lookup({
+            "powershell.exe": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+            wslpath: "/usr/bin/wslpath",
+            grim: "/usr/bin/grim",
+            swaymsg: "/usr/bin/swaymsg",
+          }),
+        ),
       ),
     ).toEqual({
       kind: "windows",
@@ -190,10 +248,13 @@ describe("ScreenCaptureDetect", () => {
   test("keeps native Linux on X11 when WSL tools are absent", () => {
     expect(
       Option.getOrNull(
-        ScreenCaptureDetect.detect({ platform: "linux", env: { DISPLAY: ":99" } }, lookup({
-          xwininfo: "/usr/bin/xwininfo",
-          import: "/usr/bin/import",
-        })),
+        ScreenCaptureDetect.detect(
+          { platform: "linux", env: { DISPLAY: ":99" } },
+          lookup({
+            xwininfo: "/usr/bin/xwininfo",
+            import: "/usr/bin/import",
+          }),
+        ),
       ),
     ).toEqual({
       kind: "x11",

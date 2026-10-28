@@ -161,7 +161,10 @@ describe("ScreenCapture macOS backend", () => {
   test("invokes osascript with the embedded JXA script and lists displays and windows", async () => {
     const calls: Call[] = []
     const result = await Effect.runPromise(
-      ScreenCaptureMacos.list(fakeProcess(calls, jxaResponses, () => ({ file: PNG })), backend),
+      ScreenCaptureMacos.list(
+        fakeProcess(calls, jxaResponses, () => ({ file: PNG })),
+        backend,
+      ),
     )
 
     expect(calls).toHaveLength(1)
@@ -170,7 +173,12 @@ describe("ScreenCapture macOS backend", () => {
 
     const payload = record(calls[0]?.stdin ?? "")
     expect(payload).toMatchObject({ operation: "list" })
-    expect(Buffer.from(String(payload.script), "base64").toString("utf8")).toContain("CGWindowListCopyWindowInfo")
+    const script = Buffer.from(String(payload.script), "base64").toString("utf8")
+    expect(script).toContain("CGWindowListCopyWindowInfo")
+    expect(script).toContain("var OPTION_INCLUDING_WINDOW = 8")
+    expect(script).toContain("rawWindowInfos(OPTION_INCLUDING_WINDOW | OPTION_EXCLUDE_DESKTOP_ELEMENTS, id)")
+    expect(script).toContain('if (mainDisplayID === 0) fail("no_interactive_session"')
+    expect(script).toContain("if (screenCaptureAccess === false)")
 
     expect(result.displays.map((display) => display.name)).toEqual(["Built-in Retina", "LG UltraFine"])
     expect(result.windows.map((window) => window.id)).toEqual(["0x10", "0x20", "0x30"])
@@ -207,14 +215,22 @@ describe("ScreenCapture macOS backend", () => {
   test("captures a numbered display and all displays through one screencapture command", async () => {
     const numbered: Call[] = []
     const numberedResult = await Effect.runPromise(
-      ScreenCaptureMacos.capture(fakeProcess(numbered, jxaResponses, () => ({ file: PNG })), backend, input({ display: 2 })),
+      ScreenCaptureMacos.capture(
+        fakeProcess(numbered, jxaResponses, () => ({ file: PNG })),
+        backend,
+        input({ display: 2 }),
+      ),
     )
     expect(numberedResult).toMatchObject({ display: 2 })
     expect(numbered[1]?.args).toEqual(["-x", "-D", "2", "-t", "png", numbered[1]!.path!])
 
     const all: Call[] = []
     const allResult = await Effect.runPromise(
-      ScreenCaptureMacos.capture(fakeProcess(all, jxaResponses, () => ({ file: PNG })), backend, input({ display: "all" })),
+      ScreenCaptureMacos.capture(
+        fakeProcess(all, jxaResponses, () => ({ file: PNG })),
+        backend,
+        input({ display: "all" }),
+      ),
     )
     expect(allResult).toMatchObject({ display: "all" })
     expect(all[1]?.args).toEqual(["-x", "-R", "0,0,3120,1080", "-t", "png", all[1]!.path!])
@@ -272,7 +288,8 @@ describe("ScreenCapture macOS backend", () => {
       ScreenCaptureMacos.capture(
         fakeProcess(
           calls,
-          (request) => (request.operation === "list" ? jsonResponse(listWithMinimizedFirst()) : jsonResponse({ ok: true })),
+          (request) =>
+            request.operation === "list" ? jsonResponse(listWithMinimizedFirst()) : jsonResponse({ ok: true }),
           () => ({ file: PNG }),
         ),
         backend,
@@ -313,6 +330,35 @@ describe("ScreenCapture macOS backend", () => {
       .filter((payload) => payload.operation === "restore")
     expect(restores.map((payload) => payload.minimized)).toEqual([false, true])
     expect(restores[0]).toMatchObject({ id: "0x10" })
+    expect(calls.filter((call) => call.command === SCREENCAPTURE)).toHaveLength(2)
+  })
+
+  test("restores a minimized window after the first capture exits with an error", async () => {
+    const calls: Call[] = []
+    const result = await Effect.runPromise(
+      ScreenCaptureMacos.capture(
+        fakeProcess(
+          calls,
+          (request) => {
+            if (request.operation === "list") return jsonResponse(listWithMinimizedFirst())
+            if (request.operation === "restore") return jsonResponse({ ok: true, focusChanged: false })
+            return jsonResponse({})
+          },
+          (index) =>
+            index === 0 ? { exitCode: 1, stderr: Buffer.from("cannot capture window", "utf8") } : { file: PNG },
+        ),
+        backend,
+        input({ target: "window", window: "0x10" }),
+      ),
+    )
+
+    expect(result.restored).toBe(true)
+    expect(result.window?.id).toBe("0x10")
+    const restores = calls
+      .filter((call) => call.command === OSASCRIPT)
+      .map((call) => record(call.stdin ?? ""))
+      .filter((payload) => payload.operation === "restore")
+    expect(restores.map((payload) => payload.minimized)).toEqual([false, true])
     expect(calls.filter((call) => call.command === SCREENCAPTURE)).toHaveLength(2)
   })
 
@@ -392,9 +438,11 @@ describe("ScreenCapture macOS backend", () => {
   test("fails unsupported when screencapture writes an empty file", async () => {
     const calls: Call[] = []
     const error = await Effect.runPromise(
-      ScreenCaptureMacos.capture(fakeProcess(calls, jxaResponses, () => ({ file: Buffer.alloc(0) })), backend, input()).pipe(
-        Effect.catch((failure) => Effect.succeed(failure)),
-      ),
+      ScreenCaptureMacos.capture(
+        fakeProcess(calls, jxaResponses, () => ({ file: Buffer.alloc(0) })),
+        backend,
+        input(),
+      ).pipe(Effect.catch((failure) => Effect.succeed(failure))),
     )
 
     expect(error).toBeInstanceOf(CaptureError)

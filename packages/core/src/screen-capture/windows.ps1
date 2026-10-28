@@ -411,16 +411,7 @@ public static class OpenCodeScreenCapture
                 }
 
                 if (!printed)
-                {
-                    try
-                    {
-                        graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, new Size(bounds.Width, bounds.Height));
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new OpenCodeCaptureException("permission_required", "PrintWindow failed and the window region could not be copied: " + ex.Message, new string[0]);
-                    }
-                }
+                    throw new OpenCodeCaptureException("window_not_capturable", "PrintWindow failed for the target window", new string[0]);
             }
             return bitmap;
         }

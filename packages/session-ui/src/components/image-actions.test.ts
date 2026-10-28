@@ -257,41 +257,59 @@ describe("imageActionAvailability", () => {
 describe("sessionImageGallery", () => {
   const labels = { image: "Image", attachment: "attachment", you: "You" }
 
-  test("returns user, tool and assistant images in timeline order", () => {
-    const messages: Message[] = [
-      assistantMessage("msg_2", 2),
-      userMessage("msg_1", 1),
-    ]
+  test("returns rendered user and tool images in timeline order", () => {
+    const messages: Message[] = [assistantMessage("msg_2", 2), userMessage("msg_1", 1)]
     const parts: Record<string, Part[]> = {
       msg_1: [filePart({ id: "user_file", messageID: "msg_1", filename: "user.png" })],
       msg_2: [
         toolPart({ id: "tool_1", messageID: "msg_2" }, "data:image/png;base64,iVBORw0KGgoAAA=="),
-        filePart({ id: "assistant_file", messageID: "msg_2", filename: "assistant.png", mime: "image/jpeg", url: JPEG }),
+        filePart({
+          id: "assistant_file",
+          messageID: "msg_2",
+          filename: "assistant.png",
+          mime: "image/jpeg",
+          url: JPEG,
+        }),
       ],
     }
     const gallery = sessionImageGallery({ sessionID: "ses_1", messages, parts, labels })
-    expect(gallery.map((entry) => entry.partID)).toEqual(["user_file", "tool_1", "assistant_file"])
+    expect(gallery.map((entry) => entry.partID)).toEqual(["user_file", "tool_1"])
     expect(gallery[0]!.source).toBe("You")
     expect(gallery[1]!.source).toBe("read · /repo/src/logo.png")
     expect(gallery[1]!.width).toBe(320)
     expect(gallery[1]!.height).toBe(180)
     expect(gallery[1]!.path).toBe("/repo/src/logo.png")
-    expect(gallery[2]!.mime).toBe("image/jpeg")
-    expect(gallery[2]!.source).toBe("assistant.png")
   })
 
-  test("dedupes identical sources and ignores non-image files", () => {
-    const messages: Message[] = [userMessage("msg_1", 1), assistantMessage("msg_2", 2)]
+  test("keeps multiple images from one tool part", () => {
+    const base = toolPart()
+    if (base.state.status !== "completed") throw new Error("expected completed tool")
+    const attachment = base.state.attachments![0]!
+    const part = {
+      ...base,
+      state: { ...base.state, attachments: [attachment, { ...attachment, id: "att_2", url: JPEG }] },
+    } as ToolPart
+    const messages: Message[] = [assistantMessage("msg_1", 1)]
+    const gallery = sessionImageGallery({ sessionID: "ses_1", messages, parts: { msg_1: [part] }, labels })
+    expect(gallery.map((entry) => entry.src)).toEqual([PNG, JPEG])
+  })
+
+  test("keeps distinct parts with the same source and ignores non-image files", () => {
+    const messages: Message[] = [userMessage("msg_1", 1), userMessage("msg_2", 2)]
     const parts: Record<string, Part[]> = {
       msg_1: [
         filePart({ id: "user_file", messageID: "msg_1" }),
-        filePart({ id: "pdf_file", messageID: "msg_1", mime: "application/pdf", url: "data:application/pdf;base64,AA==" }),
+        filePart({
+          id: "pdf_file",
+          messageID: "msg_1",
+          mime: "application/pdf",
+          url: "data:application/pdf;base64,AA==",
+        }),
       ],
-      msg_2: [toolPart({ id: "tool_1", messageID: "msg_2" })],
+      msg_2: [filePart({ id: "duplicate_file", messageID: "msg_2" })],
     }
     const gallery = sessionImageGallery({ sessionID: "ses_1", messages, parts, labels })
-    expect(gallery).toHaveLength(1)
-    expect(gallery[0]!.partID).toBe("user_file")
+    expect(gallery.map((entry) => entry.partID)).toEqual(["user_file", "duplicate_file"])
   })
 
   test("excludes user and assistant file parts whose URLs are not inline images", () => {
@@ -314,11 +332,7 @@ describe("sessionImageGallery", () => {
   test("falls back to the attachment label for users and the image label for assistants", () => {
     const noYou = { image: "Image", attachment: "attachment" }
     const user = userImageViewerItem(filePart({ id: "user_file", messageID: "msg_1" }), "msg_1", noYou)
-    const assistant = assistantImageViewerItem(
-      filePart({ id: "assistant_file", messageID: "msg_2" }),
-      "msg_2",
-      noYou,
-    )
+    const assistant = assistantImageViewerItem(filePart({ id: "assistant_file", messageID: "msg_2" }), "msg_2", noYou)
     expect(user?.source).toBe("attachment")
     expect(assistant?.source).toBe("Image")
   })

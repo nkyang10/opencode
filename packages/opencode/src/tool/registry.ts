@@ -34,7 +34,7 @@ import { ApplyPatchTool } from "./apply_patch"
 import { Glob } from "@opencode-ai/core/util/glob"
 import path from "path"
 import { pathToFileURL } from "url"
-import { Effect, Layer, Option, Context } from "effect"
+import { Effect, Layer, Context } from "effect"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { ScreenCapture } from "@opencode-ai/core/screen-capture/index"
@@ -128,7 +128,7 @@ const layer = Layer.effect(
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
     const agent = yield* Agent.Service
-    const screenshotAvailable = Option.isSome(ScreenCaptureDetect.detect())
+    const screenshotAvailable = ScreenCaptureDetect.supported()
     const screenshotTool = screenshotAvailable ? yield* Tool.init(screenshot) : undefined
     const codeMode = flags.experimentalCodeMode ? yield* Effect.promise(() => import("./code-mode")) : undefined
     const codeModeTool = codeMode ? yield* codeMode.CodeModeTool : undefined

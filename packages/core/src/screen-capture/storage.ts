@@ -10,7 +10,7 @@ import { makeGlobalNode } from "../effect/app-node"
 export const DIRECTORY_NAME = "screenshots"
 export const RETENTION = Duration.days(7)
 export const MAX_SLUG_LENGTH = 40
-export const FILE_PATTERN = /^\d{8}-\d{6}-[a-z0-9-]{1,40}-[0-9a-f]{4}\.png$/
+export const FILE_PATTERN = /^\d{8}-\d{6}-[a-z0-9-]{1,40}(?:-[0-9a-f]{4})?\.png$/
 
 export class StorageError extends Schema.TaggedErrorClass<StorageError>()("ScreenshotStorage.StorageError", {
   operation: Schema.Literals(["ensure-dir", "write", "rename", "cleanup"]),

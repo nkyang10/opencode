@@ -39,7 +39,7 @@ type Detail = {
   pid?: number
   title?: string
   minimized?: boolean
-  currentDesktop?: boolean
+  desktop?: number
   windowType?: string
 }
 
@@ -72,7 +72,9 @@ export function capture(
   display: string,
   input: Input,
 ): Effect.Effect<CaptureResult, CaptureError> {
-  return input.target === "window" ? captureWindow(process, backend, display, input) : captureScreen(process, backend, display, input)
+  return input.target === "window"
+    ? captureWindow(process, backend, display, input)
+    : captureScreen(process, backend, display, input)
 }
 
 export function parseDisplays(text: string): Display[] {
@@ -91,7 +93,8 @@ export function parseDisplays(text: string): Display[] {
       bounds: width > 0 && height > 0 ? { width, height, x, y } : undefined,
     })
   }
-  if (displays.length > 0 && !displays.some((display) => display.primary)) displays[0] = { ...displays[0]!, primary: true }
+  if (displays.length > 0 && !displays.some((display) => display.primary))
+    displays[0] = { ...displays[0]!, primary: true }
   return displays
 }
 
@@ -106,7 +109,8 @@ export function parseWindows(text: string): Window[] {
     const rest = start[3] ?? ""
     const geometry = /(\d+)x(\d+)\+(-?\d+)\+(-?\d+)/.exec(rest)
     if (!geometry) continue
-    const quoted = Array.from((rest.slice(0, geometry.index) ?? "").matchAll(/"((?:[^"\\]|\\.)*)"/g)).map((match) => match[1] ?? "")
+    const beforeGeometry = rest.slice(0, geometry.index) ?? ""
+    const title = beforeGeometry.match(/^\s*"((?:[^"\\]|\\.)*)"\s*:/)?.[1]
     const bounds = {
       width: Number(geometry[1] ?? 0),
       height: Number(geometry[2] ?? 0),
@@ -114,19 +118,20 @@ export function parseWindows(text: string): Window[] {
       y: Number(geometry[4] ?? 0),
     }
     if (bounds.width <= 0 || bounds.height <= 0) continue
-    const title = unescapeX11(quoted.at(-1) ?? "")
-    windows.push({ id, title: title || undefined, bounds, minimized: false })
+    windows.push({ id, title: title ? unescapeX11(title) : undefined, bounds, minimized: false })
   }
   return windows
 }
 
 export function parseWindowProps(id: string, text: string): Detail {
   const classes = quotedValues(text.match(/WM_CLASS(?:\([^)]*\))?\s*=\s*(.+)/)?.[1] ?? "")
-  const title = text.match(/^WM_NAME(?:\([^)]*\))?\s*=\s*"((?:[^"\\]|\\.)*)"/m)?.[1]
+  const title =
+    text.match(/^_NET_WM_NAME(?:\([^)]*\))?\s*=\s*"((?:[^"\\]|\\.)*)"/m)?.[1] ??
+    text.match(/^WM_NAME(?:\([^)]*\))?\s*=\s*"((?:[^"\\]|\\.)*)"/m)?.[1]
   const states = new Set(
     Array.from(text.matchAll(/_NET_WM_STATE(?:\([^)]*\))?\s*=\s*(.+)/g)).flatMap((match) => atomValues(match[1] ?? "")),
   )
-  const desktop = text.match(/_NET_WM_DESKTOP(?:\([^)]*\))?\s*=\s*(-?\d+)/)?.[1]
+  const desktop = Number(text.match(/_NET_WM_DESKTOP(?:\([^)]*\))?\s*=\s*(-?\d+)/)?.[1])
   const windowType = atomValues(text.match(/_NET_WM_WINDOW_TYPE(?:\([^)]*\))?\s*=\s*(.+)/)?.[1] ?? "")[0]
   const pid = Number(text.match(/_NET_WM_PID(?:\([^)]*\))?\s*=\s*(\d+)/)?.[1])
   return {
@@ -134,8 +139,20 @@ export function parseWindowProps(id: string, text: string): Detail {
     ...(title === undefined ? {} : { title: unescapeX11(title) }),
     ...(Number.isFinite(pid) && pid > 0 ? { pid } : {}),
     ...(states.has("_NET_WM_STATE_HIDDEN") ? { minimized: true } : {}),
-    ...(desktop === undefined ? {} : { currentDesktop: desktop === "-1" || desktop === "0" }),
+    ...(Number.isFinite(desktop) ? { desktop } : {}),
     ...(windowType === undefined ? {} : { windowType }),
+  }
+}
+
+export function rootWindowID(text: string) {
+  return text.match(/Window id:\s*(0x[0-9a-fA-F]+)/)?.[1]
+}
+
+function desktopState(desktop: number | undefined, current: number | undefined) {
+  if (desktop === undefined) return {}
+  return {
+    currentDesktop:
+      desktop === -1 || desktop === 4294967295 || (current === undefined ? desktop === 0 : desktop === current),
   }
 }
 
@@ -215,7 +232,10 @@ function run(
 }
 
 function tryRun(process: AppProcess.Interface, display: string, bin: string, args: ReadonlyArray<string>) {
-  return run(process, display, bin, args).pipe(Effect.as(true), Effect.catch(() => Effect.succeed(false)))
+  return run(process, display, bin, args).pipe(
+    Effect.as(true),
+    Effect.catch(() => Effect.succeed(false)),
+  )
 }
 
 function mapProcessError(error: AppProcess.AppProcessError): CaptureError {
@@ -252,10 +272,18 @@ function collect(
     const displays = backend.xrandr ? yield* readDisplays(process, display) : defaultDisplays()
     const tree = yield* run(process, display, "xwininfo", ["-root", "-tree", "-display", display])
     const activeID = backend.xprop ? yield* readActiveWindow(process, display) : Option.none<string>()
-    const raw = parseWindows(tree.stdout.toString("utf8"))
+    const currentDesktop = backend.xprop ? yield* readCurrentDesktop(process, display) : Option.none<number>()
+    const rootID = rootWindowID(tree.stdout.toString("utf8"))
+    const raw = parseWindows(tree.stdout.toString("utf8")).filter(
+      (window) => !rootID || !sameWindowId(window.id, rootID),
+    )
     const props = backend.xprop ? yield* readWindowProps(process, display, raw) : new Map<string, Detail>()
     const windows = assignDisplays(
-      raw.map((window) => ({ ...window, ...(props.get(window.id) ?? {}) })),
+      raw.map((window) => ({
+        ...window,
+        ...(props.get(window.id) ?? {}),
+        ...desktopState(props.get(window.id)?.desktop, Option.getOrUndefined(currentDesktop)),
+      })),
       displays,
     )
     return { displays, windows, activeID: Option.getOrUndefined(activeID) }
@@ -289,6 +317,19 @@ function readActiveWindow(
   )
 }
 
+function readCurrentDesktop(
+  process: AppProcess.Interface,
+  display: string,
+): Effect.Effect<Option.Option<number>, CaptureError> {
+  return run(process, display, "xprop", ["-root", "_NET_CURRENT_DESKTOP", "-display", display]).pipe(
+    Effect.map((result) => {
+      const desktop = Number(result.stdout.toString("utf8").match(/_NET_CURRENT_DESKTOP[^=]*=\s*(-?\d+)/)?.[1])
+      return Number.isFinite(desktop) ? Option.some(desktop) : Option.none<number>()
+    }),
+    Effect.catch(() => Effect.succeed(Option.none<number>())),
+  )
+}
+
 function readWindowProps(
   process: AppProcess.Interface,
   display: string,
@@ -297,29 +338,32 @@ function readWindowProps(
   return Effect.gen(function* () {
     const props = new Map<string, Detail>()
     for (const window of windows.slice(0, PROPERTY_WINDOW_LIMIT)) {
-      const result = yield* run(
-        process,
+      const result = yield* run(process, display, "xprop", [
+        "-id",
+        window.id,
+        "WM_CLASS",
+        "WM_NAME",
+        "_NET_WM_NAME",
+        "_NET_WM_STATE",
+        "_NET_WM_WINDOW_TYPE",
+        "_NET_WM_PID",
+        "_NET_WM_DESKTOP",
+        "-display",
         display,
-        "xprop",
-        [
-          "-id",
-          window.id,
-          "WM_CLASS",
-          "_NET_WM_STATE",
-          "_NET_WM_WINDOW_TYPE",
-          "_NET_WM_PID",
-          "_NET_WM_DESKTOP",
-          "-display",
-          display,
-        ],
-      ).pipe(Effect.map((result) => parseWindowProps(window.id, result.stdout.toString("utf8"))))
+      ]).pipe(
+        Effect.map((result) => parseWindowProps(window.id, result.stdout.toString("utf8"))),
+        Effect.catch(() => Effect.succeed({})),
+      )
       props.set(window.id, result)
     }
     return props
   })
 }
 
-function assignDisplays(windows: ReadonlyArray<Window & Detail>, displays: ReadonlyArray<Display>): (Window & Detail)[] {
+function assignDisplays(
+  windows: ReadonlyArray<Window & Detail>,
+  displays: ReadonlyArray<Display>,
+): (Window & Detail)[] {
   return windows.map((window) => ({ ...window, display: displayFor(window, displays) }))
 }
 
@@ -373,7 +417,7 @@ function screenBounds(
   const chosen =
     typeof selector === "number"
       ? displays.find((display) => display.index === selector)
-      : displays.find((display) => display.primary) ?? displays[0]
+      : (displays.find((display) => display.primary) ?? displays[0])
   if (typeof selector === "number" && !chosen)
     return Effect.fail(new CaptureError({ code: "unsupported", reason: `display ${selector} was not found` }))
   return Effect.succeed(chosen?.bounds)
@@ -398,6 +442,11 @@ function captureWindow(
         candidates: selected.candidates,
       })
     const window = selected.match.selected
+    if (window.currentDesktop === false)
+      return yield* new CaptureError({
+        code: "window_not_capturable",
+        reason: "window is on another virtual desktop",
+      })
     if (window.minimized && !input.restore_minimized)
       return yield* new CaptureError({
         code: "window_not_capturable",
@@ -408,10 +457,18 @@ function captureWindow(
       ? yield* restoreWindow(process, display, window.id, collected.activeID)
       : { ok: true, focusChanged: false }
     if (!restore.ok)
-      return yield* new CaptureError({ code: "window_not_capturable", reason: "window could not be restored for capture" })
+      return yield* new CaptureError({
+        code: "window_not_capturable",
+        reason: "window could not be restored for capture",
+      })
 
-    const data = yield* capturePng(process, backend, display, { kind: "window", id: window.id })
-    if (window.minimized) yield* minimizeWindow(process, display, window.id, restore.focusChanged, collected.activeID)
+    const data = window.minimized
+      ? yield* Effect.acquireUseRelease(
+          Effect.succeed(restore),
+          () => capturePng(process, backend, display, { kind: "window", id: window.id }),
+          (restored) => minimizeWindow(process, display, window.id, restored.focusChanged, collected.activeID),
+        )
+      : yield* capturePng(process, backend, display, { kind: "window", id: window.id })
     return yield* captureResult({
       data,
       target: "window",
@@ -434,7 +491,9 @@ function capturePng(
 ): Effect.Effect<Uint8Array, CaptureError> {
   return Effect.gen(function* () {
     if (backend.capture === "import") {
-      const result = yield* run(process, display, "import", importArgs(target), { maxOutputBytes: CAPTURE_OUTPUT_BYTES })
+      const result = yield* run(process, display, "import", importArgs(target), {
+        maxOutputBytes: CAPTURE_OUTPUT_BYTES,
+      })
       return yield* pngBytes(result.stdout, result.stdoutTruncated)
     }
 
@@ -460,7 +519,9 @@ function capturePng(
 
 function pngBytes(bytes: Buffer, truncated: boolean): Effect.Effect<Uint8Array, CaptureError> {
   if (truncated)
-    return Effect.fail(new CaptureError({ code: "unsupported", reason: "screenshot is larger than the 25 MB capture limit" }))
+    return Effect.fail(
+      new CaptureError({ code: "unsupported", reason: "screenshot is larger than the 25 MB capture limit" }),
+    )
   if (bytes.length === 0)
     return Effect.fail(new CaptureError({ code: "unsupported", reason: "capture command produced no image data" }))
   return Effect.succeed(new Uint8Array(bytes))
@@ -469,7 +530,9 @@ function pngBytes(bytes: Buffer, truncated: boolean): Effect.Effect<Uint8Array, 
 function screenDisplay(selector: Input["display"], displays: ReadonlyArray<Display>, bounds?: Bounds) {
   if (selector === "all") return "all" as const
   if (typeof selector === "number") return selector
-  return bounds ? displays.find((display) => display.bounds === bounds)?.index : displays.find((display) => display.primary)?.index
+  return bounds
+    ? displays.find((display) => display.bounds === bounds)?.index
+    : displays.find((display) => display.primary)?.index
 }
 
 function captureResult(input: {

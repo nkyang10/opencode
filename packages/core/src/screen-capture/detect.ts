@@ -4,7 +4,10 @@ import { Option } from "effect"
 import type { Backend, MacOSBackend, WaylandBackend, WindowsBackend, X11Backend } from "./schema"
 import { which } from "../util/which"
 
-export function detectX11(env: NodeJS.ProcessEnv = process.env, lookup: typeof which = which): Option.Option<X11Backend> {
+export function detectX11(
+  env: NodeJS.ProcessEnv = process.env,
+  lookup: typeof which = which,
+): Option.Option<X11Backend> {
   const display = env.DISPLAY?.trim()
   if (!display) return Option.none()
   if (!lookup("xwininfo", env)) return Option.none()
@@ -50,9 +53,9 @@ export function detectWsl(
 ): Option.Option<WindowsBackend> {
   if (!isWsl(env)) return Option.none()
   const program = lookup("powershell.exe", env)
+  if (!program) return Option.none()
   const wslpath = lookup("wslpath", env)
-  if (!program || !wslpath) return Option.none()
-  return Option.some({ kind: "windows", transport: "wsl", program, wslpath })
+  return Option.some({ kind: "windows", transport: "wsl", program, ...(wslpath ? { wslpath } : {}) })
 }
 
 export function detectWayland(
@@ -65,7 +68,8 @@ export function detectWayland(
 
   const display = env.WAYLAND_DISPLAY?.trim() || "wayland-0"
   const swaymsg = lookup("swaymsg", env)
-  if (swaymsg && isSway(env)) return Option.some({ kind: "wayland", compositor: "sway", program, lister: swaymsg, display })
+  if (swaymsg && isSway(env))
+    return Option.some({ kind: "wayland", compositor: "sway", program, lister: swaymsg, display })
 
   const hyprctl = lookup("hyprctl", env)
   if (hyprctl && isHyprland(env))
@@ -82,6 +86,23 @@ export function detectMacOS(
   const screencapture = lookup("screencapture", _env)
   if (!osascript || !screencapture) return Option.none()
   return Option.some({ kind: "macos", osascript, screencapture })
+}
+
+export function supported(
+  input: { platform?: NodeJS.Platform; env?: NodeJS.ProcessEnv } = {},
+  lookup: typeof which = which,
+) {
+  const platform = input.platform ?? process.platform
+  const env = input.env ?? process.env
+  if (platform === "darwin") return Boolean(lookup("osascript", env) && lookup("screencapture", env))
+  if (platform === "win32") return Boolean(lookup("powershell.exe", env))
+  if (platform !== "linux") return false
+  const x11 =
+    Boolean(lookup("xwininfo", env)) &&
+    Boolean(lookup("import", env) || (lookup("xwd", env) && (lookup("convert", env) || lookup("magick", env))))
+  const wayland = Boolean(lookup("grim", env) && (lookup("swaymsg", env) || lookup("hyprctl", env)))
+  const wsl = isWsl(env) && Boolean(lookup("powershell.exe", env))
+  return x11 || wayland || wsl
 }
 
 export function detect(

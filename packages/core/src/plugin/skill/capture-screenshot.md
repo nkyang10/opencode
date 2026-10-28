@@ -20,17 +20,24 @@ target that answers the request, save the result outside the repository, and sho
 
 ## 2. Capture web pages
 
-Prefer the project's Playwright when it is installed:
+Create the screenshots directory first. The browser writes directly to it, so the `screenshot`
+tool's storage layer is not involved:
 
 ```sh
-npx playwright screenshot --viewport-size=1280,800 <url> {{screenshots_dir}}/<timestamp>-<slug>.png
+mkdir -p "{{screenshots_dir}}"
+```
+
+Prefer the project's Playwright when it is installed. Use a `YYYYMMDD-HHMMSS` timestamp:
+
+```sh
+npx playwright screenshot --viewport-size=1280,800 <url> "{{screenshots_dir}}/<timestamp>-<slug>.png"
 ```
 
 Add `--full-page` when the user needs the whole page rather than the viewport. Otherwise use
 headless Chrome or Chromium:
 
 ```sh
-google-chrome --headless=new --hide-scrollbars --window-size=1280,800 --screenshot={{screenshots_dir}}/<timestamp>-<slug>.png <url>
+google-chrome --headless=new --hide-scrollbars --window-size=1280,800 --screenshot="{{screenshots_dir}}/<timestamp>-<slug>.png" <url>
 ```
 
 Substitute `chromium`, `chromium-browser` or `chrome` for the available binary. Wait until the page
@@ -54,7 +61,7 @@ under Xvfb, start `xvfb-run -a` or `Xvfb :99`, then capture with `screenshot` us
 
 On Linux X11, the tool needs a reachable `DISPLAY` and capture tools. On Windows it uses Windows
 PowerShell and an interactive desktop session. In WSL it captures the Windows desktop through
-`powershell.exe` and `wslpath`. Use `delay_ms` only after starting an app or changing window state.
+`powershell.exe`. Use `delay_ms` only after starting an app or changing window state.
 If `window_not_found` lists candidate windows, choose one explicitly rather than guessing. If the
 result is `blank_capture`, the screen may be locked, remote, protected, elevated, or capture may lack
 permission; report the likely cause instead of retrying the same target repeatedly.

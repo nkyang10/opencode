@@ -4,6 +4,28 @@ type Assistant = Extract<SessionMessageInfo, { type: "assistant" }>
 type Compaction = Extract<SessionMessageInfo, { type: "compaction" }>
 type Shell = Extract<SessionMessageInfo, { type: "shell" }>
 
+type NextToolContent =
+  | { readonly type: "text"; readonly text: string }
+  | { readonly type: "file"; readonly uri: string; readonly mime: string; readonly name?: string }
+type NextToolEvent = {
+  readonly type: string
+  readonly metadata?: Record<string, JsonValue>
+  readonly data: {
+    readonly timestamp: number
+    readonly sessionID: string
+    readonly assistantMessageID: string
+    readonly callID: string
+    readonly name?: string
+    readonly delta?: string
+    readonly text?: string
+    readonly input?: Record<string, JsonValue>
+    readonly provider?: { readonly executed: boolean }
+    readonly structured?: Record<string, JsonValue>
+    readonly content?: [NextToolContent, ...NextToolContent[]]
+    readonly error?: unknown
+  }
+}
+
 export type V2SessionReduction = {
   sessionID: string
   messages: SessionMessageInfo[]
@@ -24,6 +46,87 @@ export function createV2SessionReducer() {
     })
     const append = (message: SessionMessageInfo) =>
       result(source.some((item) => item.id === message.id) ? [...source] : [...source, message], [message.id])
+
+    const next = event as unknown as NextToolEvent
+    switch (next.type) {
+      case "session.next.tool.input.started":
+        return updateAssistant(source, next.data.assistantMessageID, sessionID, (item) => ({
+          ...item,
+          content: item.content.some((content) => content.type === "tool" && content.id === next.data.callID)
+            ? item.content
+            : [
+                ...item.content,
+                {
+                  type: "tool",
+                  id: next.data.callID,
+                  name: next.data.name ?? "",
+                  state: { status: "streaming", input: "" },
+                  time: { created: next.data.timestamp },
+                },
+              ],
+        }))
+      case "session.next.tool.input.delta":
+        return updateTool(source, next.data.assistantMessageID, next.data.callID, sessionID, (tool) =>
+          tool.state.status === "streaming"
+            ? { ...tool, state: { ...tool.state, input: tool.state.input + (next.data.delta ?? "") } }
+            : tool,
+        )
+      case "session.next.tool.input.ended":
+        return updateTool(source, next.data.assistantMessageID, next.data.callID, sessionID, (tool) =>
+          tool.state.status === "streaming" ? { ...tool, state: { ...tool.state, input: next.data.text ?? "" } } : tool,
+        )
+      case "session.next.tool.called":
+        return updateTool(source, next.data.assistantMessageID, next.data.callID, sessionID, (tool) => ({
+          ...tool,
+          ...(next.data.provider === undefined ? {} : { executed: next.data.provider.executed }),
+          state: { status: "running", input: next.data.input ?? {}, metadata: {} },
+          time: { ...tool.time, ran: next.data.timestamp },
+        }))
+      case "session.next.tool.progress":
+        return updateTool(source, next.data.assistantMessageID, next.data.callID, sessionID, (tool) =>
+          tool.state.status === "running"
+            ? {
+                ...tool,
+                state: { ...tool.state, metadata: toolMetadata(next.data) },
+              }
+            : tool,
+        )
+      case "session.next.tool.success":
+        return updateTool(source, next.data.assistantMessageID, next.data.callID, sessionID, (tool) => {
+          if (tool.state.status !== "running") return tool
+          return {
+            ...tool,
+            ...(next.data.provider === undefined
+              ? {}
+              : { executed: next.data.provider.executed || tool.executed === true }),
+            state: {
+              status: "completed",
+              input: tool.state.input,
+              metadata: toolMetadata(next.data),
+              content: next.data.content?.length ? next.data.content : [{ type: "text" as const, text: "" }],
+            },
+            time: { ...tool.time, completed: next.data.timestamp },
+          }
+        })
+      case "session.next.tool.failed":
+        return updateTool(source, next.data.assistantMessageID, next.data.callID, sessionID, (tool) => {
+          if (tool.state.status !== "streaming" && tool.state.status !== "running") return tool
+          return {
+            ...tool,
+            ...(next.data.provider === undefined
+              ? {}
+              : { executed: next.data.provider.executed || tool.executed === true }),
+            state: {
+              status: "error",
+              input: typeof tool.state.input === "string" ? {} : tool.state.input,
+              metadata: toolMetadata(next.data, tool.state.status === "running" ? tool.state.metadata : {}),
+              content: next.data.content?.length ? next.data.content : [{ type: "text" as const, text: "" }],
+              error: next.data.error as { type: string; message: string },
+            },
+            time: { ...tool.time, completed: next.data.timestamp },
+          }
+        })
+    }
 
     switch (event.type) {
       case "session.input.admitted":
@@ -419,13 +522,43 @@ function record(value: unknown): value is Record<string, JsonValue> {
   return !!value && typeof value === "object" && !Array.isArray(value)
 }
 
+const METADATA_STRING_LIMIT = 4096
+
 function toolMetadata(
-  value: { metadata?: unknown },
+  value: { metadata?: unknown; structured?: unknown },
   fallback: Record<string, JsonValue> = {},
 ): Record<string, JsonValue> {
-  const structured = (value as { structured?: unknown }).structured
-  const metadata = value.metadata ?? structured
-  return record(metadata) ? metadata : fallback
+  const metadata = value.metadata ?? value.structured
+  if (!record(metadata)) return fallback
+  const sanitized = sanitizeMetadata(metadata)
+  return Object.keys(sanitized).length > 0 ? sanitized : fallback
+}
+
+function sanitizeMetadata(value: Record<string, unknown>): Record<string, JsonValue> {
+  const out: Record<string, JsonValue> = {}
+  for (const [key, item] of Object.entries(value)) {
+    const safe = sanitizeMetadataValue(item)
+    if (safe !== undefined) out[key] = safe
+  }
+  return out
+}
+
+function sanitizeMetadataValue(value: unknown): JsonValue | undefined {
+  if (typeof value === "string") {
+    if (value.length > METADATA_STRING_LIMIT || value.startsWith("data:")) return undefined
+    return value
+  }
+  if (typeof value === "number" || typeof value === "boolean" || value === null) return value
+  if (Array.isArray(value)) {
+    const items = value.flatMap((item) => {
+      const safe = sanitizeMetadataValue(item)
+      return safe === undefined ? [] : [safe]
+    })
+    return items
+  }
+  if (!record(value)) return undefined
+  const nested = sanitizeMetadata(value)
+  return Object.keys(nested).length > 0 ? nested : undefined
 }
 
 function messageID(eventID: string) {

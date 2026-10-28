@@ -63,9 +63,9 @@ function stdout(command: string, args: readonly string[]) {
   }
   if (command === "import" || command === "xwd" || command === "convert" || command === "magick")
     return createPng(2, 1, [
-    [255, 0, 0, 255],
-    [0, 255, 0, 255],
-  ])
+      [255, 0, 0, 255],
+      [0, 255, 0, 255],
+    ])
   return Buffer.alloc(0)
 }
 
@@ -96,9 +96,9 @@ const TREE = `xwininfo: Window id: 0x247 (the root window) (has no name)
     X, Y position: 0, 0
 
 Tree for window 0x247:
-  0x247: ("nautilus-desktop" "Nautilus-desktop")  1920x1080+0+0  +0+0
-  0x00a: ("firefox" "Firefox")  1000x600+0+0  +0+0
-  0x00b: ("gnome-terminal-server" "Gnome-terminal")  800x600+100+100  +100+100
+  0x247: "Desktop": ("nautilus-desktop" "Nautilus-desktop")  1920x1080+0+0  +0+0
+  0x00a: "Alpha Project": ("firefox" "Firefox")  1000x600+0+0  +0+0
+  0x00b: "Beta Project Terminal": ("gnome-terminal-server" "Gnome-terminal")  800x600+100+100  +100+100
 `
 
 const PROPS: Record<string, string> = {
@@ -133,8 +133,17 @@ describe("ScreenCapture X11 parsers", () => {
   test("parses xwininfo tree window ids, titles, and bounds", () => {
     const windows = ScreenCaptureX11.parseWindows(TREE)
     expect(windows.map((window) => window.id)).toEqual(["0x247", "0x00a", "0x00b"])
-    expect(windows[1]).toMatchObject({ id: "0x00a", title: "Firefox", bounds: { width: 1000, height: 600, x: 0, y: 0 } })
-    expect(windows[2]).toMatchObject({ id: "0x00b", title: "Gnome-terminal", bounds: { width: 800, height: 600, x: 100, y: 100 } })
+    expect(windows[1]).toMatchObject({
+      id: "0x00a",
+      title: "Alpha Project",
+      bounds: { width: 1000, height: 600, x: 0, y: 0 },
+    })
+    expect(windows[2]).toMatchObject({
+      id: "0x00b",
+      title: "Beta Project Terminal",
+      bounds: { width: 800, height: 600, x: 100, y: 100 },
+    })
+    expect(ScreenCaptureX11.rootWindowID(TREE)).toBe("0x247")
   })
 
   test("parses xprop metadata used for app names and minimized windows", () => {
@@ -142,7 +151,7 @@ describe("ScreenCapture X11 parsers", () => {
       app: "Firefox",
       title: "Alpha Project - Mozilla Firefox",
       pid: 111,
-      currentDesktop: true,
+      desktop: 0,
       windowType: "_NET_WM_WINDOW_TYPE_NORMAL",
     })
     expect(
@@ -156,7 +165,15 @@ _NET_WM_DESKTOP(CARDINAL) = 0
 WM_NAME(STRING) = "plan.md - workspace"
 `,
       ),
-    ).toMatchObject({ app: "Code", pid: 42, minimized: true, currentDesktop: true })
+    ).toMatchObject({ app: "Code", pid: 42, minimized: true, desktop: 0 })
+    expect(
+      ScreenCaptureX11.parseWindowProps(
+        "0xbeef",
+        `WM_NAME(STRING) = "legacy title"
+_NET_WM_NAME(UTF8_STRING) = "preferred title"
+`,
+      ),
+    ).toMatchObject({ title: "preferred title" })
   })
 })
 
@@ -193,23 +210,20 @@ describe("ScreenCapture select helpers", () => {
 describe("ScreenCaptureX11 process integration", () => {
   test("lists displays and front-to-back windows with xprop metadata", async () => {
     const calls: Call[] = []
-    const result = await Effect.runPromise(
-      ScreenCaptureX11.list(fakeProcess(calls, stdout) as never, backend(), ":99"),
-    )
+    const result = await Effect.runPromise(ScreenCaptureX11.list(fakeProcess(calls, stdout) as never, backend(), ":99"))
 
     expect(result.displays.map((display) => display.name)).toEqual(["eDP-1", "DP-1"])
-    expect(result.windows.map((window) => window.id)).toEqual(["0x00b", "0x247", "0x00a"])
-    expect(result.windows[0]).toMatchObject({ app: "Gnome-terminal", pid: 222, title: "Beta Project Terminal", display: 1 })
-    expect(result.windows[2]).toMatchObject({ app: "Firefox", pid: 111, title: "Alpha Project - Mozilla Firefox" })
+    expect(result.windows.map((window) => window.id)).toEqual(["0x00b", "0x00a"])
+    expect(result.windows[0]).toMatchObject({
+      app: "Gnome-terminal",
+      pid: 222,
+      title: "Beta Project Terminal",
+      display: 1,
+    })
+    expect(result.windows[1]).toMatchObject({ app: "Firefox", pid: 111, title: "Alpha Project - Mozilla Firefox" })
     expect(result.text).toContain("0x00b  Gnome-terminal  pid 222")
-    expect(calls.map((call) => call.command)).toEqual([
-      "xrandr",
-      "xwininfo",
-      "xprop",
-      "xprop",
-      "xprop",
-      "xprop",
-    ])
+    expect(result.text).not.toContain("0x247")
+    expect(calls.map((call) => call.command)).toEqual(["xrandr", "xwininfo", "xprop", "xprop", "xprop", "xprop"])
     expect(calls[1]).toMatchObject({ command: "xwininfo", args: ["-root", "-tree", "-display", ":99"] })
   })
 
@@ -229,15 +243,7 @@ describe("ScreenCaptureX11 process integration", () => {
       platform: "linux",
     })
     const importCall = calls.find((call) => call.command === "import")
-    expect(importCall?.args).toEqual([
-      "-silent",
-      "-window",
-      "root",
-      "-crop",
-      "1920x1080+0+0",
-      "+repage",
-      "png:-",
-    ])
+    expect(importCall?.args).toEqual(["-silent", "-window", "root", "-crop", "1920x1080+0+0", "+repage", "png:-"])
   })
 
   test("falls back to xwd and ImageMagick when import is unavailable", async () => {
@@ -262,7 +268,12 @@ describe("ScreenCaptureX11 process integration", () => {
     for (const testCase of cases) {
       const calls: Call[] = []
       const result = await Effect.runPromise(
-        ScreenCaptureX11.capture(fakeProcess(calls, stdout) as never, backend(), ":99", input({ target: "window", window: testCase.selector })),
+        ScreenCaptureX11.capture(
+          fakeProcess(calls, stdout) as never,
+          backend(),
+          ":99",
+          input({ target: "window", window: testCase.selector }),
+        ),
       )
       expect(result.window?.id).toBe(testCase.id)
       expect(calls.some((call) => call.command === "import" && call.args.includes(testCase.id))).toBe(true)
@@ -283,9 +294,8 @@ describe("ScreenCaptureX11 process integration", () => {
     if (!(error instanceof CaptureError)) return
     expect(error.code).toBe("window_not_found")
     expect(error.candidates).toEqual([
-      '0x247 "Nautilus-desktop"',
-      "0x00a Firefox pid 111 \"Alpha Project - Mozilla Firefox\"",
-      "0x00b Gnome-terminal pid 222 \"Beta Project Terminal\"",
+      '0x00a Firefox pid 111 "Alpha Project - Mozilla Firefox"',
+      '0x00b Gnome-terminal pid 222 "Beta Project Terminal"',
     ])
   })
 
@@ -344,13 +354,93 @@ WM_NAME(STRING) = "Alpha Project - Mozilla Firefox"
     expect(restoreIndex).toBeGreaterThanOrEqual(0)
     expect(captureIndex).toBeGreaterThan(restoreIndex)
     expect(minimizeIndex).toBeGreaterThan(captureIndex)
-    expect(calls[restoreIndex]?.args).toEqual([
-      "windowstate",
-      "--remove",
-      "_NET_WM_STATE_HIDDEN",
-      "0x00a",
-    ])
+    expect(calls[restoreIndex]?.args).toEqual(["windowstate", "--remove", "_NET_WM_STATE_HIDDEN", "0x00a"])
     expect(calls[minimizeIndex]?.args).toEqual(["windowminimize", "0x00a"])
+  })
+
+  test("re-minimizes a restored window when capture fails", async () => {
+    const calls: Call[] = []
+    const props: Record<string, string> = {
+      ...PROPS,
+      "0x00a": `WM_CLASS(STRING) = "firefox", "Firefox"
+_NET_WM_STATE(ATOM) = _NET_WM_STATE_HIDDEN
+_NET_WM_WINDOW_TYPE(ATOM) = _NET_WM_WINDOW_TYPE_NORMAL
+_NET_WM_PID(CARDINAL) = 111
+_NET_WM_DESKTOP(CARDINAL) = 0
+WM_NAME(STRING) = "Alpha Project - Mozilla Firefox"
+`,
+    }
+    const error = await Effect.runPromise(
+      ScreenCaptureX11.capture(
+        AppProcess.Service.of({
+          run: (command: ChildProcess.Command) =>
+            Effect.sync(() => {
+              if (command._tag !== "StandardCommand") throw new Error("unexpected command tag " + command._tag)
+              calls.push({ command: command.command, args: command.args })
+              if (command.command === "xprop") {
+                const id = command.args[1]
+                return processResult(command.command, command.args, Buffer.from(props[id] ?? "_NET_WM_STATE: 0x0\n"))
+              }
+              if (command.command === "import")
+                return processResult(command.command, command.args, Buffer.from("not a png"))
+              return processResult(command.command, command.args, stdout(command.command, command.args))
+            }),
+        } as unknown as AppProcess.Interface) as never,
+        backend(),
+        ":99",
+        input({ target: "window", window: "0x00a" }),
+      ).pipe(Effect.catch((error) => Effect.succeed(error))),
+    )
+
+    expect(error).toBeInstanceOf(CaptureError)
+    if (!(error instanceof CaptureError)) return
+    expect(error.code).toBe("unsupported")
+    const xdotool = calls.filter((call) => call.command === "xdotool")
+    expect(xdotool.at(-1)?.args).toEqual(["windowminimize", "0x00a"])
+  })
+
+  test("does not capture a window on another virtual desktop", async () => {
+    const calls: Call[] = []
+    const props: Record<string, string> = {
+      ...PROPS,
+      "0x00a": `WM_CLASS(STRING) = "firefox", "Firefox"
+_NET_WM_STATE(ATOM) =
+_NET_WM_WINDOW_TYPE(ATOM) = _NET_WM_WINDOW_TYPE_NORMAL
+_NET_WM_PID(CARDINAL) = 111
+_NET_WM_DESKTOP(CARDINAL) = 1
+WM_NAME(STRING) = "Alpha Project - Mozilla Firefox"
+`,
+    }
+    const error = await Effect.runPromise(
+      ScreenCaptureX11.capture(
+        AppProcess.Service.of({
+          run: (command: ChildProcess.Command) =>
+            Effect.sync(() => {
+              if (command._tag !== "StandardCommand") throw new Error("unexpected command tag " + command._tag)
+              calls.push({ command: command.command, args: command.args })
+              if (command.command === "xprop") {
+                if (command.args.includes("-root"))
+                  return processResult(
+                    command.command,
+                    command.args,
+                    Buffer.from("_NET_CURRENT_DESKTOP(CARDINAL) = 2\n_NET_ACTIVE_WINDOW: window id: 0x0000b\n"),
+                  )
+                const id = command.args[1]
+                return processResult(command.command, command.args, Buffer.from(props[id] ?? "_NET_WM_STATE: 0x0\n"))
+              }
+              return processResult(command.command, command.args, stdout(command.command, command.args))
+            }),
+        } as unknown as AppProcess.Interface) as never,
+        backend(),
+        ":99",
+        input({ target: "window", window: "0x00a" }),
+      ).pipe(Effect.catch((error) => Effect.succeed(error))),
+    )
+
+    expect(error).toBeInstanceOf(CaptureError)
+    if (!(error instanceof CaptureError)) return
+    expect(error.code).toBe("window_not_capturable")
+    expect(calls.some((call) => call.command === "import")).toBe(false)
   })
 
   test("does not restore minimized windows when restore_minimized is false", async () => {

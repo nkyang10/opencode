@@ -121,8 +121,12 @@ export function sessionImageGallery(input: ImageGalleryInput): ImageViewerItem[]
   const items: ImageViewerItem[] = []
 
   const add = (item: ImageViewerItem | undefined) => {
-    if (!item?.src || !isInlineImageUrl(item.src) || seen.has(item.src)) return
-    seen.add(item.src)
+    if (!item?.src || !isInlineImageUrl(item.src)) return
+    if (item.partID) {
+      const key = `${item.partID}:${item.src}`
+      if (seen.has(key)) return
+      seen.add(key)
+    }
     items.push(item)
   }
 
@@ -131,11 +135,7 @@ export function sessionImageGallery(input: ImageGalleryInput): ImageViewerItem[]
     const parts = input.parts[message.id] ?? []
     for (const part of parts) {
       if (part.type === "file") {
-        add(
-          message.role === "user"
-            ? userImageViewerItem(part, message.id, input.labels)
-            : assistantImageViewerItem(part, message.id, input.labels),
-        )
+        if (message.role === "user") add(userImageViewerItem(part, message.id, input.labels))
         continue
       }
       if (part.type !== "tool") continue

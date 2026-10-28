@@ -23,7 +23,9 @@ export const { use: useImageActions, provider: ImageActionsProvider } = createSi
         return () => setAttach((current) => (current === handler ? undefined : current))
       },
       attachImage(image: ImageSource) {
-        return attach()?.(image)
+        const handler = attach()
+        if (!handler) return Promise.reject(new Error("no composer attachment handler is registered"))
+        return Promise.resolve(handler(image))
       },
     }
   },

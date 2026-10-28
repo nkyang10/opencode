@@ -83,7 +83,7 @@ export function grimArgs(selector: Input["display"], displays: ReadonlyArray<Dis
     const bounds = unionBounds(displays)
     if (bounds)
       return {
-        args: ["-g", `${bounds.width}x${bounds.height}+${bounds.x}+${bounds.y}`],
+        args: ["-g", `${bounds.x},${bounds.y} ${bounds.width}x${bounds.height}`],
         display: "all",
       }
   }
@@ -91,7 +91,7 @@ export function grimArgs(selector: Input["display"], displays: ReadonlyArray<Dis
   const chosen =
     typeof selector === "number"
       ? displays.find((display) => display.index === selector)
-      : displays.find((display) => display.primary) ?? displays[0]
+      : (displays.find((display) => display.primary) ?? displays[0])
   if (!chosen)
     return new CaptureError({
       code: typeof selector === "number" ? "unsupported" : "no_interactive_session",
@@ -120,14 +120,10 @@ function unsupportedWindow(
   })
 }
 
-function listDisplays(
-  process: AppProcess.Interface,
-  backend: WaylandBackend,
-): Effect.Effect<Display[], CaptureError> {
+function listDisplays(process: AppProcess.Interface, backend: WaylandBackend): Effect.Effect<Display[], CaptureError> {
   return Effect.gen(function* () {
     const output = yield* runJson(process, backend, backend.lister, listArgs(backend), LIST_OUTPUT_BYTES)
-    const displays =
-      backend.compositor === "sway" ? normalizeSwayDisplays(output) : normalizeHyprlandDisplays(output)
+    const displays = backend.compositor === "sway" ? normalizeSwayDisplays(output) : normalizeHyprlandDisplays(output)
     if (!displays.length)
       return yield* new CaptureError({ code: "no_interactive_session", reason: "No Wayland outputs are available." })
     return displays
@@ -142,7 +138,9 @@ function listWindows(
   return Effect.gen(function* () {
     const output = yield* runJson(process, backend, backend.lister, windowListArgs(backend), LIST_OUTPUT_BYTES)
     const collected =
-      backend.compositor === "sway" ? normalizeSwayWindows(output, displays) : normalizeHyprlandWindows(output, displays)
+      backend.compositor === "sway"
+        ? normalizeSwayWindows(output, displays)
+        : normalizeHyprlandWindows(output, displays)
     return { ...collected, windows: orderFrontToBack(collected.windows, collected.active) }
   })
 }
@@ -153,7 +151,7 @@ function captureStdout(
   args: ReadonlyArray<string>,
 ): Effect.Effect<Uint8Array, CaptureError> {
   return Effect.gen(function* () {
-    const data = yield* runBytes(process, backend, backend.program, args, CAPTURE_OUTPUT_BYTES)
+    const data = yield* runBytes(process, backend, backend.program, [...args, "-"], CAPTURE_OUTPUT_BYTES)
     if (data.length === 0)
       return yield* new CaptureError({ code: "unsupported", reason: "grim produced no image data" })
     if (!imageDimensions(new Uint8Array(data)))
@@ -234,7 +232,10 @@ function run(
       .pipe(Effect.mapError(mapProcessError))
     if (result.exitCode !== 0) return yield* commandFailure(program, result)
     if (result.stdoutTruncated)
-      return yield* new CaptureError({ code: "unsupported", reason: `${program} output is larger than the capture limit` })
+      return yield* new CaptureError({
+        code: "unsupported",
+        reason: `${program} output is larger than the capture limit`,
+      })
     return result
   })
 }
@@ -263,15 +264,18 @@ function classifyFailure(text: string): CaptureError["code"] {
 }
 
 function normalizeSwayDisplays(value: unknown): Display[] {
-  return arrayField(value)
-    .map((item, index): Display | undefined => {
-      const record = asRecord(item)
+  const records = arrayField(value).map(asRecord)
+  const primary = records.findIndex((record) => booleanField(record, "primary") === true)
+  const active = records.findIndex((record) => booleanField(record, "active") === true)
+  const primaryIndex = primary >= 0 ? primary : active >= 0 ? active : 0
+  return records
+    .map((record, index): Display | undefined => {
       const bounds = objectBounds(asRecord(record?.rect))
       if (!bounds) return undefined
       return {
         index: index + 1,
         name: stringField(record, "name") ?? `output-${index + 1}`,
-        primary: booleanField(record, "primary") ?? booleanField(record, "active") ?? index === 0,
+        primary: index === primaryIndex,
         bounds,
         scale: numberField(record, "scale"),
       }
@@ -280,16 +284,19 @@ function normalizeSwayDisplays(value: unknown): Display[] {
 }
 
 function normalizeHyprlandDisplays(value: unknown): Display[] {
-  return arrayField(value)
-    .map((item, index): Display | undefined => {
-      const record = asRecord(item)
+  const records = arrayField(value).map(asRecord)
+  const primary = records.findIndex((record) => booleanField(record, "primary") === true)
+  const focused = records.findIndex((record) => booleanField(record, "focused") === true)
+  const active = records.findIndex((record) => booleanField(record, "active") === true)
+  const primaryIndex = primary >= 0 ? primary : focused >= 0 ? focused : active >= 0 ? active : 0
+  return records
+    .map((record, index): Display | undefined => {
       const bounds = flatBounds(record)
       if (!bounds) return undefined
       return {
         index: index + 1,
         name: stringField(record, "name") ?? `output-${index + 1}`,
-        primary:
-          booleanField(record, "primary") ?? booleanField(record, "focused") ?? booleanField(record, "active") ?? index === 0,
+        primary: index === primaryIndex,
         bounds,
         scale: numberField(record, "scale"),
       }
@@ -306,7 +313,8 @@ function normalizeSwayWindows(value: unknown, displays: ReadonlyArray<Display>):
       const id = idField(record, "id")
       if (!id) return undefined
       const properties = asRecord(record.window_properties)
-      const app = stringField(record, "app_id") ?? stringField(properties, "class") ?? stringField(properties, "instance")
+      const app =
+        stringField(record, "app_id") ?? stringField(properties, "class") ?? stringField(properties, "instance")
       const title = stringField(record, "name") ?? stringField(properties, "title")
       const bounds = objectBounds(asRecord(record.rect))
       return {
@@ -324,7 +332,9 @@ function normalizeSwayWindows(value: unknown, displays: ReadonlyArray<Display>):
 }
 
 function normalizeHyprlandWindows(value: unknown, displays: ReadonlyArray<Display>): CollectedWindows {
-  const records = arrayField(value).map(asRecord).filter((record): record is RawRecord => record !== undefined)
+  const records = arrayField(value)
+    .map(asRecord)
+    .filter((record): record is RawRecord => record !== undefined)
   const active = records.find((record) => booleanField(record, "focused"))
   const windows = records
     .map((record): Window | undefined => {
@@ -344,7 +354,7 @@ function normalizeHyprlandWindows(value: unknown, displays: ReadonlyArray<Displa
       }
     })
     .filter((window): window is Window => window !== undefined)
-  return { windows, active: active ? idField(active, "address") ?? idField(active, "id") : undefined }
+  return { windows, active: active ? (idField(active, "address") ?? idField(active, "id")) : undefined }
 }
 
 function collectSwayWindows(value: unknown, out: RawRecord[]) {
@@ -354,7 +364,16 @@ function collectSwayWindows(value: unknown, out: RawRecord[]) {
   }
   const record = asRecord(value)
   if (!record) return
-  if ((record.type === "con" || record.type === "floating_con" || record.window_properties) && (idField(record, "id") || record.name || record.app_id))
+  const properties = asRecord(record.window_properties)
+  const view =
+    stringField(record, "app_id") !== undefined ||
+    (properties !== undefined && Object.keys(properties).length > 0) ||
+    numberField(record, "pid") !== undefined
+  if (
+    view &&
+    (record.type === "con" || record.type === "floating_con" || record.window_properties) &&
+    (idField(record, "id") || record.name)
+  )
     out.push(record)
   for (const child of arrayField(record.nodes)) collectSwayWindows(child, out)
   for (const child of arrayField(record.floating_nodes)) collectSwayWindows(child, out)

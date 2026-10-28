@@ -56,6 +56,7 @@ describe("SkillPlugin.Plugin", () => {
           "Use when the user wants to see, capture or visually check something: the screen, an application window, a web page or a test artifact.",
         )
         expect(capture.content).toContain(ScreenshotStorage.directory(global))
+        expect(capture.content).toContain(`mkdir -p "${ScreenshotStorage.directory(global)}"`)
         expect(capture.content).toContain(`${ScreenshotStorage.directory(global)}/<timestamp>-<slug>.png`)
         expect(capture.content).not.toContain("{{screenshots_dir}}")
       }),

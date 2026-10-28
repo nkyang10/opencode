@@ -37,7 +37,7 @@ const layer = Layer.effect(
     })
 
     const available = Effect.fn("ScreenCapture.available")(function* () {
-      return Option.isSome(ScreenCaptureDetect.detect())
+      return ScreenCaptureDetect.supported()
     })
 
     const list = Effect.fn("ScreenCapture.list")(function* (input: Pick<Input, "x_display">) {
@@ -84,13 +84,14 @@ function noBackend(input: Pick<Input, "x_display">): CaptureError {
   if (process.platform === "win32")
     return new CaptureError({
       code: "missing_dependency",
-      reason: "Windows screenshot capture requires Windows PowerShell (powershell.exe) and an interactive desktop session.",
+      reason:
+        "Windows screenshot capture requires Windows PowerShell (powershell.exe) and an interactive desktop session.",
     })
   return new CaptureError({
     code: "no_display",
     reason:
       `No screenshot backend was detected${input.x_display ? ` for DISPLAY=${input.x_display}` : ""}. ` +
-      "Linux needs an X server plus xwininfo and import or xwd/convert, or Wayland plus grim with swaymsg or hyprctl; WSL needs powershell.exe and wslpath.",
+      "Linux needs an X server plus xwininfo and import or xwd/convert, or Wayland plus grim with swaymsg or hyprctl; WSL needs powershell.exe.",
   })
 }
 
