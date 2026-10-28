@@ -19,17 +19,28 @@
 | `cf494c2029` | 2026-09-21 | fix(console): forward client IP to inference | clean |
 | `70a24697ea` | 2026-09-21 | fix(console): authenticate inference proxy | clean |
 | `ba341c6cac` | 2026-09-21 | fix(core): resolve npm package entrypoint to a file under Node (#50413) | clean |
+| `3a35b45db8` | 2026-09-22 | feat(openai): allow GPT-6 Sol and Luna with Codex (#50704) | clean |
+| `fe51b0b19a` | 2026-09-22 | fix(console): restrict legacy access to Black (#50716) | clean |
+| `610df0b566` | 2026-09-24 | fix(gemini): switch thinking default logic (#50841) | clean |
+| `82d4c89031` | 2026-09-23 | fix(opencode): redact credentials in debug config (#50956) | clean |
 ## Skipped as large
 
 | Upstream commit | Date | Subject | Size |
 | --- | --- | --- | --- |
 | `e059ac5918` | 2026-09-21 | feat: add Grok 4.7 to Zen and Go (#50288) | 239 lines, 39 files |
-
+| `1b4a6dbc65` | 2026-09-23 | feat(go): add Space Bunny promotion (#50572) | 281 lines, 61 files |
+| `1d6c3c0e29` | 2026-09-24 | feat(go): add GPT 6 Luna to Go pages (#50947) | 169 lines, 21 files |
 ## Skipped as already present
 
 | Upstream commit | Date | Subject | Reason |
 | --- | --- | --- | --- |
 | `f5ce4f881e` | 2026-09-21 | fix(core): break filesystem search import cycle (#50439) | Fork already has the `Entry`/`Match` import split; conflict is textual only. |
+
+## Skipped needing skipped prerequisite
+
+| Upstream commit | Date | Subject | Reason |
+| --- | --- | --- | --- |
+| `0027387dc5` | 2026-09-24 | fix(go): include DeepSeek V4 Flash in chart (#51032) | File is unchanged locally; context depends on skipped large Go-page commits. |
 
 ## Hard conflicts
 
