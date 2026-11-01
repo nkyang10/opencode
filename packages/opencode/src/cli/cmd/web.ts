@@ -1,4 +1,4 @@
-import { Effect } from "effect"
+import { Effect, Schedule, Scope } from "effect"
 import { UI } from "../ui"
 import { effectCmd } from "../effect-cmd"
 import { withNetworkOptions, resolveNetworkOptions, hasArg } from "../network"
@@ -6,7 +6,9 @@ import { Flag } from "@opencode-ai/core/flag/flag"
 import { Global } from "@opencode-ai/core/global"
 import { WebuiAutostart } from "../web-autostart"
 import { WebRestart } from "../web-restart"
+import { WebIdle } from "../web-idle"
 import { ServerLifecycle } from "@/server/lifecycle"
+import { ServerMaintenance } from "@/server/maintenance"
 import open from "open"
 import { networkInterfaces } from "os"
 
@@ -115,6 +117,28 @@ export const WebCommand = effectCmd({
     // Not the autostart branch above: a desktop-spawned `web --autostart` child is owned by the desktop,
     // so only this host — the one a deploy stops — is allowed to ask for its own replacement.
     WebRestart.installSuccessor()
+
+    // Idle reclaim: the fork's `web` server keeps Bun/JSC heap high-water that a GC never returns to the
+    // OS, so a fresh process is the only real reset. This is the default `opencode web` path, so the
+    // restart must not assume a supervisor: `WebRestart.install` already hands the port to a systemd unit
+    // or a detached child, and `restartable()` is false on a desktop/TUI sidecar (which owns its child),
+    // so the monitor is never armed there. The scope is never closed — the fiber is a process-lifetime
+    // daemon, interrupted only when the process exits.
+    if (ServerMaintenance.restartable()) {
+      const { Config } = yield* Effect.promise(() => import("@/config/config"))
+      const global = yield* Config.Service.use((cfg) => cfg.getGlobal())
+      const idleSeconds = global.server?.webui?.idleRestartSeconds ?? WebIdle.DefaultIdleSeconds
+      if (idleSeconds > 0) {
+        const scope = yield* Scope.make()
+        yield* WebIdle.check(idleSeconds)
+          .pipe(
+            Effect.repeat(Schedule.spaced(WebIdle.CheckInterval)),
+            Effect.forkIn(scope, { startImmediately: true }),
+            Effect.asVoid,
+          )
+      }
+    }
+
     UI.empty()
     UI.println(UI.logo("  "))
     UI.empty()

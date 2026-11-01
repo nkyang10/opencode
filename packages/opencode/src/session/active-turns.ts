@@ -18,13 +18,23 @@
 export * as ActiveTurns from "./active-turns"
 
 let count = 0
+let last = 0
 
 export const begin = () => {
   count += 1
+  last = Date.now()
 }
 
 export const end = () => {
   count = Math.max(0, count - 1)
+  last = Date.now()
 }
 
 export const active = () => count
+
+/**
+ * Wall-clock ms of the most recent turn start/end, or `0` when no turn has ever run in this process.
+ * The idle-restart monitor uses this as its "last activity" anchor: a server that has never run a turn
+ * reads `0` and is therefore never restarted, so a freshly restarted (still unused) server cannot thrash.
+ */
+export const lastActivity = () => last
