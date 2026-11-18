@@ -185,17 +185,17 @@ describe("ModelContextSize.resolveAlias", () => {
   })
 
   test("attributes the alias probe with a stable synthetic session", async () => {
-    let session: string | null = null
+    const sessions: (string | null)[] = []
     const server = Bun.serve({
       port: 0,
       fetch: (request) => {
-        session = request.headers.get("x-opencode-session")
+        sessions.push(request.headers.get("x-opencode-session"))
         return new Response("{}", { headers: { "x-zen-model": "space-bunny-free" } })
       },
     })
     try {
       expect(await ask(server.url.toString(), "opencode-go-default", { "space-bunny-free": 1048576 })).toBe(1048576)
-      expect(session).toBe("ses_alias_opencode-go-default")
+      expect(sessions[0]).toBe("ses_alias_opencode-go-default")
     } finally {
       server.stop(true)
     }
