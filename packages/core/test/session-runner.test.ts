@@ -1175,12 +1175,16 @@ describe("SessionRunnerLLM", () => {
       expect(requests).toHaveLength(2)
       expect(requests.map((request) => request.http?.headers)).toEqual([
         {
+          "x-opencode-session-id": sessionID,
           "x-session-affinity": sessionID,
           "X-Session-Id": sessionID,
+          "x-opencode-session": sessionID,
         },
         {
+          "x-opencode-session-id": sessionID,
           "x-session-affinity": sessionID,
           "X-Session-Id": sessionID,
+          "x-opencode-session": sessionID,
         },
       ])
       expect(userTexts(requests[0])[0]).toContain("## Objective")
@@ -2600,8 +2604,10 @@ describe("SessionRunnerLLM", () => {
       yield* session.resume(sessionID)
 
       expect(requests[0]?.http?.headers).toEqual({
+        "x-opencode-session-id": sessionID,
         "x-session-affinity": sessionID,
         "X-Session-Id": sessionID,
+        "x-opencode-session": sessionID,
       })
     }),
   )
@@ -2623,7 +2629,14 @@ describe("SessionRunnerLLM", () => {
       requests.length = 0
       yield* session.resume(sessionID)
 
-      expect(requests[0]?.http?.headers?.["x-parent-session-id"]).toBe(parentID)
+      expect(requests[0]?.http?.headers).toEqual({
+        "x-opencode-session-id": sessionID,
+        "x-opencode-parent-session-id": parentID,
+        "x-session-affinity": sessionID,
+        "X-Session-Id": sessionID,
+        "x-parent-session-id": parentID,
+        "x-opencode-session": parentID,
+      })
     }),
   )
 

@@ -174,7 +174,11 @@ const askAlias = (baseURL: string, headers: Record<string, string>, modelID: str
   Effect.gen(function* () {
     const http = HttpClient.filterStatusOk(yield* HttpClient.HttpClient)
     const request = yield* HttpClientRequest.post(`${baseURL.replace(/\/+$/, "")}/chat/completions`).pipe(
-      HttpClientRequest.setHeaders(headers),
+      // Gateways require session attribution even for an alias probe; keep one stable synthetic ID per alias.
+      HttpClientRequest.setHeaders({
+        "x-opencode-session": `ses_alias_${modelID.replace(/[^A-Za-z0-9_.-]/g, "_")}`,
+        ...headers,
+      }),
       HttpClientRequest.bodyJson({ model: modelID, messages: [{ role: "user", content: "hi" }], max_tokens: 1 }),
     )
     const response = yield* http.execute(request)
